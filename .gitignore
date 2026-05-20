@@ -1,0 +1,68 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj
+*.playground
+
+# Xcode
+## User-specific
+xcuserdata/
+*.xcuserstate
+*.xcuserstatev2
+*.xcscmblueprint
+*.xccheckout
+
+## Build artifacts
+DerivedData/
+build/
+*.o
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Other
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Core ML compiled models (committed sources only)
+*.mlmodelc/
+
+# Datasets and captured frames (project-specific outputs)
+datasets/
+captures/
+*.mov
+*.mp4
+!**/fixtures/*.mov
+!**/fixtures/*.mp4
+
+# Environment / secrets
+.env
+.env.local
+*.pem
+*.p12
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude / planning workspace artifacts
+.planning/cache/
+.claude/local/
