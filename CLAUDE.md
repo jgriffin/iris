@@ -1,3 +1,5 @@
+@~/.claude/skills/blockmaster/blockmaster.md
+
 # Iris
 
 Swift package providing the shared scaffolding for camera + ML vision apps on
