@@ -2,7 +2,7 @@
 
 parent: roadmap
 created: 2026-05-20 10:00
-modified: 2026-05-20 10:00
+modified: 2026-05-20 (survey closed; review-prior-projects opened)
 context: .blockmaster/blocks/260520-m0-explorations.md
 kind: milestone
 goal: Harvest reusable patterns from prior camera / capture / detection work in `~/dev/` and lock design defaults for M1 before code lands.
@@ -21,13 +21,14 @@ Branch is `main` for now — work is read-only research with no code changes to 
 
 ### Children
 
-- [survey-dev-folder](.blockmaster/blocks/260520-survey-dev-folder.md) — 🟡 sweep `~/dev/`, produce shortlist of candidates
-- [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — 📋 deep-read shortlisted candidates, extract patterns
+- [survey-dev-folder](.blockmaster/blocks/260520-survey-dev-folder.md) — ✅ closed; produced 5-project shortlist
+- [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — 🟡 in flight against the shortlist
 
 ### Pick-up-here
 
-`survey-dev-folder` 🟡 is the active leaf. Once it closes with a shortlist, `review-prior-projects` opens against that list. Close M0 when both children close; the Outcome should answer at minimum BRIEF open questions #1, #2, #5.
+`review-prior-projects` 🟡 is the active leaf, walking the 5 shortlisted projects. Close M0 when it closes; the Outcome should answer at minimum BRIEF open questions #1, #2, #5.
 
 ### Progress
 
 - 2026-05-20 10:00 — created; two child research blocks set up (survey 🟡, review 📋)
+- 2026-05-20 — `survey-dev-folder` closed with 5-project shortlist; `review-prior-projects` opened with concrete scope
