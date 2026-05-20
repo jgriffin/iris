@@ -22,14 +22,14 @@ Outcome: 5 per-project notes + `SYNTHESIS.md` (verdicts on `BRIEF.md`'s 6 M1 ope
 ### 🟡 [survey-swift-ecosystem](.blockmaster/blocks/260520-survey-swift-ecosystem.md) — Survey the wider Swift package ecosystem
 
 research · branch main · opened 2026-05-20 14:00
-Pick-up-here: Two-phase nested arc. `search-swift-packages` 🟡 in flight (two agents dispatched across SwiftPackageIndex / GitHub topics + curated lists / web); `deep-dive-swift-packages` 📋 queued, scope set by search outcome. Output lives in `explorations/swift-ecosystem/`. Outcome augments `explorations/prior-projects/RECOMMENDATIONS.md`.
+Pick-up-here: Search phase ✅ done (SHORTLIST.md landed, user pruned to 5). Deep-dive 🟡 in flight: 5 parallel agents reading Apple AVCam, NextLevel, MijickCamera, Kadr, PrivateFoundationModels. Close this parent when deep-dive closes and recommendations roll into `explorations/prior-projects/RECOMMENDATIONS.md`.
 
-#### 🟡 [search-swift-packages](.blockmaster/blocks/260520-search-swift-packages.md) — Scan SwiftPackageIndex, GitHub, curated lists, and the recent web for candidates
+#### ✅ [search-swift-packages](.blockmaster/blocks/260520-search-swift-packages.md) — Scan SwiftPackageIndex, GitHub, curated lists, and the recent web for candidates
 
-research · opened 2026-05-20 14:00
-Pick-up-here: Agents writing raw findings to `explorations/swift-ecosystem/raw/<agent>.md`. Synthesize into `SHORTLIST.md` when they return. Target 8–15 packages across the six Iris module areas. Don't re-surface the 5 already-read in-house projects.
+research · closed 2026-05-20
+Outcome: [`SHORTLIST.md`](../explorations/swift-ecosystem/SHORTLIST.md) with 5 Tier-1 deep-read packages (Apple AVCam, NextLevel, MijickCamera, Kadr, PrivateFoundationModels), Apple-framework verdicts, and 8 headline findings. Three Iris modules (Overlay/Tuning/Dataset) have *zero* SwiftPM competition; Apple has eaten the Detection-wrapper space via the iOS 18 Vision Swift API. Create ML JSON should join Q3 sidecar-format options. `Detector` is search-ambiguous in SPM-land.
 
-#### 📋 [deep-dive-swift-packages](.blockmaster/blocks/260520-deep-dive-swift-packages.md) — Deep-read shortlisted external packages
+#### 🟡 [deep-dive-swift-packages](.blockmaster/blocks/260520-deep-dive-swift-packages.md) — Deep-read shortlisted external packages
 
-research · queued 2026-05-20 14:00
-Opens after `search-swift-packages` closes with a shortlist. Same four lenses as `review-prior-projects` plus a public-API-shape lens; go/no-go recommendation per package (use / borrow / study-then-diverge / ignore).
+research · opened 2026-05-20
+Pick-up-here: 5 parallel deep-read agents writing `explorations/swift-ecosystem/<slug>.md` (same five-lens structure as the prior-art reads plus a public-API-shape lens and a Go/No-Go verdict per package). When all 5 land, append a "Recommendations from external packages" section to `explorations/prior-projects/RECOMMENDATIONS.md`.

@@ -34,10 +34,23 @@ Per package: a `path · stars · last activity · platforms` header, the five le
 - **Extension to** `explorations/prior-projects/RECOMMENDATIONS.md` — add a "Recommendations from external packages" section folding in the go/no-go decisions, the new patterns worth lifting, and any updates to the "Still open" list. Don't start a parallel recommendations doc; one is enough.
 - Outcome in this block file: the go/no-go table + a one-line BRIEF.md impact note.
 
+### Scope (from `SHORTLIST.md`, user-approved)
+
+Five packages, one per deep-read agent, all parallel:
+
+1. **Apple AVCam (SwiftUI sample)** — [developer.apple.com/documentation/avfoundation/avcam](https://developer.apple.com/documentation/avfoundation/avcam-building-a-camera-app) · Apple sample · iOS 18+ · *Priority: the `CaptureService` actor architecture — this is the canonical reference everyone implicitly converges on, including the Swift Forums Dec-2025 consensus thread.*
+2. **NextLevel** — [github.com/NextLevel/NextLevel](https://github.com/NextLevel/NextLevel) · 2,306★ · iOS 16+ Swift 6 · *Priority: Swift 6 migration scars in the CHANGELOG, per-frame `imageBuffer` hook, AsyncStream session events, Sendable boundaries on `CMSampleBuffer`.*
+3. **MijickCamera** — [github.com/Mijick/Camera](https://github.com/Mijick/Camera) · 622★ · iOS 14+ · *Priority: SwiftUI public-API shape — what's the preview view, what's hidden, where's the boundary Iris should keep (bottom half) vs drop (top half / built-in UI shell).*
+4. **Kadr** — [github.com/SteliyanH/kadr](https://github.com/SteliyanH/kadr) · 41★ · iOS 16+/macOS 13+/tvOS/visionOS Swift 6.0 · *Priority: architectural template. Multi-target SPM with `kadr-ui` / `kadr-captions` / `kadr-photos` companion packages — 1:1 mirror of Iris's shape, different domain (video composition). Read README + ARCHITECTURE + v0.10-v0.12 changelog for real Swift 6 strict-concurrency migration pain.*
+5. **PrivateFoundationModels** — [github.com/john-rocky/PrivateFoundationModels](https://github.com/john-rocky/PrivateFoundationModels) · 4★ · iOS 18+ · *Priority: the polymorphic backend pattern (iOS 26 → FM native, older OSes → CoreML/MLX). Directly informs M1 Q6 (Foundation Models as Detector backend vs separate Captioner). Small codebase — focus on API shape and backend dispatch.*
+
 ### Pick-up-here
 
-Awaiting `search-swift-packages` close. When the shortlist lands, open this block with concrete scope: list the packages from the shortlist, set per-package priority lens, dispatch parallel deep-read agents (one per package, same pattern as `review-prior-projects`).
+Dispatch five parallel deep-read agents. Each writes `explorations/swift-ecosystem/<slug>.md` using the same five-lens structure as `explorations/prior-projects/<slug>.md` reads (capture entry / Frame plumbing / detection async / overlay coords) plus a **public-API-shape lens** (since these are packages, not apps) and a **Go/No-Go verdict** at the end (use / borrow / study-then-diverge / ignore). Each note also includes opinions on Iris's remaining-open M1 questions (Q3 sidecar format, Q6 Foundation Models scope, Source-protocol unification, cache ownership, cancellation policy).
+
+When all 5 land, append a "Recommendations from external packages" section to `explorations/prior-projects/RECOMMENDATIONS.md` rolling up the go/no-go calls, new patterns, and any updates to the "Still open" list. Don't start a parallel recommendations doc.
 
 ### Progress
 
 - 2026-05-20 14:00 — created and queued
+- 2026-05-20 — opened with 5-package user-approved scope; deep-read agents dispatched in parallel

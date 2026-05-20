@@ -59,4 +59,31 @@ Dispatch two parallel general-purpose agents — one for structured indices (swi
 
 ### Progress
 
-- 2026-05-20 14:00 — created and opened with the parent; agents dispatched
+- 2026-05-20 14:00 — created and opened with the parent; two agents dispatched (SPI/GitHub + curated/web/Apple)
+- 2026-05-20 — both agents returned; raw findings at `explorations/swift-ecosystem/raw/{structured-indices,curated-web}.md`; synthesized into `explorations/swift-ecosystem/SHORTLIST.md` (7 Tier-1 deep-read candidates, 7 Tier-2 skim, 8 Tier-3 reference, plus Apple-framework verdicts and 7 key reference documents)
+- 2026-05-20 — user pruned to 5 Tier-1 (dropped swift-capture-kit + HaishinKit) and skipped Tier-2 entirely. Block closed.
+
+### Outcome
+
+Shortlist for `deep-dive-swift-packages`: [`explorations/swift-ecosystem/SHORTLIST.md`](../../explorations/swift-ecosystem/SHORTLIST.md). Five packages for deep-read:
+
+1. **Apple AVCam (SwiftUI sample)** — canonical `CaptureService` actor architecture
+2. **NextLevel** (2,306★, Swift 6) — battle-tested AVCapture wrapper, real Swift 6 migration scars
+3. **MijickCamera** (622★, SwiftUI-first) — only SwiftUI camera with zero data-races
+4. **Kadr** (41★, Swift 6.0) — architectural template (multi-target SPM with companion adapter packages, different domain)
+5. **PrivateFoundationModels** (4★) — only example treating FM/CoreML/MLX as interchangeable backends; informs M1 Q6
+
+**Eight headline findings** worth surfacing now (full discussion in SHORTLIST.md):
+
+1. `IrisOverlay`, `IrisTuning`, `IrisDataset` have **no SwiftPM competition** at all — Iris is the only player in those three slots by ecosystem necessity.
+2. Apple has eaten the Detection-wrapper space with the iOS 18 Vision Swift API rewrite; community wrappers are nearly gone.
+3. `AsyncStream<CMSampleBuffer>` per-frame is consensus but unpackaged — `IrisCapture`'s contribution is packaging, not architecture.
+4. Capture is the most contested slot (three live competitors) but none is a perfect fit.
+5. macOS camera packages don't exist beyond HaishinKit — validates "no macOS capture" decision.
+6. Foundation Models wrappers are immature but moving fast; no VLM captioning package yet — M6 is feasible *and* novel.
+7. **Create ML JSON should be added to Q3** sidecar-format options alongside COCO and YOLO.
+8. **"Detector" is search-ambiguous in SPM-land** (means QR/charset/jailbreak detection) — anchor in module docs.
+
+Apple-framework verdicts: depend directly on Vision (new Swift API), CoreML, AVFoundation, Foundation Models (M6); ignore VisionKit/DockKit for v1; reconsider Create ML JSON for `IrisDataset`.
+
+Key reference docs (not packages): Apple AVCam sample page, Swift Forums Dec-2025 thread on AVCaptureSession + Swift 6, WWDC24 #10163 (Vision Swift API rewrite), WWDC25 #286/#301/#259 (Foundation Models), machinethink.net "How to display Vision bounding boxes."
