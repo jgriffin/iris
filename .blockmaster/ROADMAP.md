@@ -2,6 +2,7 @@
 
 ## Milestones
 
+- **M0** explorations — Upfront research blocks (prior-art surveys, design spikes) before code starts — 🟡 active · 2026-05-20
 - **M1** capture-core — `IrisCapture` + `CameraPreview` SwiftUI view + frame stream (iOS only) — 📋 next
 - **M2** detection-overlay — `IrisDetection` with Vision adapter + `IrisOverlay` drawing boxes, end-to-end live demo on iOS — 📋 next
 - **M3** playback — `IrisPlayback` with same `Frame` stream interface; first macOS target lands here — 📋 next
