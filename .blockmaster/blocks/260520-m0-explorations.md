@@ -22,13 +22,16 @@ Branch is `main` for now — work is read-only research with no code changes to 
 ### Children
 
 - [survey-dev-folder](.blockmaster/blocks/260520-survey-dev-folder.md) — ✅ closed; produced 5-project shortlist
-- [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — 🟡 in flight against the shortlist
+- [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — ✅ closed; SYNTHESIS + RECOMMENDATIONS landed
+- [survey-swift-ecosystem](.blockmaster/blocks/260520-survey-swift-ecosystem.md) — 🟡 nested; scans the *external* package ecosystem to complement the in-house prior-art read
 
 ### Pick-up-here
 
-`review-prior-projects` 🟡 is the active leaf, walking the 5 shortlisted projects. Close M0 when it closes; the Outcome should answer at minimum BRIEF open questions #1, #2, #5.
+`survey-swift-ecosystem` 🟡 is the active leaf (with its own `search-swift-packages` 🟡 child). M0 closes when the ecosystem survey closes. Then BRIEF.md gets one refresh pass folding in resolved open questions + new patterns; then M1 capture can plan.
 
 ### Progress
 
 - 2026-05-20 10:00 — created; two child research blocks set up (survey 🟡, review 📋)
 - 2026-05-20 — `survey-dev-folder` closed with 5-project shortlist; `review-prior-projects` opened with concrete scope
+- 2026-05-20 — `review-prior-projects` closed; SYNTHESIS + RECOMMENDATIONS under `explorations/prior-projects/`
+- 2026-05-20 14:00 — third child `survey-swift-ecosystem` opened (with nested `search-swift-packages` / `deep-dive-swift-packages`) to scan the external package ecosystem before BRIEF.md is refreshed
