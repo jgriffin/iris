@@ -20,7 +20,7 @@ Outcome of *this* block (rolled up from its children) is a small set of go/no-go
 Two-phase, nested. Same survey→review rhythm as the prior-art arc.
 
 1. [search-swift-packages](.blockmaster/blocks/260520-search-swift-packages.md) — scan swiftpackageindex.com tags, GitHub topics, awesome-* lists, and the recent web for candidates across all six Iris module areas. Narrow to a shortlist with `path · last activity · stars · platforms · primary signal · one-line relevance` per entry. Land the shortlist in `explorations/swift-ecosystem/SHORTLIST.md`.
-2. [deep-dive-swift-packages](.blockmaster/blocks/260520-deep-dive-swift-packages.md) — for each shortlisted package, the same four-lens deep-read used in `review-prior-projects` (capture entrypoint / Frame plumbing / detection async / overlay coords) plus a public-API-shape lens (since these are packages, not apps). Per-package notes under `explorations/swift-ecosystem/<package-slug>.md`; synthesis extends `explorations/prior-projects/RECOMMENDATIONS.md` rather than starting a parallel doc.
+2. [deep-dive-swift-packages](.blockmaster/blocks/260520-deep-dive-swift-packages.md) — for each shortlisted package, the same four-lens deep-read used in `review-prior-projects` (capture entrypoint / Frame plumbing / detection async / overlay coords) plus a public-API-shape lens (since these are packages, not apps). Per-package notes under `explorations/swift-ecosystem/<package-slug>.md`; synthesis lands in `explorations/swift-ecosystem/RECOMMENDATIONS.md` (per-arc) with cross-cutting rollup at `explorations/RECOMMENDATIONS-PRIOR-ART.md`.
 
 ### Children
 
@@ -31,7 +31,7 @@ Two-phase, nested. Same survey→review rhythm as the prior-art arc.
 
 - `explorations/swift-ecosystem/SHORTLIST.md` (from child 1)
 - `explorations/swift-ecosystem/<package-slug>.md` per shortlisted package (from child 2)
-- Recommendations appended/edited into `explorations/prior-projects/RECOMMENDATIONS.md` and surfaced into BRIEF.md as needed
+- Recommendations: per-arc `explorations/swift-ecosystem/RECOMMENDATIONS.md` + cross-cutting rollup `explorations/RECOMMENDATIONS-PRIOR-ART.md`; both feed BRIEF.md updates as needed
 
 ### Pick-up-here
 
@@ -41,7 +41,7 @@ Two-phase, nested. Same survey→review rhythm as the prior-art arc.
 
 - 2026-05-20 14:00 — created and opened; two child research blocks set up (search 🟡, deep-dive 📋)
 - 2026-05-20 — `search-swift-packages` ✅ closed with SHORTLIST.md (5 Tier-1 packages after user prune); `deep-dive-swift-packages` opened with concrete scope
-- 2026-05-20 — `deep-dive-swift-packages` ✅ closed with 5 per-package notes + appended external-packages section to `explorations/prior-projects/RECOMMENDATIONS.md`. Parent closed.
+- 2026-05-20 — `deep-dive-swift-packages` ✅ closed with 5 per-package notes + `explorations/swift-ecosystem/RECOMMENDATIONS.md` + cross-cutting rollup at `explorations/RECOMMENDATIONS-PRIOR-ART.md`. Parent closed.
 
 ### Outcome
 

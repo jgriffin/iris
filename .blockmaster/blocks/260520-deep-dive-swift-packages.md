@@ -31,7 +31,8 @@ Per package: a `path · stars · last activity · platforms` header, the five le
 ### Output
 
 - Per-package notes under `explorations/swift-ecosystem/<package-slug>.md` (same shape as `explorations/prior-projects/<project-slug>.md`).
-- **Extension to** `explorations/prior-projects/RECOMMENDATIONS.md` — add a "Recommendations from external packages" section folding in the go/no-go decisions, the new patterns worth lifting, and any updates to the "Still open" list. Don't start a parallel recommendations doc; one is enough.
+- **Write** `explorations/swift-ecosystem/RECOMMENDATIONS.md` scoped to the ecosystem scan (per-package verdicts, ecosystem-specific patterns, anti-patterns, resolutions surfaced).
+- **Update** `explorations/RECOMMENDATIONS-PRIOR-ART.md` (cross-cutting rollup) with any new resolutions or open questions surfaced by these reads.
 - Outcome in this block file: the go/no-go table + a one-line BRIEF.md impact note.
 
 ### Scope (from `SHORTLIST.md`, user-approved)
@@ -48,13 +49,13 @@ Five packages, one per deep-read agent, all parallel:
 
 Dispatch five parallel deep-read agents. Each writes `explorations/swift-ecosystem/<slug>.md` using the same five-lens structure as `explorations/prior-projects/<slug>.md` reads (capture entry / Frame plumbing / detection async / overlay coords) plus a **public-API-shape lens** (since these are packages, not apps) and a **Go/No-Go verdict** at the end (use / borrow / study-then-diverge / ignore). Each note also includes opinions on Iris's remaining-open M1 questions (Q3 sidecar format, Q6 Foundation Models scope, Source-protocol unification, cache ownership, cancellation policy).
 
-When all 5 land, append a "Recommendations from external packages" section to `explorations/prior-projects/RECOMMENDATIONS.md` rolling up the go/no-go calls, new patterns, and any updates to the "Still open" list. Don't start a parallel recommendations doc.
+When all 5 land, write `explorations/swift-ecosystem/RECOMMENDATIONS.md` scoped to the ecosystem scan, and update `explorations/RECOMMENDATIONS-PRIOR-ART.md` as the cross-cutting rollup that synthesizes both arcs.
 
 ### Progress
 
 - 2026-05-20 14:00 — created and queued
 - 2026-05-20 — opened with 5-package user-approved scope; deep-read agents dispatched in parallel
-- 2026-05-20 — all 5 deep-reads landed under `explorations/swift-ecosystem/`; recommendations folded into `explorations/prior-projects/RECOMMENDATIONS.md` as a new "Recommendations from external packages" section. Block closed.
+- 2026-05-20 — all 5 deep-reads landed under `explorations/swift-ecosystem/`; recommendations split into per-arc scoped files (`explorations/swift-ecosystem/RECOMMENDATIONS.md`) with a cross-cutting rollup at `explorations/RECOMMENDATIONS-PRIOR-ART.md`. Block closed.
 
 ### Outcome
 
@@ -66,7 +67,7 @@ Deliverables under [`explorations/swift-ecosystem/`](../../explorations/swift-ec
 - [`kadr.md`](../../explorations/swift-ecosystem/kadr.md) — verdict: **Borrow structurally**. Companion-package split (separate repos) + `@unchecked Sendable + NSLock` invariant pattern + surface-then-engine tier rollout.
 - [`private-foundation-models.md`](../../explorations/swift-ecosystem/private-foundation-models.md) — verdict: **Study then diverge**. Direct pattern transfer to `Detector`/`Captioner` shape: concrete `AsyncThrowingStream`, additive default-impl multimodal, separate protocol per IO shape, `prewarm`/`availability`/`modelIdentifier`.
 
-**Resolutions to previously-open M1 questions** (full discussion in `RECOMMENDATIONS.md`):
+**Resolutions to previously-open M1 questions** (full discussion in `explorations/RECOMMENDATIONS-PRIOR-ART.md`):
 
 - **Q6 Foundation Models scope** — RESOLVED. Two protocols: `Detector` + `Captioner`. (PFM `EmbeddingBackend`/`LanguageModelBackend` precedent.)
 - **`Source`-protocol unification** — RESOLVED, do it. (AVCam's `OutputService`/`PreviewSource` + NextLevel's negative example.)
@@ -77,6 +78,6 @@ Deliverables under [`explorations/swift-ecosystem/`](../../explorations/swift-ec
 
 - **Package layout — single-package multi-target vs core-package + adapter-repos.** Kadr's lived experience says split into separate adapter repos (`iris-overlay`, `iris-dataset`, `iris-tuning` each their own package depending on a core `iris`). Current BRIEF.md plan is single-package multi-target. **Real architectural fork before M1 plans lock.**
 
-**New scope additions** rolled into `RECOMMENDATIONS.md` (beyond the 7 from in-house reads): `prewarm()` / `availability` / `modelIdentifier` on `Detector` from day one; `AVCaptureDevice.RotationCoordinator`-based rotation; interruption recovery (~100ms `AVAudioSession` settle delay); multi-subscriber `AsyncStream` broadcast (`[UUID: Continuation]`); photo-output dictionary key validation; per-frame back-pressure as the public contract; `MockDetector`/`MockCaptureSource`/`MockFrameSource` conformers for previews and tests.
+**New scope additions** rolled into `explorations/swift-ecosystem/RECOMMENDATIONS.md` (beyond the 7 from in-house reads): `prewarm()` / `availability` / `modelIdentifier` on `Detector` from day one; `AVCaptureDevice.RotationCoordinator`-based rotation; interruption recovery (~100ms `AVAudioSession` settle delay); multi-subscriber `AsyncStream` broadcast (`[UUID: Continuation]`); photo-output dictionary key validation; per-frame back-pressure as the public contract; `MockDetector`/`MockCaptureSource`/`MockFrameSource` conformers for previews and tests.
 
 Still open: Q3 sidecar format (COCO vs YOLO vs Create ML JSON); package layout fork (above); whether stateful detector conformers should be required to be `actor`s or just `Sendable`.
