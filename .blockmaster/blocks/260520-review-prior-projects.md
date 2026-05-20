@@ -23,7 +23,7 @@ For each shortlisted project:
 
 ### Output
 
-Per-project notes (likely under `notes/prior-projects/<slug>.md`, or inlined here if short), plus a synthesis section in the Outcome that answers M1 open design questions where the prior art has opinion to offer.
+Per-project notes (likely under `explorations/prior-projects/<slug>.md`, or inlined here if short), plus a synthesis section in the Outcome that answers M1 open design questions where the prior art has opinion to offer.
 
 ### Scope (from survey shortlist, priority order)
 
@@ -35,25 +35,25 @@ Per-project notes (likely under `notes/prior-projects/<slug>.md`, or inlined her
 
 ### Pick-up-here
 
-Walk the 5 shortlisted projects in priority order. Per project: capture-entrypoint shape, Frame plumbing (struct/class/`inout`, shared shape?), detection-path async pattern, overlay coord-space handling. Land 2–3 carry-forwards + 1–2 anti-patterns per project (likely under `notes/prior-projects/<slug>.md`). Synthesis section addresses M1 open design questions where prior art has opinion.
+Walk the 5 shortlisted projects in priority order. Per project: capture-entrypoint shape, Frame plumbing (struct/class/`inout`, shared shape?), detection-path async pattern, overlay coord-space handling. Land 2–3 carry-forwards + 1–2 anti-patterns per project (likely under `explorations/prior-projects/<slug>.md`). Synthesis section addresses M1 open design questions where prior art has opinion.
 
 ### Progress
 
 - 2026-05-20 10:00 — created and queued
 - 2026-05-20 — opened with concrete 5-project scope after `survey-dev-folder` closed
-- 2026-05-20 — five per-project notes written to `notes/prior-projects/<slug>.md` (parallel deep-reads); `SYNTHESIS.md` written addressing the six M1 open questions in `BRIEF.md` plus ten findings not currently on the M1 list
+- 2026-05-20 — five per-project notes written to `explorations/prior-projects/<slug>.md` (parallel deep-reads); `SYNTHESIS.md` written addressing the six M1 open questions in `BRIEF.md` plus ten findings not currently on the M1 list
 - 2026-05-20 — `RECOMMENDATIONS.md` written as the action-oriented distillation: principles, patterns with code pointers, M1-scope additions, interesting tangents, anti-patterns. Block closed.
 
 ### Outcome
 
-Deliverables under [`notes/prior-projects/`](../../notes/prior-projects/):
+Deliverables under [`explorations/prior-projects/`](../../explorations/prior-projects/):
 
-- [`ios-videoCapture.md`](../../notes/prior-projects/ios-videoCapture.md) — modular SPM mirror; module-boundary lens.
-- [`PRVisionSpike.md`](../../notes/prior-projects/PRVisionSpike.md) — actor-based detection + Vision→overlay seam.
-- [`yolo-ios-app.md`](../../notes/prior-projects/yolo-ios-app.md) — public Swift package craft.
-- [`sportvision.md`](../../notes/prior-projects/sportvision.md) — Swift 6 strict concurrency + iOS/macOS dual target.
-- [`action-and-vision.md`](../../notes/prior-projects/action-and-vision.md) — Apple-canonical pattern check.
-- [`SYNTHESIS.md`](../../notes/prior-projects/SYNTHESIS.md) — verdicts on the six M1 open questions, plus carry-forward patterns, anti-patterns to avoid, and new findings to add to M1 scope.
+- [`ios-videoCapture.md`](../../explorations/prior-projects/ios-videoCapture.md) — modular SPM mirror; module-boundary lens.
+- [`PRVisionSpike.md`](../../explorations/prior-projects/PRVisionSpike.md) — actor-based detection + Vision→overlay seam.
+- [`yolo-ios-app.md`](../../explorations/prior-projects/yolo-ios-app.md) — public Swift package craft.
+- [`sportvision.md`](../../explorations/prior-projects/sportvision.md) — Swift 6 strict concurrency + iOS/macOS dual target.
+- [`action-and-vision.md`](../../explorations/prior-projects/action-and-vision.md) — Apple-canonical pattern check.
+- [`SYNTHESIS.md`](../../explorations/prior-projects/SYNTHESIS.md) — verdicts on the six M1 open questions, plus carry-forward patterns, anti-patterns to avoid, and new findings to add to M1 scope.
 
 **Verdicts on the six M1 open questions in `BRIEF.md`** (full evidence in `SYNTHESIS.md`):
 
