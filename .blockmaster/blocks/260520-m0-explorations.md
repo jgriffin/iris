@@ -23,11 +23,11 @@ Branch is `main` for now — work is read-only research with no code changes to 
 
 - [survey-dev-folder](.blockmaster/blocks/260520-survey-dev-folder.md) — ✅ closed; produced 5-project shortlist
 - [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — ✅ closed; SYNTHESIS + RECOMMENDATIONS landed
-- [survey-swift-ecosystem](.blockmaster/blocks/260520-survey-swift-ecosystem.md) — 🟡 nested; scans the *external* package ecosystem to complement the in-house prior-art read
+- [survey-swift-ecosystem](.blockmaster/blocks/260520-survey-swift-ecosystem.md) — ✅ closed; SHORTLIST + 5 external-package deep reads landed; recommendations rolled into the project RECOMMENDATIONS
 
 ### Pick-up-here
 
-`survey-swift-ecosystem` 🟡 is the active leaf (with its own `search-swift-packages` 🟡 child). M0 closes when the ecosystem survey closes. Then BRIEF.md gets one refresh pass folding in resolved open questions + new patterns; then M1 capture can plan.
+All three children closed. M0 is ready to close. Recommended next move: optional `BRIEF.md` refresh pass folding in (a) the resolved open questions (Q1 async, Q2 `@CaptureActor`, Q4 hot-swap, Q5 macOS parity, Q6 Foundation Models), (b) the package-layout decision (single-package vs core + adapter-repos), and (c) the M1-scope additions surfaced in `RECOMMENDATIONS.md`. Then close M0 and move to M1 capture planning.
 
 ### Progress
 
@@ -35,3 +35,4 @@ Branch is `main` for now — work is read-only research with no code changes to 
 - 2026-05-20 — `survey-dev-folder` closed with 5-project shortlist; `review-prior-projects` opened with concrete scope
 - 2026-05-20 — `review-prior-projects` closed; SYNTHESIS + RECOMMENDATIONS under `explorations/prior-projects/`
 - 2026-05-20 14:00 — third child `survey-swift-ecosystem` opened (with nested `search-swift-packages` / `deep-dive-swift-packages`) to scan the external package ecosystem before BRIEF.md is refreshed
+- 2026-05-20 — `survey-swift-ecosystem` ✅ closed with SHORTLIST + 5 deep reads + appended recommendations. All three M0 children done.

@@ -40,3 +40,22 @@ Two-phase, nested. Same survey→review rhythm as the prior-art arc.
 ### Progress
 
 - 2026-05-20 14:00 — created and opened; two child research blocks set up (search 🟡, deep-dive 📋)
+- 2026-05-20 — `search-swift-packages` ✅ closed with SHORTLIST.md (5 Tier-1 packages after user prune); `deep-dive-swift-packages` opened with concrete scope
+- 2026-05-20 — `deep-dive-swift-packages` ✅ closed with 5 per-package notes + appended external-packages section to `explorations/prior-projects/RECOMMENDATIONS.md`. Parent closed.
+
+### Outcome
+
+Both children closed:
+
+- [search-swift-packages](.blockmaster/blocks/260520-search-swift-packages.md) ✅ — [`SHORTLIST.md`](../../explorations/swift-ecosystem/SHORTLIST.md) with 5 Tier-1 packages, Apple-framework verdicts, 8 headline findings (three Iris modules have zero SPM competition; Apple has eaten the Detection-wrapper space; AsyncStream-per-frame is consensus-but-unpackaged; etc.).
+- [deep-dive-swift-packages](.blockmaster/blocks/260520-deep-dive-swift-packages.md) ✅ — 5 per-package notes under `explorations/swift-ecosystem/`. Verdicts: AVCam **Borrow**, NextLevel **Study-then-diverge**, MijickCamera **Study-then-diverge**, Kadr **Borrow structurally**, PrivateFoundationModels **Study-then-diverge**. Findings folded into the project recommendations doc.
+
+**The combined arc (`survey-dev-folder` ✅ → `review-prior-projects` ✅ → `survey-swift-ecosystem` ✅) leaves M0 with:**
+
+- Verdicts on 4 of the original 6 BRIEF.md M1 open questions (Q1 async, Q2 `@CaptureActor`, Q4 hot-swap, Q5 macOS parity) from the in-house read
+- Additional resolutions on Q6 (Foundation Models) and three of the M1-from-the-prior-art "still open" items (Source-protocol unification, `DetectorCache` ownership, cancellation policy) from the external read
+- A new fork on package layout (single-package multi-target vs core + adapter-repos) to decide before M1 plans lock
+- One genuinely open question: Q3 sidecar format (COCO vs YOLO vs Create ML JSON) — decide on domain merits
+- 15+ concrete patterns to lift, ~10 anti-patterns to forbid, ~12 scope additions for M1 capture
+
+Ready for M0 close, optionally after a `BRIEF.md` refresh pass folding the resolutions in.

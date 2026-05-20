@@ -54,3 +54,29 @@ When all 5 land, append a "Recommendations from external packages" section to `e
 
 - 2026-05-20 14:00 — created and queued
 - 2026-05-20 — opened with 5-package user-approved scope; deep-read agents dispatched in parallel
+- 2026-05-20 — all 5 deep-reads landed under `explorations/swift-ecosystem/`; recommendations folded into `explorations/prior-projects/RECOMMENDATIONS.md` as a new "Recommendations from external packages" section. Block closed.
+
+### Outcome
+
+Deliverables under [`explorations/swift-ecosystem/`](../../explorations/swift-ecosystem/):
+
+- [`apple-avcam.md`](../../explorations/swift-ecosystem/apple-avcam.md) — verdict: **Borrow**. Mirror `CaptureService` line-for-line for session lifecycle + custom serial executor + `PreviewSource` indirection + `OutputService` extensibility.
+- [`nextlevel.md`](../../explorations/swift-ecosystem/nextlevel.md) — verdict: **Study then diverge**. Lift `SendablePixelBuffer` shape + recording-session/capture-class split; reject singleton + delegate-only API.
+- [`mijick-camera.md`](../../explorations/swift-ecosystem/mijick-camera.md) — verdict: **Study then diverge**. Borrow UIViewRepresentable preview + `@MainActor` Observable + baked-in permissions; drop the app-shell + `.startSession()` sentinel.
+- [`kadr.md`](../../explorations/swift-ecosystem/kadr.md) — verdict: **Borrow structurally**. Companion-package split (separate repos) + `@unchecked Sendable + NSLock` invariant pattern + surface-then-engine tier rollout.
+- [`private-foundation-models.md`](../../explorations/swift-ecosystem/private-foundation-models.md) — verdict: **Study then diverge**. Direct pattern transfer to `Detector`/`Captioner` shape: concrete `AsyncThrowingStream`, additive default-impl multimodal, separate protocol per IO shape, `prewarm`/`availability`/`modelIdentifier`.
+
+**Resolutions to previously-open M1 questions** (full discussion in `RECOMMENDATIONS.md`):
+
+- **Q6 Foundation Models scope** — RESOLVED. Two protocols: `Detector` + `Captioner`. (PFM `EmbeddingBackend`/`LanguageModelBackend` precedent.)
+- **`Source`-protocol unification** — RESOLVED, do it. (AVCam's `OutputService`/`PreviewSource` + NextLevel's negative example.)
+- **`DetectorCache` ownership** — Injectable instance per pipeline/session, not singleton. (PFM + AVCam `DeviceLookup` precedent.)
+- **Cancellation policy** — `AsyncStream` with `.bufferingNewest(1)` + consumer-owned task lifetime + structured `Task` parent/child. No per-frame `Task` spawn inside the framework.
+
+**New open question raised by the reads:**
+
+- **Package layout — single-package multi-target vs core-package + adapter-repos.** Kadr's lived experience says split into separate adapter repos (`iris-overlay`, `iris-dataset`, `iris-tuning` each their own package depending on a core `iris`). Current BRIEF.md plan is single-package multi-target. **Real architectural fork before M1 plans lock.**
+
+**New scope additions** rolled into `RECOMMENDATIONS.md` (beyond the 7 from in-house reads): `prewarm()` / `availability` / `modelIdentifier` on `Detector` from day one; `AVCaptureDevice.RotationCoordinator`-based rotation; interruption recovery (~100ms `AVAudioSession` settle delay); multi-subscriber `AsyncStream` broadcast (`[UUID: Continuation]`); photo-output dictionary key validation; per-frame back-pressure as the public contract; `MockDetector`/`MockCaptureSource`/`MockFrameSource` conformers for previews and tests.
+
+Still open: Q3 sidecar format (COCO vs YOLO vs Create ML JSON); package layout fork (above); whether stateful detector conformers should be required to be `actor`s or just `Sendable`.
