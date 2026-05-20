@@ -24,10 +24,12 @@ Branch is `main` for now — work is read-only research with no code changes to 
 - [survey-dev-folder](.blockmaster/blocks/260520-survey-dev-folder.md) — ✅ closed; produced 5-project shortlist
 - [review-prior-projects](.blockmaster/blocks/260520-review-prior-projects.md) — ✅ closed; SYNTHESIS + RECOMMENDATIONS landed
 - [survey-swift-ecosystem](.blockmaster/blocks/260520-survey-swift-ecosystem.md) — ✅ closed; SHORTLIST + 5 external-package deep reads landed; recommendations rolled into the project RECOMMENDATIONS
+- [runtime-pipeline-architecture](.blockmaster/blocks/260520-runtime-pipeline-architecture.md) — ✅ closed; 20 locked decisions, Q1 + Q2 resolved
+- [display-pipeline-architecture](.blockmaster/blocks/260520-display-pipeline-architecture.md) — 🟡 active; preview/player rendering, overlay layering, source fan-out, frame sync
 
 ### Pick-up-here
 
-All three children closed. M0 is ready to close. Recommended next move: optional `BRIEF.md` refresh pass folding in (a) the resolved open questions (Q1 async, Q2 `@CaptureActor`, Q4 hot-swap, Q5 macOS parity, Q6 Foundation Models), (b) the package-layout decision (single-package vs core + adapter-repos), and (c) the M1-scope additions surfaced in `RECOMMENDATIONS.md`. Then close M0 and move to M1 capture planning.
+Four children closed (three breadth + data-plane synthesis); fifth child [display-pipeline-architecture](.blockmaster/blocks/260520-display-pipeline-architecture.md) 🟡 now active to cover the rendering layer that `runtime-pipeline-architecture` deliberately deferred: how preview/player surfaces work, where overlays sit in the layer stack, how a single `Source` fans out to display + detection without violating `.bufferingNewest(1)`, and how detector results stay frame-synchronized with what's on screen. After it closes: M0 ready to close, optionally after `BRIEF.md` refresh pass folding in resolved questions (Q1 async, Q2 actor, Q4 hot-swap, Q5 macOS parity, Q6 Foundation Models) + display-side locked decisions + the package-layout decision (single-package vs core + adapter-repos) + the M1-scope additions surfaced across all five children. Then M1 capture planning.
 
 ### Progress
 
@@ -35,4 +37,7 @@ All three children closed. M0 is ready to close. Recommended next move: optional
 - 2026-05-20 — `survey-dev-folder` closed with 5-project shortlist; `review-prior-projects` opened with concrete scope
 - 2026-05-20 — `review-prior-projects` closed; SYNTHESIS + RECOMMENDATIONS under `explorations/prior-projects/`
 - 2026-05-20 14:00 — third child `survey-swift-ecosystem` opened (with nested `search-swift-packages` / `deep-dive-swift-packages`) to scan the external package ecosystem before BRIEF.md is refreshed
-- 2026-05-20 — `survey-swift-ecosystem` ✅ closed with SHORTLIST + 5 deep reads + appended recommendations. All three M0 children done.
+- 2026-05-20 — `survey-swift-ecosystem` ✅ closed with SHORTLIST + 5 deep reads + appended recommendations. All three breadth-pass children done.
+- 2026-05-20 16:00 — fourth child [runtime-pipeline-architecture](.blockmaster/blocks/260520-runtime-pipeline-architecture.md) opened (synthesis-focused; source-side performance + isolation; detector internals + dataset + sidecar out of scope)
+- 2026-05-20 — `runtime-pipeline-architecture` ✅ closed. Q1 locked (concrete `AsyncStream<Frame>` via `Source` protocol). Q2 locked (actor instance + custom serial executor, no `@globalActor`). 20 decisions + 11 M1 additions + 12 anti-patterns + 6 deferred. Three BRIEF.md surprises to surface at refresh.
+- 2026-05-20 — fifth child [display-pipeline-architecture](.blockmaster/blocks/260520-display-pipeline-architecture.md) opened to cover the rendering / preview / overlay / frame-sync layer.
