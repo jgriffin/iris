@@ -13,9 +13,12 @@ team ID out of git:
 cp Apps/IrisDemo-iOS/Local.xcconfig.template Apps/IrisDemo-iOS/Local.xcconfig
 ```
 
-Then edit `Local.xcconfig` and replace `YOUR_TEAM_ID_HERE` with your real
-team ID. Find it in Xcode → Settings → Accounts → select your Apple ID →
-"Team ID" column (10 alphanumeric characters).
+Then edit `Local.xcconfig` and fill in two values:
+
+- `DEVELOPMENT_TEAM` — find in Xcode → Settings → Accounts → select your
+  Apple ID → "Team ID" column (10 alphanumeric characters).
+- `PRODUCT_BUNDLE_IDENTIFIER` — a reverse-DNS bundle ID rooted at a domain
+  you own or your team namespace; must be unique inside your team.
 
 `Local.xcconfig` is gitignored. `Shared.xcconfig` (committed) does
 `#include? "Local.xcconfig"` so build settings layer cleanly.

@@ -15,3 +15,8 @@
 // rebuild pbxproj from the (clean) project.yml.
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE
+
+// Reverse-DNS bundle ID rooted at a domain you own (or your team's namespace
+// inside developer.apple.com). Must be unique across all apps signed under
+// your team. Example: com.example.iris-demo-ios
+PRODUCT_BUNDLE_IDENTIFIER = your.reverse.dns.iris.demo

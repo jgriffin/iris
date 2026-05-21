@@ -5,8 +5,8 @@
 //     cp Local.xcconfig.template Local.xcconfig
 // then fill in your team ID. See Local.xcconfig.template for details.
 
-// Bundle / device
-PRODUCT_BUNDLE_IDENTIFIER = com.example.iris-demo-ios
+// Device family is shared; PRODUCT_BUNDLE_IDENTIFIER lives in Local.xcconfig
+// because the reverse-DNS prefix is tied to your developer account.
 TARGETED_DEVICE_FAMILY = 1,2
 
 // Info.plist
