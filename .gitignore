@@ -29,6 +29,10 @@ build/
 *.dSYM.zip
 *.dSYM
 
+## Per-developer signing — kept out of git via xcconfig override.
+## Shared.xcconfig (committed) does `#include? "Local.xcconfig"`.
+Apps/**/Local.xcconfig
+
 ## Other
 *.moved-aside
 *.pbxuser

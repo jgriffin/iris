@@ -4,6 +4,27 @@ M1 smoke-test app: live `CameraPreview` + a `for await` loop logging frame
 timestamps to `os.Logger`. The whole app is two source files (this folder)
 plus the `Iris` package as a local-path SwiftPM dependency.
 
+## One-time setup (per clone)
+
+The project uses an xcconfig override pattern to keep your Apple Developer
+team ID out of git:
+
+```bash
+cp Apps/IrisDemo-iOS/Local.xcconfig.template Apps/IrisDemo-iOS/Local.xcconfig
+```
+
+Then edit `Local.xcconfig` and replace `YOUR_TEAM_ID_HERE` with your real
+team ID. Find it in Xcode → Settings → Accounts → select your Apple ID →
+"Team ID" column (10 alphanumeric characters).
+
+`Local.xcconfig` is gitignored. `Shared.xcconfig` (committed) does
+`#include? "Local.xcconfig"` so build settings layer cleanly.
+
+**Don't edit the Signing & Capabilities tab in Xcode** — those edits write
+`DEVELOPMENT_TEAM` into `pbxproj` which IS committed. Edit `Local.xcconfig`
+instead. If you slip and the team ID lands in `pbxproj`, run
+`cd Apps && xcodegen generate` to rebuild it from the clean `project.yml`.
+
 ## Run
 
 1. Open [`../IrisDemo-iOS.xcodeproj`](../IrisDemo-iOS.xcodeproj) in Xcode 26+.

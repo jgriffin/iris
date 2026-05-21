@@ -18,14 +18,6 @@ options:
     generateEmptyDirectories: true
     minimumXcodeGenVersion: "2.45"
 
-settings:
-    base:
-        SWIFT_VERSION: "6.0"
-        SWIFT_STRICT_CONCURRENCY: complete
-        ENABLE_USER_SCRIPT_SANDBOXING: YES
-        CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
-
 packages:
     Iris:
         path: ..
@@ -40,13 +32,14 @@ targets:
               excludes:
                   - "**/*.md"
                   - "Info.plist"
+                  - "**/*.xcconfig"
+                  - "**/*.xcconfig.template"
+        # All build settings live in Shared.xcconfig (committed).
+        # DEVELOPMENT_TEAM is layered in from Local.xcconfig (gitignored)
+        # via `#include?` inside Shared.xcconfig.
+        configFiles:
+            Debug: IrisDemo-iOS/Shared.xcconfig
+            Release: IrisDemo-iOS/Shared.xcconfig
         dependencies:
             - package: Iris
               product: Iris
-        settings:
-            base:
-                PRODUCT_BUNDLE_IDENTIFIER: com.example.iris-demo-ios
-                INFOPLIST_FILE: IrisDemo-iOS/Info.plist
-                TARGETED_DEVICE_FAMILY: "1,2"
-                GENERATE_INFOPLIST_FILE: NO
-                ENABLE_PREVIEWS: YES

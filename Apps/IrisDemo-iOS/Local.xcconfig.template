@@ -1,0 +1,17 @@
+// Per-developer build settings. NOT committed to git.
+//
+// Bootstrap on a fresh clone:
+//     cp Local.xcconfig.template Local.xcconfig
+// then edit Local.xcconfig (NOT this template) and fill in your team ID.
+//
+// Find your team ID in Xcode → Settings → Accounts → select your Apple ID
+// → look at the team row's "Team ID" column. It's a 10-character
+// alphanumeric string (e.g. ABCDE12345).
+//
+// IMPORTANT: do not edit the Signing & Capabilities tab in Xcode — those
+// edits write DEVELOPMENT_TEAM into pbxproj which IS committed. Edit
+// Local.xcconfig instead. If you accidentally touch the Signing UI and
+// the team ID lands in pbxproj, run `cd Apps && xcodegen generate` to
+// rebuild pbxproj from the (clean) project.yml.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE
