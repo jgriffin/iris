@@ -18,12 +18,11 @@ final class AVCapturePreviewSource: PreviewSource, @unchecked Sendable {
         self.session = session
     }
 
-    func connect(to target: PreviewTarget) {
-        // Hop to MainActor so the AVCaptureVideoPreviewLayer assignment
-        // happens on the main thread (CALayer requirement).
-        Task { @MainActor in
-            target.setSession(session)
-        }
+    @MainActor func connect(to target: PreviewTarget) {
+        // Caller is already on MainActor (per the protocol contract); hand
+        // the session directly. The CALayer assignment inside setSession
+        // runs on the main thread, as required.
+        target.setSession(session)
     }
 }
 

@@ -38,10 +38,10 @@ struct ContentView: View {
             }
             await MainActor.run { session = new }
             for await frame in new.frames {
+                let width = Int(frame.dimensions.width)
+                let height = Int(frame.dimensions.height)
                 Logger.demo.info(
-                    "frame ts=\(frame.seconds, privacy: .public) "
-                    + "size=\(Int(frame.dimensions.width), privacy: .public)"
-                    + "x\(Int(frame.dimensions.height), privacy: .public)"
+                    "frame ts=\(frame.seconds, privacy: .public) size=\(width, privacy: .public)x\(height, privacy: .public)"
                 )
             }
         }

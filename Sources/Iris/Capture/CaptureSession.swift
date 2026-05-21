@@ -33,7 +33,7 @@ public actor CaptureSession: @preconcurrency Source {
     // MARK: - Public surface
 
     public nonisolated let previewSource: PreviewSource
-    public let frames: AsyncStream<Frame>
+    public nonisolated let frames: AsyncStream<Frame>
     public private(set) var state: SourceState = .idle
 
     // MARK: - Private storage

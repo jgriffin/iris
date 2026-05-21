@@ -40,7 +40,7 @@ public struct CameraPreview: UIViewRepresentable {
 /// enough to validate layout without spinning up a camera.
 public final class MockPreviewSource: PreviewSource, @unchecked Sendable {
     public init() {}
-    public func connect(to target: PreviewTarget) {
+    @MainActor public func connect(to target: PreviewTarget) {
         // No-op.
     }
 }

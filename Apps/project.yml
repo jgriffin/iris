@@ -1,0 +1,52 @@
+# xcodegen spec for Iris demo apps.
+#
+# Regenerate the .xcodeproj(s) after changing this file:
+#     cd Apps && xcodegen generate
+#
+# The generated IrisDemo-iOS.xcodeproj is checked in alongside this file so
+# contributors don't need xcodegen installed just to open + run the demo.
+# Install only when editing project settings: `brew install xcodegen`.
+
+name: IrisDemo-iOS
+
+options:
+    deploymentTarget:
+        iOS: "26.0"
+    bundleIdPrefix: com.example.iris
+    developmentLanguage: en
+    createIntermediateGroups: true
+    generateEmptyDirectories: true
+    minimumXcodeGenVersion: "2.45"
+
+settings:
+    base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+
+packages:
+    Iris:
+        path: ..
+
+targets:
+    IrisDemo-iOS:
+        type: application
+        platform: iOS
+        deploymentTarget: "26.0"
+        sources:
+            - path: IrisDemo-iOS
+              excludes:
+                  - "**/*.md"
+                  - "Info.plist"
+        dependencies:
+            - package: Iris
+              product: Iris
+        settings:
+            base:
+                PRODUCT_BUNDLE_IDENTIFIER: com.example.iris-demo-ios
+                INFOPLIST_FILE: IrisDemo-iOS/Info.plist
+                TARGETED_DEVICE_FAMILY: "1,2"
+                GENERATE_INFOPLIST_FILE: NO
+                ENABLE_PREVIEWS: YES
