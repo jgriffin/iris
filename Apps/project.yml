@@ -12,11 +12,14 @@ name: IrisDemo-iOS
 options:
     deploymentTarget:
         iOS: "26.0"
-    bundleIdPrefix: com.example.iris
     developmentLanguage: en
     createIntermediateGroups: true
     generateEmptyDirectories: true
     minimumXcodeGenVersion: "2.45"
+    # No bundleIdPrefix — PRODUCT_BUNDLE_IDENTIFIER comes from Local.xcconfig
+    # (gitignored, per-developer). If bundleIdPrefix were set, xcodegen would
+    # auto-fill PRODUCT_BUNDLE_IDENTIFIER as an inline target build setting,
+    # which would override the xcconfig value at a higher precedence level.
 
 packages:
     Iris:
