@@ -2,7 +2,7 @@
 
 parent: [m0-explorations](.blockmaster/blocks/260520-m0-explorations.md)
 created: 2026-05-20 18:00
-modified: 2026-05-20 18:00
+modified: 2026-05-20 19:30 (closed)
 context: .blockmaster/blocks/260520-project-shape-and-tooling.md
 kind: exploration
 goal: Lock the overall shape of the Iris repo before M1 code lands — Swift package structure, where iOS + macOS test apps live, and the build/dev tooling chain.
@@ -63,9 +63,9 @@ This block resolves the project-shape questions before M1 starts touching `Sourc
 
 ### Approach
 
-**Open question — pending user input on methodology.** This block is opened scoped but **no researcher dispatched yet**. The two sibling blocks used a single focused researcher returning SYNTHESIS + RECOMMENDATIONS — that pattern is available, but project-shape is more opinion-driven and less doc-citation-driven, so the user may prefer to walk through the decisions interactively first.
+Methodology settled at close: **interactive walkthrough** (user picked over researcher dispatch). Four headline questions landed sequentially with 2–4 options each; user picked one per question; a second-pass discussion revisited Q1 (package shape) and revised the verdict from umbrella+six-targets to single-target.
 
-Likely shape either way: deliverables under `explorations/project-shape-and-tooling/` (`SYNTHESIS.md` + `RECOMMENDATIONS.md`), in the same convention as the prior two architecture blocks.
+Deliverables landed at `explorations/project-shape-and-tooling/` (`SYNTHESIS.md` + `RECOMMENDATIONS.md`), in the same convention as the prior two architecture blocks.
 
 ### Pick-up-here
 
@@ -74,3 +74,17 @@ Block opened with concrete scope. **No researcher dispatched** — per user dire
 ### Progress
 
 - 2026-05-20 18:00 — created and opened with scope; researcher dispatch deferred per user direction.
+- 2026-05-20 — closed. Interactive walkthrough landed four verdicts (single-target package shape, Apps/ Xcode projects, standard tooling baseline, LFS fixtures). Q1 revised second-pass from umbrella+six-targets to single-target after the `Frame` ownership problem and walkback-cheap argument surfaced. `BRIEF.md` + `CLAUDE.md` refreshed in the same pass to drop the "six modules, each a SwiftPM target" framing.
+
+### Outcome
+
+`SYNTHESIS.md` + `RECOMMENDATIONS.md` under [`explorations/project-shape-and-tooling/`](../../explorations/project-shape-and-tooling/) capturing four locked verdicts:
+
+- **Package shape:** one package, one product, one `Iris` target. Components organized as folders under `Sources/Iris/` (`Capture/`, `Playback/`, `Detection/`, `Overlay/`) with `Frame.swift`/`Detector.swift`/`Detection.swift` at root. Capture sources gated `#if os(iOS)` at the file level. **Revised second-pass** from a first-pass umbrella+six-targets verdict after the `Frame` ownership problem and walkback-cheap argument surfaced. `Tuning` (M4) and `Dataset` (M5) deferred — not scaffolded at M1.
+- **Test apps:** `Apps/IrisDemo-iOS.xcodeproj` + `Apps/IrisDemo-macOS.xcodeproj` — real Xcode projects (for Info.plist control of `NSCameraUsageDescription`), local-path SwiftPM deps on Iris.
+- **Tooling chain:** swift-format + SwiftLint + GitHub Actions CI + DocC + **native git pre-commit hook** in `.githooks/` (no Python framework dependency; no tests in hook — fast checks only). Codecov / xcbeautify / periphery considered and deferred.
+- **Fixtures:** **Git LFS from day one** in `Tests/IrisTests/Fixtures/`, tracked via `.gitattributes`. Carve-out preserves the existing `*.mov`/`*.mp4`/`*.mlmodelc/` gitignore policy at top level.
+
+`BRIEF.md` and `CLAUDE.md` updated in the same pass: "six modules, each a SwiftPM target" framing replaced with single-target + folder layout; tests note updated to `Tests/IrisTests/`; `#if os(iOS)` working-norm softened to permit whole-subsystem platform gating.
+
+Methodology: interactive Q&A walkthrough between user and Claude (no researcher dispatched). Two-pass discussion on Q1 surfaced the single-target revision.

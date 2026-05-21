@@ -69,6 +69,14 @@ projects start with the boring parts done.
 
 ## High-level components
 
+Iris ships as a **single SwiftPM target** (`Iris`) with one umbrella library
+product. The components below are folders under `Sources/Iris/` — conceptual
+responsibilities, not separate modules. They share `Frame`, `Detector`, and
+coordinate-space conventions and co-evolve through M1–M3. `Tuning` (M4) and
+`Dataset` (M5) are scaffolded only when the work begins. See
+[`explorations/project-shape-and-tooling/RECOMMENDATIONS.md`](./explorations/project-shape-and-tooling/RECOMMENDATIONS.md)
+for the locked verdicts on package shape, test apps, tooling, and fixtures.
+
 ### 1. `IrisCapture` — camera session *(iOS only)*
 
 - AVCaptureSession wrapper; device, format, orientation handling.

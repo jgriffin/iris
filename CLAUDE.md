@@ -24,16 +24,25 @@ milestone path.** This file is the operating contract for working in the repo.
 
 ## Architecture at a glance
 
-Six modules, each a SwiftPM target:
+Iris ships as a **single SwiftPM target** (`Iris`) with one umbrella library
+product. The components below are folders under `Sources/Iris/` — conceptual
+responsibilities that share `Frame`, `Detector`, and coordinate-space
+conventions. Splitting into separate targets later is a non-breaking change
+if module boundaries start mattering; for now, folder organization plus
+discipline is the right level of separation. Locked verdict:
+[`explorations/project-shape-and-tooling/RECOMMENDATIONS.md`](./explorations/project-shape-and-tooling/RECOMMENDATIONS.md).
 
-| Module           | Platforms     | Role                                                         |
-| ---------------- | ------------- | ------------------------------------------------------------ |
-| `IrisCapture`    | iOS only      | AVCaptureSession + `CameraPreview` + `AsyncStream<Frame>`    |
-| `IrisPlayback`   | iOS + macOS   | AVAssetReader-backed `Frame` stream, scrubber, frame-step    |
-| `IrisDetection`  | iOS + macOS   | `Detector` protocol; Vision / Core ML / Foundation Models    |
-| `IrisOverlay`    | iOS + macOS   | SwiftUI views drawing `[Detection]`; coordinate-space mgmt   |
-| `IrisTuning`     | iOS + macOS   | `@Observable` filter/threshold controls, "what-if" mode      |
-| `IrisDataset`    | iOS + macOS   | One-tap frame + COCO-JSON sidecar to a pluggable sink        |
+| Folder                    | Platforms    | Role                                                         |
+| ------------------------- | ------------ | ------------------------------------------------------------ |
+| `Sources/Iris/Capture/`   | iOS only*    | AVCaptureSession + `CameraPreview` + `AsyncStream<Frame>`    |
+| `Sources/Iris/Playback/`  | iOS + macOS  | AVAssetReader-backed `Frame` stream, scrubber, frame-step    |
+| `Sources/Iris/Detection/` | iOS + macOS  | `Detector` protocol; Vision / Core ML / Foundation Models    |
+| `Sources/Iris/Overlay/`   | iOS + macOS  | SwiftUI views drawing `[Detection]`; coordinate-space mgmt   |
+| `Sources/Iris/Tuning/`    | iOS + macOS  | `@Observable` filter/threshold controls — **deferred to M4** |
+| `Sources/Iris/Dataset/`   | iOS + macOS  | One-tap frame + COCO-JSON sidecar — **deferred to M5**       |
+
+\*Capture source files are gated by `#if os(iOS)` at the file level. On
+macOS, `import Iris` succeeds; Capture types are simply not visible.
 
 **Cross-cutting invariants:**
 
@@ -48,9 +57,12 @@ Six modules, each a SwiftPM target:
 
 - **Public API is SwiftUI-shaped.** If a public type forces a consumer to import
   UIKit or AVFoundation, that's a smell — wrap it.
-- **Tests live alongside their target** in `Tests/<Module>Tests/`. Use real
-  fixtures (sample video clips, sample `MLModel`s) in
-  `Tests/<Module>Tests/Fixtures/`, not mocks, wherever it's tractable.
+- **Tests live in** `Tests/IrisTests/` with subfolders mirroring
+  `Sources/Iris/` (e.g., `Tests/IrisTests/Capture/`,
+  `Tests/IrisTests/Detection/`). Use real fixtures (sample video clips,
+  sample `MLModel`s) in `Tests/IrisTests/Fixtures/`, not mocks, wherever
+  it's tractable. Fixtures are tracked via Git LFS — `.gitattributes`
+  declares the extensions; run `git lfs install` once on clone.
 - **Static visual previews** for any view that draws detections — small HTML or
   SwiftUI `#Preview` cases with known detection inputs, so visual regressions
   show up without running a full demo app. See the user's "favorite pattern"
@@ -87,8 +99,10 @@ per-milestone detail.
 
 - New code should compile under Swift 6 strict concurrency on first try. If
   it doesn't, the design is the bug.
-- Prefer protocol + adapter over conditional compilation for
-  iOS-vs-macOS divergence. `#if os(iOS)` is fine for *implementation* details
-  inside a module, not for public API shape.
+- Prefer protocol + adapter over conditional compilation when divergence
+  is within a feature shared by both platforms. `#if os(iOS)` is the right
+  tool for **whole-subsystem** platform gating (e.g., the entire
+  `Sources/Iris/Capture/` folder is iOS-only); it should not be used to
+  fork the API shape of a single type that exists on both platforms.
 - When adding a new detector or sink, add a fixture-based test in the same
   commit. The point of Iris is reuse — untested adapters defeat that.
