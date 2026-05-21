@@ -12,7 +12,7 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             if let session {
-                CameraPreview(source: session.previewSource)
+                CameraPreview(source: session.previewSource, videoGravity: .resizeAspectFill)
                     .ignoresSafeArea()
             } else if let errorText {
                 VStack(spacing: 12) {

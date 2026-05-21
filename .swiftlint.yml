@@ -11,6 +11,7 @@ disabled_rules:
   - todo                    # TODO M1+ / TODO M2+ markers are intentional forward-pointers
   - static_over_final_class # wrong for `override class var layerClass` (UIView pattern)
   - opening_brace           # multi-line conformance lists with brace on new line read cleaner
+  - function_body_length    # 50-line default is overly tight for coherent config functions
 
 identifier_name:
   min_length:

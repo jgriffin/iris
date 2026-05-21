@@ -27,9 +27,28 @@ public final class PreviewView: UIView, PreviewTarget {
         layer as! AVCaptureVideoPreviewLayer
     }
 
+    private var rotationTask: Task<Void, Never>?
+
     public func setSession(_ session: AVCaptureSession) {
         previewLayer.session = session
-        previewLayer.videoGravity = .resizeAspect
+        // videoGravity is set by `CameraPreview` after `connect(to:)` so it
+        // can be configured by consumers.
+    }
+
+    /// Subscribe to a stream of preview rotation angles (in degrees) and
+    /// apply each to the preview layer's connection on MainActor. Replaces
+    /// any prior subscription.
+    @MainActor func observePreviewAngles(_ stream: AsyncStream<CGFloat>) {
+        rotationTask?.cancel()
+        rotationTask = Task { @MainActor [weak self] in
+            for await angle in stream {
+                self?.previewLayer.connection?.videoRotationAngle = angle
+            }
+        }
+    }
+
+    deinit {
+        rotationTask?.cancel()
     }
 }
 

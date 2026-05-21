@@ -43,6 +43,8 @@ public actor CaptureSession: @preconcurrency Source {
     private let videoOutput = AVCaptureVideoDataOutput()
     private var router: SampleBufferRouter?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var captureRotationObservation: NSKeyValueObservation?
+    private var previewRotationObservation: NSKeyValueObservation?
     private let continuation: AsyncStream<Frame>.Continuation
     private let logger = Logger(subsystem: "iris.capture", category: "session")
 
@@ -108,6 +110,13 @@ public actor CaptureSession: @preconcurrency Source {
     }
 
     public func invalidate() async {
+        captureRotationObservation?.invalidate()
+        captureRotationObservation = nil
+        previewRotationObservation?.invalidate()
+        previewRotationObservation = nil
+        if let avSource = previewSource as? AVCapturePreviewSource {
+            avSource.finishAngleStream()
+        }
         continuation.finish()
         if session.isRunning {
             session.stopRunning()
@@ -177,21 +186,46 @@ public actor CaptureSession: @preconcurrency Source {
         }
         session.addOutput(videoOutput)
 
-        // Rotation: observe `videoRotationAngleForHorizonLevelCapture` (the
-        // angle Vision wants) and apply it to the data-output connection.
-        // We don't have a preview-layer reference here; the preview path's
-        // own connection rotation is handled by AVF when the layer attaches
-        // the session in `PreviewView.setSession`. Per-camera-side preview
-        // rotation tuning is deferred — see runtime-pipeline-architecture
-        // §"Open items deferred".
+        // Rotation: own one `RotationCoordinator` and route its two angles
+        // independently per display-pipeline-architecture decision 18 —
+        //   videoRotationAngleForHorizonLevelCapture  → data-output connection
+        //   videoRotationAngleForHorizonLevelPreview  → preview-layer connection
+        //                                              (via PreviewSource.previewAngles)
         let coordinator = AVCaptureDevice.RotationCoordinator(
             device: device,
             previewLayer: nil
         )
         self.rotationCoordinator = coordinator
+
+        // Apply initial angles.
         if let dataConnection = videoOutput.connection(with: .video) {
             dataConnection.videoRotationAngle = coordinator.videoRotationAngleForHorizonLevelCapture
             dataConnection.isVideoMirrored = false
+        }
+        if let avSource = previewSource as? AVCapturePreviewSource {
+            avSource.publishPreviewAngle(coordinator.videoRotationAngleForHorizonLevelPreview)
+        }
+
+        // Observe ongoing changes. KVO callbacks arrive on an arbitrary
+        // queue — for the capture side, hop back to the actor's executor
+        // before mutating the connection; for the preview side, just yield
+        // into the AsyncStream (the continuation is thread-safe).
+        captureRotationObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture,
+            options: [.new]
+        ) { [weak self] _, change in
+            guard let newAngle = change.newValue else { return }
+            Task { [weak self] in
+                await self?.applyCaptureAngle(newAngle)
+            }
+        }
+        previewRotationObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelPreview,
+            options: [.new]
+        ) { [weak self] _, change in
+            guard let newAngle = change.newValue else { return }
+            guard let avSource = self?.previewSource as? AVCapturePreviewSource else { return }
+            avSource.publishPreviewAngle(newAngle)
         }
 
         // TODO M1+: interruption recovery wiring. The AVF notifications
@@ -206,6 +240,13 @@ public actor CaptureSession: @preconcurrency Source {
 
     private func currentRotation() -> CGFloat {
         rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 0
+    }
+
+    /// Apply a new capture-side rotation angle to the data-output connection.
+    /// Called from a `Task` spawned by the `RotationCoordinator` KVO observer,
+    /// so the connection mutation happens on the actor's serial executor.
+    private func applyCaptureAngle(_ angle: CGFloat) {
+        videoOutput.connection(with: .video)?.videoRotationAngle = angle
     }
 
     private static func mapPosition(_ position: AVCaptureDevice.Position) -> CameraDevice.Position {
