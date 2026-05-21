@@ -73,9 +73,7 @@ Iris ships as a **single SwiftPM target** (`Iris`) with one umbrella library
 product. The components below are folders under `Sources/Iris/` — conceptual
 responsibilities, not separate modules. They share `Frame`, `Detector`, and
 coordinate-space conventions and co-evolve through M1–M3. `Tuning` (M4) and
-`Dataset` (M5) are scaffolded only when the work begins. See
-[`explorations/project-shape-and-tooling/RECOMMENDATIONS.md`](./explorations/project-shape-and-tooling/RECOMMENDATIONS.md)
-for the locked verdicts on package shape, test apps, tooling, and fixtures.
+`Dataset` (M5) are scaffolded only when the work begins.
 
 ### 1. `IrisCapture` — camera session *(iOS only)*
 
@@ -134,36 +132,16 @@ protocol Detector: Sendable {
 - Folder layout compatible with common training formats — COCO-style JSON as
   canonical, exporters convert to YOLO / Pascal VOC.
 
-## Architecture references
+## Architecture
 
-Pre-code M0 explorations lock the runtime architecture for the components above:
-
-- **Frame pipeline (data plane)** — [`explorations/runtime-pipeline-architecture/RECOMMENDATIONS.md`](./explorations/runtime-pipeline-architecture/RECOMMENDATIONS.md) · [`SYNTHESIS.md`](./explorations/runtime-pipeline-architecture/SYNTHESIS.md). Capture and playback as `Source`s of `Frame` values; isolation model; back-pressure; type signatures; the boundary between AV input and analysis.
-- **Display pipeline (render plane)** — [`explorations/display-pipeline-architecture/RECOMMENDATIONS.md`](./explorations/display-pipeline-architecture/RECOMMENDATIONS.md) · [`SYNTHESIS.md`](./explorations/display-pipeline-architecture/SYNTHESIS.md). Preview / player surfaces; overlay layering; detector→overlay frame synchronization; coordinate-space conversion; how display rides AVF's native path in parallel with the analysis pipeline.
-
-Cross-cutting prior-art rollup: [`explorations/RECOMMENDATIONS-PRIOR-ART.md`](./explorations/RECOMMENDATIONS-PRIOR-ART.md). Per-arc detail in [`explorations/prior-projects/`](./explorations/prior-projects/) and [`explorations/swift-ecosystem/`](./explorations/swift-ecosystem/).
-
-## Open questions to resolve before coding
-
-> Most of the questions below have been resolved by the M0 architecture explorations linked above; their `RECOMMENDATIONS.md` files carry the locked verdicts. This section will be refreshed as part of M0 close.
-
-1. **Async model.** `AsyncStream<Frame>` vs. `AsyncSequence` protocol. Probably
-   `AsyncStream` for capture sources, but exposing them through an `AsyncSequence`
-   protocol so consumers don't care about the concrete type.
-2. **Concurrency boundaries.** Capture queue, inference actor(s), main actor for
-   rendering. How explicit do actor isolations need to be in the public API?
-   Likely an `@CaptureActor` global actor for the capture pipeline.
-3. **Dataset format.** COCO JSON sidecar as canonical, exporters convert from
-   that. Confirm before locking in.
-4. **Model lifecycle.** Hot-swapping a Core ML model mid-session: tear down the
-   pipeline vs. swap the detector instance? Affects whether `Detector` is a
-   value or reference type. Probably reference (most models hold state).
-5. **macOS UI parity.** SwiftUI overlays are mostly portable but coordinate
-   spaces and gesture handling differ. Verify the overlay component works
-   unchanged on macOS.
-6. **Foundation Models scope.** Use as a detection backend, a separate
-   `Captioner` protocol, or both? Probably both — captioning is a different
-   shape of output than bounding boxes.
+Locked architectural verdicts — package shape, frame pipeline, display pipeline,
+isolation model, protocol shapes — live in [`DECISIONS.md`](./DECISIONS.md) with
+one-line entries pointing at the exploration that produced each. Prior-art reads
+in two arcs informed those decisions:
+[`../explorations/prior-projects/`](../explorations/prior-projects/) (in-house)
+and [`../explorations/swift-ecosystem/`](../explorations/swift-ecosystem/)
+(external Swift packages). Open questions live in
+[`QUESTIONS.md`](./QUESTIONS.md).
 
 ## Milestone path
 

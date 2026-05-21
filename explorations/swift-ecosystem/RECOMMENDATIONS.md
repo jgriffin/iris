@@ -3,7 +3,7 @@
 **Read date:** 2026-05-20
 **Source:** deep reads of 5 shortlisted external packages — full notes in this folder. Headline scan and per-package verdicts in [`SHORTLIST.md`](./SHORTLIST.md).
 
-This file is scoped to recommendations from the external Swift package ecosystem deep-read. Recommendations from the in-house prior-art reads (5 projects in `~/dev/`) live in [`../prior-projects/RECOMMENDATIONS.md`](../prior-projects/RECOMMENDATIONS.md). The cross-cutting rollup that synthesizes both is at [`../RECOMMENDATIONS-PRIOR-ART.md`](../RECOMMENDATIONS-PRIOR-ART.md).
+This file is scoped to recommendations from the external Swift package ecosystem deep-read. Recommendations from the in-house prior-art reads (5 projects in `~/dev/`) live in [`../prior-projects/RECOMMENDATIONS.md`](../prior-projects/RECOMMENDATIONS.md).
 
 ---
 
@@ -85,7 +85,7 @@ This file is scoped to recommendations from the external Swift package ecosystem
 
 ## Resolutions surfaced by the ecosystem scan
 
-(Cross-referenced against questions raised in [`../prior-projects/RECOMMENDATIONS.md`](../prior-projects/RECOMMENDATIONS.md)'s "Still open" section; the rollup at [`../RECOMMENDATIONS-PRIOR-ART.md`](../RECOMMENDATIONS-PRIOR-ART.md) consolidates.)
+(Cross-referenced against questions raised in [`../prior-projects/RECOMMENDATIONS.md`](../prior-projects/RECOMMENDATIONS.md)'s "Still open" section.)
 
 - **Q6 Foundation Models scope** — **RESOLVED.** Two protocols: `Detector` and `Captioner`. VLM backends conform to both. (PFM `EmbeddingBackend`/`LanguageModelBackend` precedent.)
 - **`Source`-protocol unification upstream of `IrisCapture`/`IrisPlayback`** — **RESOLVED, do it.** Apple AVCam's `OutputService` and `PreviewSource` patterns plus NextLevel's negative example (delegate-only frames lock consumers to AVCaptureSession semantics, including the `onQueue:` parameter leaking into the protocol).

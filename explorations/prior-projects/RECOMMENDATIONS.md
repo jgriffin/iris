@@ -132,5 +132,5 @@ Not resolved by prior art; needs decision before locking M1 plans:
 
 ---
 
-*This file is scoped to recommendations from the in-house prior-art reads. Recommendations from the external Swift package ecosystem live in [`../swift-ecosystem/RECOMMENDATIONS.md`](../swift-ecosystem/RECOMMENDATIONS.md). The cross-cutting rollup that synthesizes both is at [`../RECOMMENDATIONS-PRIOR-ART.md`](../RECOMMENDATIONS-PRIOR-ART.md).*
+*This file is scoped to recommendations from the in-house prior-art reads. Recommendations from the external Swift package ecosystem live in [`../swift-ecosystem/RECOMMENDATIONS.md`](../swift-ecosystem/RECOMMENDATIONS.md).*
 

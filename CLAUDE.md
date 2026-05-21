@@ -7,8 +7,21 @@ Apple platforms: capture, playback, inference, overlays, tuning, and dataset
 capture. Individual downstream projects depend on Iris and focus only on their
 specific detection problem.
 
-**Read [`BRIEF.md`](./BRIEF.md) for the full design intent, principles, and
-milestone path.** This file is the operating contract for working in the repo.
+## Project workflow
+
+This project uses the planning structure described in
+[`plans/WORKFLOW.md`](./plans/WORKFLOW.md). Read it before making non-trivial
+changes. In short:
+
+- [`plans/BRIEF.md`](./plans/BRIEF.md) — what & why (design intent, components, milestones)
+- [`plans/DECISIONS.md`](./plans/DECISIONS.md) — settled questions (check before proposing architectural changes)
+- [`plans/QUESTIONS.md`](./plans/QUESTIONS.md) — open questions (land new ones here, don't speculate in code)
+- [`plans/LOG.md`](./plans/LOG.md) — append a dated entry at the end of each work block
+- `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`
+
+This file (`CLAUDE.md`) is the **constitution**: stack, conventions, and
+invariants that constrain how code gets written. Anything more volatile —
+design intent, decisions, open questions, work log — lives under `plans/`.
 
 ## Platform baseline
 
@@ -29,8 +42,8 @@ product. The components below are folders under `Sources/Iris/` — conceptual
 responsibilities that share `Frame`, `Detector`, and coordinate-space
 conventions. Splitting into separate targets later is a non-breaking change
 if module boundaries start mattering; for now, folder organization plus
-discipline is the right level of separation. Locked verdict:
-[`explorations/project-shape-and-tooling/RECOMMENDATIONS.md`](./explorations/project-shape-and-tooling/RECOMMENDATIONS.md).
+discipline is the right level of separation. Locked verdicts in
+[`plans/DECISIONS.md`](./plans/DECISIONS.md).
 
 | Folder                    | Platforms    | Role                                                         |
 | ------------------------- | ------------ | ------------------------------------------------------------ |
@@ -73,28 +86,6 @@ macOS, `import Iris` succeeds; Capture types are simply not visible.
 - **Package.resolved is gitignored** (library convention). If Iris ever ships a
   demo app target that pins versions, revisit this for that target only.
 
-## Open design questions
-
-These are unresolved as of the brief and should be settled *before* the
-relevant module is built, not after:
-
-1. `AsyncStream<Frame>` vs. exposing through an `AsyncSequence` protocol.
-2. Explicit actor isolation in the public API (e.g. a `@CaptureActor`).
-3. COCO JSON as canonical sidecar format (vs. YOLO / Pascal VOC).
-4. Hot-swapping a Core ML model: tear down vs. swap detector instance →
-   determines whether `Detector` is value or reference type.
-5. macOS overlay parity (coordinate spaces, gestures).
-6. Foundation Models: a `Detector` backend, a separate `Captioner` protocol,
-   or both.
-
-When you hit one of these in a task, surface it rather than silently picking.
-
-## Milestone path
-
-M1 Capture → M2 Detection+Overlay → M3 Playback (first macOS target) →
-M4 Tuning → M5 Dataset → M6 Custom models + captioning. See `BRIEF.md` for the
-per-milestone detail.
-
 ## Working norms for this repo
 
 - New code should compile under Swift 6 strict concurrency on first try. If
@@ -106,3 +97,6 @@ per-milestone detail.
   fork the API shape of a single type that exists on both platforms.
 - When adding a new detector or sink, add a fixture-based test in the same
   commit. The point of Iris is reuse — untested adapters defeat that.
+- When a design question arises mid-task, land it in `plans/QUESTIONS.md`
+  rather than silently picking. Open a new exploration under
+  `explorations/YYYY-MM-DD-topic/` if it warrants one.
