@@ -68,10 +68,40 @@ Under `explorations/display-pipeline-architecture/`:
 - `SYNTHESIS.md` — architectural narrative + layer-stack diagrams + frame-sync timeline diagrams + code-shape sketches for the public SwiftUI surface
 - `RECOMMENDATIONS.md` — locked decisions for M1+ in the same shape as the sibling's
 
-### Pick-up-here
-
-Block opened. Researcher dispatch incoming. Awaiting `SYNTHESIS.md` + `RECOMMENDATIONS.md` under `explorations/display-pipeline-architecture/`. Headline decisions to extract: (a) display surface choice for playback, (b) fan-out strategy that doesn't break sibling's `.bufferingNewest(1)` contract, (c) overlay layer + macOS parity, (d) frame-sync model. After return: review with user, write Outcome, close. After close: M0 has both architecture sibling blocks closed and is ready to close, optionally after BRIEF.md refresh.
-
 ### Progress
 
 - 2026-05-20 17:00 — created and opened. Sibling to `runtime-pipeline-architecture` (now ✅). Scope: preview/player display, overlay layering, source fan-out, frame sync. Researcher dispatch pending.
+- 2026-05-20 — researcher returned `SYNTHESIS.md` (848 lines) + `RECOMMENDATIONS.md` (474 lines, 27 locked decisions). All four headline questions resolved; zero tensions with sibling block. User signed off.
+
+### Outcome
+
+Deliverables under [`explorations/display-pipeline-architecture/`](../../explorations/display-pipeline-architecture/):
+
+- [`SYNTHESIS.md`](../../explorations/display-pipeline-architecture/SYNTHESIS.md) — 848-line narrative. Two-parallel-paths diagram (display via AVF preview/player layer; analysis via `Source` → detector → overlay). Frame-sync timing diagram. Coordinate-space conversion. Public SwiftUI surface signatures. Open items.
+- [`RECOMMENDATIONS.md`](../../explorations/display-pipeline-architecture/RECOMMENDATIONS.md) — 474 lines, 27 locked decisions + type sketches (`CameraPreview`, `PlayerView` + platform hosts, `DetectionLayer`, `ResultStore`, `TimestampedDetections`, `NormalizedGeometryConverting`), M1/M2/M3 scope additions, anti-patterns, deferred items.
+
+**Locked verdicts:**
+
+- **Playback display surface** — `AVPlayer` + bare `AVPlayerLayer` (layer-backed `UIView` / `NSView`). Rejected `AVSampleBufferDisplayLayer` (re-implements `AVPlayer` for no gain), AVKit `VideoPlayer` / `AVPlayerView` (ships transport controls, no `videoRect` hook), manual Metal (unnecessary doubling of the asset-reader path).
+- **Fan-out** — display does **not** consume `Source.frames`. The two consumers tap *different AVF surfaces of the same root* (preview-layer + data-output on a capture session; player-layer + asset-reader on an asset). `Source` stays single-consumer; sibling's `.bufferingNewest(1)` contract is preserved trivially because the "second consumer" never materializes.
+- **Overlay layer** — pure SwiftUI `Canvas` in a `ZStack` over the display view, wrapped in `TimelineView(.animation(minimumInterval: 1.0/60))`, with `.drawingGroup()` and `.allowsHitTesting(false)`. Rejected `AVSynchronizedLayer` (**capture-incompatible — `AVPlayerItem`-only**), custom `CALayer`, `UIBezierPath` / `NSBezierPath`. macOS parity automatic.
+- **Frame-sync model** — results tagged with source `Frame.timestamp`, stored in a sorted ring buffer (`ResultStore`). Overlay reads `displayTime` at draw time (host clock live; `AVPlayer.currentTime` playback; slider binding scrub) and does O(log n) binary-search lookup of "most-recent result ≤ displayTime." Staleness threshold returns `[]` if newest result is older than 500 ms (live) / 2 s (playback). `seek` clears the store before reader rebuild. Iris ships **best-effort lagged** overlays in live capture; **frame-accurate** in playback.
+
+**Three findings worth surfacing to BRIEF.md refresh:**
+
+1. `AVSynchronizedLayer` is `AVPlayerItem`-only — no capture-session variant exists. This single fact rules out a whole class of designs and forces SwiftUI `Canvas` as the unifying overlay choice.
+2. The fan-out "problem" dissolves once you frame AVF as providing two parallel hardware paths off the same root. The "second consumer" of `Source` everyone worries about never materializes — display is a sibling path, not a downstream consumer.
+3. `videoRect` is load-bearing — both `AVCaptureVideoPreviewLayer.layerRectConverted(...)` (capture, AVF handles math) and `AVPlayerLayer.videoRect` (playback, expose directly) give the post-letterbox on-screen rect. Threading it through to the overlay as a `CGRect` parameter keeps `DetectionLayer` platform-pure.
+
+**Composes cleanly with sibling** [runtime-pipeline-architecture](.blockmaster/blocks/260520-runtime-pipeline-architecture.md):
+
+- `Source` stays `.bufferingNewest(1)` single-consumer (sibling #2, #14) — display isn't a consumer.
+- `previewSource` (sibling #15) mirrored to `playbackPreviewSource`.
+- `AVPlayerItemVideoOutput` ban (sibling anti-pattern) reaffirmed.
+- `@preconcurrency import` gating (sibling #18) extended to the new host-view files.
+- No Combine, no per-frame `Task` (sibling #19, #20) — KVO on `videoRect` wrapped in `AsyncStream`.
+- `Frame.timestamp` first-class (sibling #9) is what makes `TimestampedDetections` lookup possible.
+
+**Deferred:** ring-buffer capacity tuning (heuristic 30; M3 may need hundreds for long-asset playback — API unchanged, eviction policy only); forward motion prediction for zero-lag live overlays (downstream-app domain choice); macOS scrub UI (lives in `IrisTuning`, not here).
+
+**Followed by:** sibling block [project-shape-and-tooling](.blockmaster/blocks/260520-project-shape-and-tooling.md) — last M0 child covering repo/package layout, iOS+macOS test apps, and build tooling.

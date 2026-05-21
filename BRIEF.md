@@ -126,7 +126,18 @@ protocol Detector: Sendable {
 - Folder layout compatible with common training formats — COCO-style JSON as
   canonical, exporters convert to YOLO / Pascal VOC.
 
+## Architecture references
+
+Pre-code M0 explorations lock the runtime architecture for the components above:
+
+- **Frame pipeline (data plane)** — [`explorations/runtime-pipeline-architecture/RECOMMENDATIONS.md`](./explorations/runtime-pipeline-architecture/RECOMMENDATIONS.md) · [`SYNTHESIS.md`](./explorations/runtime-pipeline-architecture/SYNTHESIS.md). Capture and playback as `Source`s of `Frame` values; isolation model; back-pressure; type signatures; the boundary between AV input and analysis.
+- **Display pipeline (render plane)** — [`explorations/display-pipeline-architecture/RECOMMENDATIONS.md`](./explorations/display-pipeline-architecture/RECOMMENDATIONS.md) · [`SYNTHESIS.md`](./explorations/display-pipeline-architecture/SYNTHESIS.md). Preview / player surfaces; overlay layering; detector→overlay frame synchronization; coordinate-space conversion; how display rides AVF's native path in parallel with the analysis pipeline.
+
+Cross-cutting prior-art rollup: [`explorations/RECOMMENDATIONS-PRIOR-ART.md`](./explorations/RECOMMENDATIONS-PRIOR-ART.md). Per-arc detail in [`explorations/prior-projects/`](./explorations/prior-projects/) and [`explorations/swift-ecosystem/`](./explorations/swift-ecosystem/).
+
 ## Open questions to resolve before coding
+
+> Most of the questions below have been resolved by the M0 architecture explorations linked above; their `RECOMMENDATIONS.md` files carry the locked verdicts. This section will be refreshed as part of M0 close.
 
 1. **Async model.** `AsyncStream<Frame>` vs. `AsyncSequence` protocol. Probably
    `AsyncStream` for capture sources, but exposing them through an `AsyncSequence`
