@@ -1,0 +1,5 @@
+Tests/IrisTests/Fixtures/*.mov            filter=lfs diff=lfs merge=lfs -text
+Tests/IrisTests/Fixtures/*.mp4            filter=lfs diff=lfs merge=lfs -text
+Tests/IrisTests/Fixtures/*.mlmodel        filter=lfs diff=lfs merge=lfs -text
+Tests/IrisTests/Fixtures/*.mlpackage/**   filter=lfs diff=lfs merge=lfs -text
+Tests/IrisTests/Fixtures/*.png            filter=lfs diff=lfs merge=lfs -text

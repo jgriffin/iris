@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Iris pre-commit hook
+# - Lints staged .swift files with swift-format (strict)
+# - Runs swiftlint (light) if installed
+# No tests here; tests run in CI.
+
+set -euo pipefail
+
+# Collect staged Swift files (Added, Copied, Modified, Renamed).
+STAGED_SWIFT_FILES=$(git diff --cached --name-only --diff-filter=ACMR -- '*.swift' || true)
+
+if [ -z "$STAGED_SWIFT_FILES" ]; then
+    exit 0
+fi
+
+# Run swift-format if available; otherwise warn and skip.
+if command -v swift-format >/dev/null 2>&1; then
+    # shellcheck disable=SC2086
+    echo "$STAGED_SWIFT_FILES" | xargs swift-format lint --strict
+else
+    echo "pre-commit: swift-format not installed; skipping format lint." >&2
+fi
+
+# Run swiftlint if available.
+if command -v swiftlint >/dev/null 2>&1; then
+    # Pass staged files via the script-input-files env protocol swiftlint understands.
+    export SCRIPT_INPUT_FILE_COUNT
+    SCRIPT_INPUT_FILE_COUNT=$(printf '%s\n' "$STAGED_SWIFT_FILES" | wc -l | tr -d ' ')
+    i=0
+    while IFS= read -r file; do
+        export "SCRIPT_INPUT_FILE_$i=$file"
+        i=$((i + 1))
+    done <<< "$STAGED_SWIFT_FILES"
+    swiftlint --quiet --use-script-input-files
+fi
+
+exit 0

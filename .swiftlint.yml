@@ -1,0 +1,19 @@
+opt_in_rules:
+  - force_unwrapping
+  - force_cast
+  - force_try
+
+disabled_rules:
+  - line_length
+  - indentation_width
+  - trailing_whitespace
+
+included:
+  - Sources
+  - Tests
+  - Apps
+
+excluded:
+  - .build
+  - .swiftpm
+  - DerivedData

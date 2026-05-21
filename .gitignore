@@ -8,12 +8,13 @@
 .swiftpm/
 Packages/
 Package.resolved
-*.xcodeproj
 *.playground
 
 # Xcode
 ## User-specific
 xcuserdata/
+Apps/**/xcuserdata/
+Apps/**/*.xcworkspace/xcuserdata/
 *.xcuserstate
 *.xcuserstatev2
 *.xcscmblueprint
