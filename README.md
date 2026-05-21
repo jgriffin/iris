@@ -23,10 +23,12 @@ Then `swift build` from the repo root, or open `Package.swift` in Xcode.
 
 ## Demo app
 
-The iOS demo lives at `Apps/IrisDemo-iOS/` and consumes Iris as a local-path
-SwiftPM dependency. It will be created at M1 phase 5; open
-`Apps/IrisDemo-iOS.xcodeproj` in Xcode 26+ and run on a physical iPhone
-(iOS 26+) to see live preview + frame-timestamp logging.
+The iOS demo lives at [`Apps/IrisDemo-iOS/`](./Apps/IrisDemo-iOS/) and
+consumes Iris as a local-path SwiftPM dependency. Source files are checked in;
+the `.xcodeproj` is a one-time manual setup — see
+[`Apps/IrisDemo-iOS/README.md`](./Apps/IrisDemo-iOS/README.md) for the
+walkthrough. Once wired, run on a physical iPhone (iOS 26+) to see live
+preview + frame-timestamp logging in Xcode's Console.
 
 ## Planning
 
