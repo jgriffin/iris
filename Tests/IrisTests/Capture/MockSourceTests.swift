@@ -1,7 +1,8 @@
-import Testing
 import CoreMedia
 import CoreVideo
 import ImageIO
+import Testing
+
 @testable import Iris
 
 // MARK: - Helpers

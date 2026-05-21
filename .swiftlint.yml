@@ -7,6 +7,20 @@ disabled_rules:
   - line_length
   - indentation_width
   - trailing_whitespace
+  - trailing_comma          # collection-literal trailing commas read cleaner in diffs
+  - todo                    # TODO M1+ / TODO M2+ markers are intentional forward-pointers
+  - static_over_final_class # wrong for `override class var layerClass` (UIView pattern)
+  - opening_brace           # multi-line conformance lists with brace on new line read cleaner
+
+identifier_name:
+  min_length:
+    warning: 1   # `i`, `t1`, `r1` are idiomatic in tests / tight loops
+    error: 1
+
+type_name:
+  min_length:
+    warning: 2   # `ID` (nested type alias inside CameraDevice) is Apple-idiomatic
+    error: 2
 
 included:
   - Sources
