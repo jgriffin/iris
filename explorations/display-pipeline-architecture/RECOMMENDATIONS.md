@@ -276,7 +276,7 @@ public struct DetectionLayer: View {
                 videoRect: CGRect,
                 displayTime: CMTime,
                 style: OverlayStyle = .default,
-                converter: any NormalizedGeometryConverting = PlayerLayerConverter()) {
+                converter: any NormalizedGeometryConverting) {  // _Amendment 2026-05-22:_ default `PlayerLayerConverter()` dropped at M2 Phase 5 — a converter without a backing AVF layer has no useful runtime behavior, and the call site is the natural place to be explicit (`PreviewLayerConverter` for camera, `PlayerLayerConverter` for playback). Item 6 in §M2 below is superseded by this amendment.
         self.resultStore = resultStore
         self.videoRect = videoRect
         self.displayTime = displayTime
@@ -417,7 +417,7 @@ Concrete bullets to fold into the milestone plans.
 3. **Staleness check inside `lookup`** — `displayTime - candidate.timestamp > threshold` returns `[]`.
 4. **`.drawingGroup()` and `.allowsHitTesting(false)` on the `Canvas`**, no knobs.
 5. **`TimelineView(.animation(minimumInterval: 1.0/60))` wraps the `Canvas`.**
-6. **`PlayerLayerConverter` is the default `converter` argument** — `PreviewLayerConverter` overrides for capture.
+6. **`converter:` is a required `DetectionLayer.init` parameter** — _Amendment 2026-05-22:_ originally specified `PlayerLayerConverter` as the default. Dropped at M2 Phase 5: a converter without a backing AVF layer has no useful runtime behavior, and the call site is the natural place to be explicit (`PreviewLayerConverter(previewLayer:)` for camera, `PlayerLayerConverter(playerLayer:)` for playback).
 7. **Fixture-based test in M2**: a known `[TimestampedDetections]` + a known `CMTime` + an expected `[Detection]` lookup result. Pure value-type test, no SwiftUI rendering needed.
 8. **`#Preview` cases for `DetectionLayer`** with synthetic detections and a static `videoRect` — establishes the visual-preview discipline (CLAUDE.md "favorite pattern" — static visual previews are higher leverage than running the full app).
 9. **Static HTML preview** of the overlay's box rendering at various sizes — co-located with the module, lets the user spot-check colors/strokes/letterbox math at a glance without a build.
