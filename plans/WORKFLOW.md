@@ -12,6 +12,8 @@ plans/
   DECISIONS.md               # settled questions, with refs to explorations
   QUESTIONS.md               # open questions with lifecycle tags
   LOG.md                     # append-only work-block journal
+  features/                  # working plans for milestones & big features
+    <slug>.md                # scope, phases, opens, risks; lifetime ~ that work
 explorations/
   YYYY-MM-DD-topic/
     QUESTIONS.md             # questions driving this exploration
@@ -33,6 +35,7 @@ The rule: match the file to the **volatility** of the content.
 | `DECISIONS.md`   | per decision | dated paragraphs with enough context to act on; link to exploration RECOMMENDATIONS.md for the deep case |
 | `QUESTIONS.md`   | per question | `[open]` / `[exploring]` / `[answered]`                                                 |
 | `LOG.md`         | per block    | append-only, dated headers                                                              |
+| `features/<slug>.md` | per phase | working plan for a milestone or big feature — scope, phase breakdown, opens, risks. Lifetime tracks the work; delete or supersede when the work closes (LOG.md keeps the trail). |
 
 If you're tempted to add something to CLAUDE.md, ask: *does this constrain how code gets written, forever?* If no, it belongs somewhere in `plans/`.
 
