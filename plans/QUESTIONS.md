@@ -4,7 +4,7 @@
 
 ## Open
 
-_(none currently)_
+- [open] **`displayTime` semantic divergence between capture (host clock) and playback (asset time), and the exact-equality assumption in `ResultStore.lookup`.** M2 Phase 6's closure-based `displayTimeSource` keeps the per-tick read in the right clock per source, but `ResultStore.lookup(at:)` still assumes the detector's timestamp lines up exactly with the lookup time. Reality won't always cooperate — skipped frames, decoder jitter, post-scrub re-emit. Eventual direction: best-effort temporal match (adaptive `stale:` window, or interpolate between the two nearest `TimestampedDetections` when the lookup time falls between them). Candidate enabler: the deferred `AVAssetReader`-backed prefetch cache from M3 (decoder runs ahead, lookups land on exact-match timestamps). Tracked here so it doesn't get lost; not in M3 scope. See [`features/M3.md`](./features/M3.md) §Risks.
 
 ## Answered
 
