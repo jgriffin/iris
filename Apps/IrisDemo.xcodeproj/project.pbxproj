@@ -11,11 +11,13 @@
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
 		7C0D8530C9919FD70A380B51 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 0EB7A0FB41B5268DBEA5747D /* Iris */; };
 		80FFD62CD539847D349D137F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */; };
+		AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */ = {isa = PBXFileReference; path = "clipboard-blank-page.mp4"; sourceTree = "<group>"; };
 		0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1B460BBC0A9FF30933C587AA /* IrisDemo-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IrisDemo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -47,9 +49,27 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		5A30A001BB4E8305CF18E0BD /* iris */ = {
+			isa = PBXGroup;
+			children = (
+				FC8EB00C6ECFF4A194DBEF10 /* Tests */,
+			);
+			name = iris;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		5C4FD9FC92D27D3D9B0AAF12 /* IrisTests */ = {
+			isa = PBXGroup;
+			children = (
+				BE90572255D06DD0EEC45F8D /* Fixtures */,
+			);
+			path = IrisTests;
+			sourceTree = "<group>";
+		};
 		6E3744837A6FA0938B83AB4D = {
 			isa = PBXGroup;
 			children = (
+				5A30A001BB4E8305CF18E0BD /* iris */,
 				CE858ABB7F3E111D7782482A /* IrisDemo-iOS */,
 				B111C293A33F72EA2657344F /* IrisDemo-macOS */,
 				CFBBE3B1248C4031EBBC2802 /* Packages */,
@@ -76,6 +96,14 @@
 			path = "IrisDemo-macOS";
 			sourceTree = "<group>";
 		};
+		BE90572255D06DD0EEC45F8D /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		CE858ABB7F3E111D7782482A /* IrisDemo-iOS */ = {
 			isa = PBXGroup;
 			children = (
@@ -92,6 +120,14 @@
 				5FE11DED63C51AD082CD66F7 /* iris */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		FC8EB00C6ECFF4A194DBEF10 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				5C4FD9FC92D27D3D9B0AAF12 /* IrisTests */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -121,6 +157,7 @@
 			buildConfigurationList = 0968E317D8840B1C3967205F /* Build configuration list for PBXNativeTarget "IrisDemo-iOS" */;
 			buildPhases = (
 				D04827E5AB2B9E84DFBCFB96 /* Sources */,
+				5D4C9B651E924745EC7DC052 /* Resources */,
 				7287D48666C0B0419AAA141F /* Frameworks */,
 			);
 			buildRules = (
@@ -174,6 +211,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5D4C9B651E924745EC7DC052 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0C9B97C882B423BAA036FDC2 /* Sources */ = {

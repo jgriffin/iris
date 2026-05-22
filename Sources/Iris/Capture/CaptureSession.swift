@@ -55,6 +55,13 @@ public actor CaptureSession: Source {
     private let continuation: AsyncStream<Frame>.Continuation
     private let logger = Logger(subsystem: "iris.capture", category: "session")
 
+    /// Notification observer tokens for interruption / runtime-error
+    /// recovery. Registered in `configureSession(for:)`, removed in
+    /// `invalidate()`. Holding `NSObjectProtocol` tokens (rather than
+    /// `addObserver(_:selector:…)`) keeps the observer closure-based and
+    /// lets us cleanly remove without an `@objc` shim.
+    private var interruptionObservers: [NSObjectProtocol] = []
+
     // MARK: - Init
 
     public init() {
@@ -119,6 +126,10 @@ public actor CaptureSession: Source {
     public func invalidate() async {
         captureRotationObservation?.invalidate()
         captureRotationObservation = nil
+        for token in interruptionObservers {
+            NotificationCenter.default.removeObserver(token)
+        }
+        interruptionObservers.removeAll()
         continuation.finish()
         if session.isRunning {
             session.stopRunning()
@@ -215,12 +226,133 @@ public actor CaptureSession: Source {
             }
         }
 
-        // TODO M1+: interruption recovery wiring. The AVF notifications
-        // (`AVCaptureSession.wasInterruptedNotification` /
-        // `interruptionEndedNotification`) need to bubble onto the actor's
-        // executor — straightforward but adds a notification observer
-        // bridge and an `actor`-isolated handler. Preview restart on
-        // foreground works without it for the M1 smoke test.
+        installInterruptionObservers()
+    }
+
+    // MARK: - Interruption recovery (M3 Phase 6, M2-deferred carryover)
+
+    /// Wire `AVCaptureSession`'s interruption / runtime-error notifications
+    /// onto the actor's executor.
+    ///
+    /// **Doctrine.** Per the M3.md §M2-deferred items folded in, the iOS app
+    /// is where interruptions actually happen (incoming calls, control-center
+    /// pulldown, route conflicts). We follow the preferred recovery shape
+    /// from the brief: on interruption, *keep `state == .running` and log*
+    /// — AVF resumes automatically when `interruptionEndedNotification`
+    /// fires for the common reasons (incoming call, control-center).
+    /// Strict-failure-on-interrupt would force callers to handle a state
+    /// transition that the system is about to undo on its own, which is
+    /// the wrong UX default.
+    ///
+    /// On `interruptionEndedNotification`, defensively call `startRunning()`
+    /// if the session isn't already running — covers the rare reasons
+    /// (`videoDeviceNotAvailableInBackground`, route conflicts) where AVF
+    /// doesn't auto-resume. `startRunning()` is a no-op when already
+    /// running, so this is safe in the common case.
+    ///
+    /// On `runtimeErrorNotification`, transition to
+    /// `.failed(.captureRuntimeError(...))` — a runtime error means AVF
+    /// has given up on the session and the caller needs to know.
+    ///
+    /// **Threading.** Notification posts can arrive on any queue. The
+    /// observer closures bounce onto a `Task` that's actor-isolated, so
+    /// the actual handler runs on the capture queue. The observer tokens
+    /// themselves are removed in `invalidate()`.
+    private func installInterruptionObservers() {
+        let center = NotificationCenter.default
+
+        // `object: session` scopes the observer to *this* session — other
+        // `AVCaptureSession` instances in the same process (rare, but
+        // possible in tests) won't trigger us.
+        let interruptedToken = center.addObserver(
+            forName: AVCaptureSession.wasInterruptedNotification,
+            object: session,
+            queue: nil
+        ) { [weak self] notification in
+            let userInfo = notification.userInfo
+            let rawReason = (userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int) ?? -1
+            Task { [weak self] in
+                await self?.handleInterruption(reasonRawValue: rawReason)
+            }
+        }
+
+        let endedToken = center.addObserver(
+            forName: AVCaptureSession.interruptionEndedNotification,
+            object: session,
+            queue: nil
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.handleInterruptionEnded()
+            }
+        }
+
+        let runtimeErrorToken = center.addObserver(
+            forName: .AVCaptureSessionRuntimeError,
+            object: session,
+            queue: nil
+        ) { [weak self] notification in
+            let nsError = notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
+            let description = nsError?.localizedDescription ?? "unknown runtime error"
+            Task { [weak self] in
+                await self?.handleRuntimeError(description: description)
+            }
+        }
+
+        interruptionObservers = [interruptedToken, endedToken, runtimeErrorToken]
+    }
+
+    /// Handle `wasInterruptedNotification`. Logs the reason; does NOT
+    /// transition state (the system will resume automatically on
+    /// `interruptionEndedNotification` for the common reasons).
+    private func handleInterruption(reasonRawValue: Int) {
+        let reason = AVCaptureSession.InterruptionReason(rawValue: reasonRawValue)
+        let reasonName = reason.map(Self.interruptionReasonName) ?? "unknown(\(reasonRawValue))"
+        logger.notice(
+            "capture interrupted: reason=\(reasonName, privacy: .public); state preserved as .running, awaiting resume"
+        )
+    }
+
+    /// Handle `interruptionEndedNotification`. Defensively restart the
+    /// session if AVF hasn't auto-resumed (rare — most reasons resume on
+    /// their own).
+    private func handleInterruptionEnded() {
+        if !session.isRunning {
+            logger.notice("interruption ended; session not auto-resumed, calling startRunning()")
+            session.startRunning()
+        } else {
+            logger.notice("interruption ended; session auto-resumed")
+        }
+    }
+
+    /// Handle `runtimeErrorNotification`. Transition to `.failed(...)` —
+    /// runtime errors are unrecoverable from inside the session.
+    private func handleRuntimeError(description: String) {
+        logger.error("capture runtime error: \(description, privacy: .public)")
+        state = .failed(.captureRuntimeError(description))
+    }
+
+    /// Stable human-readable name for `AVCaptureSession.InterruptionReason`,
+    /// used in log lines so they're greppable across iOS versions where
+    /// the raw value semantics could shift.
+    private static func interruptionReasonName(
+        _ reason: AVCaptureSession.InterruptionReason
+    ) -> String {
+        switch reason {
+        case .videoDeviceNotAvailableInBackground:
+            return "videoDeviceNotAvailableInBackground"
+        case .audioDeviceInUseByAnotherClient:
+            return "audioDeviceInUseByAnotherClient"
+        case .videoDeviceInUseByAnotherClient:
+            return "videoDeviceInUseByAnotherClient"
+        case .videoDeviceNotAvailableWithMultipleForegroundApps:
+            return "videoDeviceNotAvailableWithMultipleForegroundApps"
+        case .videoDeviceNotAvailableDueToSystemPressure:
+            return "videoDeviceNotAvailableDueToSystemPressure"
+        case .sensitiveContentMitigationActivated:
+            return "sensitiveContentMitigationActivated"
+        @unknown default:
+            return "unknown(\(reason.rawValue))"
+        }
     }
 
     // MARK: - Helpers

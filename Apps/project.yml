@@ -43,6 +43,14 @@ targets:
                   - "Info.plist"
                   - "**/*.xcconfig"
                   - "**/*.xcconfig.template"
+            # Bundle the M3 Phase 1 fixture clip into the iOS demo so the
+            # Playback tab can load it via `Bundle.main.url(forResource:…)`
+            # without a file picker. Referenced by path (no duplication) —
+            # the canonical copy lives under `Tests/IrisTests/Fixtures/`
+            # and is LFS-tracked via `.gitattributes`. The macOS demo keeps
+            # the `.fileImporter` flow and does NOT need this resource.
+            - path: ../Tests/IrisTests/Fixtures/clipboard-blank-page.mp4
+              buildPhase: resources
         # All build settings live in Shared.xcconfig (committed).
         # DEVELOPMENT_TEAM is layered in from Local.xcconfig (gitignored)
         # via `#include?` inside Shared.xcconfig.
