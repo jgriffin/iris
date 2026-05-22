@@ -49,7 +49,7 @@ This file is scoped to recommendations from the external Swift package ecosystem
 
 ### Detection
 - **`Detector` protocol shape derived from PFM's `LanguageModelBackend`:**
-  - `var availability: Detector.Availability { get }` — enum with `.deviceNotEligible / .modelNotReady / .custom`
+  - `var availability: DetectorAvailability { get }` — enum with `.available / .deviceNotEligible / .modelNotReady / .custom(String)`. _Amendment 2026-05-21:_ originally written as nested `Detector.Availability` mirroring PFM's `LanguageModelBackend.Availability`, but Swift forbids nested types in protocol extensions (PFM gets away with it because `LanguageModelBackend` is a struct). Shipped as a top-level `DetectorAvailability` enum at M2 Phase 1.
   - `var modelIdentifier: String { get }` — for telemetry and dataset sidecar
   - `func prewarm() async`
   - `func detect(in frame: Frame) async throws -> [Detection]`
@@ -64,7 +64,7 @@ This file is scoped to recommendations from the external Swift package ecosystem
 ## New additions to M1 scope (beyond the 7 from in-house reads)
 
 1. **`prewarm() async` on `Detector`** — beyond just `warmup()`; PFM's name + shape.
-2. **`availability: Detector.Availability` and `modelIdentifier: String`** on the `Detector` protocol from day one.
+2. **`availability: DetectorAvailability` and `modelIdentifier: String`** on the `Detector` protocol from day one.
 3. **`AVCaptureDevice.RotationCoordinator`-based rotation handling** in `IrisCapture` and `IrisOverlay` — don't roll your own.
 4. **Interruption recovery pre-empted in `IrisCapture`** — pause on `wasInterrupted`, resume on `interruptionEnded` with ~100ms `AVAudioSession` settle delay. [NextLevel scar #281](./nextlevel.md).
 5. **Multi-subscriber `AsyncStream` broadcast** — `[UUID: Continuation]` shape. [NextLevel cautionary tale](./nextlevel.md): they stored continuations as single `Any?` and the second subscriber silently overwrote the first.

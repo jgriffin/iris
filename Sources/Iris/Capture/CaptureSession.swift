@@ -20,7 +20,7 @@ import os
 /// Public preview surface is `previewSource` (a `nonisolated let
 /// PreviewSource`) — the SwiftUI `CameraPreview` view consumes it via
 /// `connect(to:)` without ever touching the underlying `AVCaptureSession`.
-public actor CaptureSession: @preconcurrency Source {
+public actor CaptureSession: Source {
 
     // MARK: - Executor
 

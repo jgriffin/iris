@@ -11,7 +11,11 @@ public protocol Source: AnyObject, Sendable {
     var frames: AsyncStream<Frame> { get }
 
     /// Lifecycle / permission / error state. Observable for SwiftUI.
-    var state: SourceState { get }
+    ///
+    /// `async` so actor-backed conformers (`CaptureSession`) can satisfy
+    /// the requirement without `@preconcurrency` on the conformance — the
+    /// caller crosses the actor boundary at the read site.
+    var state: SourceState { get async }
 
     /// Start producing frames. May request permissions on first call.
     /// Idempotent: a second call on an already-running source is a no-op.
