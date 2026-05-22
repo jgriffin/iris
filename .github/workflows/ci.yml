@@ -20,7 +20,7 @@ jobs:
       - run: swift test
       - run: |
           xcodebuild test \
-            -project Apps/IrisDemo-iOS.xcodeproj \
+            -project Apps/IrisDemo.xcodeproj \
             -scheme IrisDemo-iOS \
             -destination 'platform=iOS Simulator,name=iPhone 16'
 

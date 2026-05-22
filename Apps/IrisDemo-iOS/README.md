@@ -30,7 +30,7 @@ instead. If you slip and the team ID lands in `pbxproj`, run
 
 ## Run
 
-1. Open [`../IrisDemo-iOS.xcodeproj`](../IrisDemo-iOS.xcodeproj) in Xcode 26+.
+1. Open [`../IrisDemo.xcodeproj`](../IrisDemo.xcodeproj) in Xcode 26+.
 2. Pick your physical iPhone as the run destination (the simulator has no
    camera hardware — the demo will surface `noDeviceAvailable` there).
 3. Hit Run. First launch prompts for camera permission.

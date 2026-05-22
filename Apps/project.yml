@@ -1,25 +1,31 @@
 # xcodegen spec for Iris demo apps.
 #
-# Regenerate the .xcodeproj(s) after changing this file:
+# Regenerate the .xcodeproj after changing this file:
 #     cd Apps && xcodegen generate
 #
-# The generated IrisDemo-iOS.xcodeproj is checked in alongside this file so
-# contributors don't need xcodegen installed just to open + run the demo.
+# The generated IrisDemo.xcodeproj is checked in alongside this file so
+# contributors don't need xcodegen installed just to open + run the demos.
 # Install only when editing project settings: `brew install xcodegen`.
+#
+# The project hosts two app targets:
+#   - IrisDemo-iOS    — live camera + Vision rectangle detector (M2 Phase 7)
+#   - IrisDemo-macOS  — file playback + Vision rectangle detector (M3 Phase 5)
 
-name: IrisDemo-iOS
+name: IrisDemo
 
 options:
     deploymentTarget:
         iOS: "26.0"
+        macOS: "26.0"
     developmentLanguage: en
     createIntermediateGroups: true
     generateEmptyDirectories: true
     minimumXcodeGenVersion: "2.45"
-    # No bundleIdPrefix — PRODUCT_BUNDLE_IDENTIFIER comes from Local.xcconfig
-    # (gitignored, per-developer). If bundleIdPrefix were set, xcodegen would
-    # auto-fill PRODUCT_BUNDLE_IDENTIFIER as an inline target build setting,
-    # which would override the xcconfig value at a higher precedence level.
+    # No bundleIdPrefix — PRODUCT_BUNDLE_IDENTIFIER comes from per-target
+    # Local.xcconfig (gitignored, per-developer). If bundleIdPrefix were set,
+    # xcodegen would auto-fill PRODUCT_BUNDLE_IDENTIFIER as an inline target
+    # build setting, which would override the xcconfig value at a higher
+    # precedence level.
 
 packages:
     Iris:
@@ -43,6 +49,25 @@ targets:
         configFiles:
             Debug: IrisDemo-iOS/Shared.xcconfig
             Release: IrisDemo-iOS/Shared.xcconfig
+        dependencies:
+            - package: Iris
+              product: Iris
+
+    IrisDemo-macOS:
+        type: application
+        platform: macOS
+        deploymentTarget: "26.0"
+        sources:
+            - path: IrisDemo-macOS
+              excludes:
+                  - "**/*.md"
+                  - "Info.plist"
+                  - "**/*.xcconfig"
+                  - "**/*.xcconfig.template"
+                  - "**/*.entitlements"
+        configFiles:
+            Debug: IrisDemo-macOS/Shared.xcconfig
+            Release: IrisDemo-macOS/Shared.xcconfig
         dependencies:
             - package: Iris
               product: Iris
