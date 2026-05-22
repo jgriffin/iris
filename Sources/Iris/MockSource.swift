@@ -20,10 +20,22 @@ public final class MockSource: Source, @unchecked Sendable {
 
     // MARK: - Init
 
-    public init(supply: [Frame]) {
+    /// Build a `MockSource` that yields `supply` from `start()`.
+    ///
+    /// - Parameters:
+    ///   - supply: Frames to yield, in order.
+    ///   - bufferingPolicy: Buffering policy for the underlying
+    ///     `AsyncStream<Frame>`. Defaults to `.bufferingNewest(1)`, matching
+    ///     the `Source` contract — late frames are dropped before they enter
+    ///     the stream. Tests that need multi-frame replay against a single
+    ///     consumer can pass `.unbounded` to observe every frame.
+    public init(
+        supply: [Frame],
+        bufferingPolicy: AsyncStream<Frame>.Continuation.BufferingPolicy = .bufferingNewest(1)
+    ) {
         let (stream, cont) = AsyncStream.makeStream(
             of: Frame.self,
-            bufferingPolicy: .bufferingNewest(1)
+            bufferingPolicy: bufferingPolicy
         )
         self._frames = stream
         self.continuation = cont

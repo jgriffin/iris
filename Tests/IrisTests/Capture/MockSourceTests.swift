@@ -133,6 +133,39 @@ func mockSourceTransitionsIdleToRunningToStopped() async throws {
 }
 
 @Test
+func mockSourceUnboundedBufferingPolicyDeliversEveryFrameToSingleConsumer() async throws {
+    // Default .bufferingNewest(1) drops earlier frames when a consumer hasn't
+    // attached yet (see mockSourceYieldsAllSuppliedFramesInOrder). Passing
+    // .unbounded relaxes that so all three supplied frames survive into the
+    // stream and a single consumer observes the full sequence.
+    let t1 = CMTime(value: 1, timescale: 60)
+    let t2 = CMTime(value: 2, timescale: 60)
+    let t3 = CMTime(value: 3, timescale: 60)
+    let supply = [
+        makeMockFrame(timestamp: t1),
+        makeMockFrame(timestamp: t2),
+        makeMockFrame(timestamp: t3),
+    ]
+    let source = MockSource(supply: supply, bufferingPolicy: .unbounded)
+    let stream = source.frames
+
+    let collected: [CMTime] = try await withTimeout(.seconds(2)) {
+        async let consumer: [CMTime] = {
+            var timestamps: [CMTime] = []
+            for await frame in stream {
+                timestamps.append(frame.timestamp)
+            }
+            return timestamps
+        }()
+        try await source.start()
+        await source.invalidate()
+        return await consumer
+    }
+
+    #expect(collected == [t1, t2, t3])
+}
+
+@Test
 func mockSourceInvalidateFinishesTheStream() async throws {
     let frame = makeMockFrame(timestamp: CMTime(value: 1, timescale: 60))
     let source = MockSource(supply: [frame])
