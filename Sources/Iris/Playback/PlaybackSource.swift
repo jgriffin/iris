@@ -5,93 +5,11 @@ import Foundation
 import ImageIO
 import os
 
-// MARK: - Tick driver
-
-/// Drives `PlaybackSource`'s per-tick pixel-buffer pull off
-/// `AVPlayerItemVideoOutput`. The production implementation is a
-/// `Task.sleep`-based driver running at a nominal display rate; tests inject
-/// `ManualTickDriver` to step the source deterministically.
-///
-/// **Why not `CADisplayLink` / `CVDisplayLink` in Phase 1?** Display links
-/// require a host view (or `NSScreen` / `UIScreen`) to attach to, and Phase 1
-/// ships `PlaybackSource` without `PlaybackView` (that's Phase 3). The driver
-/// abstraction lets Phase 3 swap in a `CADisplayLink`-backed driver vended
-/// from the view without changing `PlaybackSource`'s public API. See
-/// [`plans/features/M3.md`](../../../plans/features/M3.md) §Phase 1.
-public protocol PlaybackTickDriver: Sendable {
-    /// Begin emitting ticks. `tick` is invoked on each frame opportunity.
-    /// Called once per `PlaybackSource` lifetime, by `start()`. The closure
-    /// is `@Sendable` so drivers can dispatch onto any executor they own.
-    func start(tick: @escaping @Sendable () -> Void)
-
-    /// Stop emitting ticks. Idempotent. Called by `PlaybackSource.pause()`
-    /// and `invalidate()`.
-    func stop()
-}
-
-/// `Task.sleep`-based driver. Polls at `~hz` Hz from a detached `Task`.
-/// Cancellation flows through normally; `stop()` cancels the running task.
-public final class TaskTickDriver: PlaybackTickDriver, @unchecked Sendable {
-    private let hz: Double
-    private let lock = NSLock()
-    private var task: Task<Void, Never>?
-
-    public init(hz: Double = 60) {
-        self.hz = hz
-    }
-
-    public func start(tick: @escaping @Sendable () -> Void) {
-        let nanos = UInt64(1_000_000_000.0 / hz)
-        let task = Task.detached(priority: .userInitiated) {
-            while !Task.isCancelled {
-                tick()
-                try? await Task.sleep(nanoseconds: nanos)
-            }
-        }
-        lock.lock()
-        self.task?.cancel()
-        self.task = task
-        lock.unlock()
-    }
-
-    public func stop() {
-        lock.lock()
-        let t = self.task
-        self.task = nil
-        lock.unlock()
-        t?.cancel()
-    }
-}
-
-/// Test-injectable driver. Tests call `fire()` to advance one tick.
-public final class ManualTickDriver: PlaybackTickDriver, @unchecked Sendable {
-    private let lock = NSLock()
-    private var tick: (@Sendable () -> Void)?
-
-    public init() {}
-
-    public func start(tick: @escaping @Sendable () -> Void) {
-        lock.lock()
-        self.tick = tick
-        lock.unlock()
-    }
-
-    public func stop() {
-        lock.lock()
-        self.tick = nil
-        lock.unlock()
-    }
-
-    /// Emit one tick synchronously.
-    public func fire() {
-        lock.lock()
-        let t = self.tick
-        lock.unlock()
-        t?()
-    }
-}
-
 // MARK: - PlaybackSource
+
+// The `PlaybackTickDriver` protocol + concrete `TaskTickDriver` /
+// `ManualTickDriver` / `DisplayLinkTickDriver` impls live in a sibling
+// file: [`PlaybackTickDriver.swift`](./PlaybackTickDriver.swift).
 
 /// File-playback `Source`. Wraps an `AVPlayer` + `AVPlayerItemVideoOutput`,
 /// publishing decoded frames to `frames: AsyncStream<Frame>` on each tick of
@@ -130,7 +48,11 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     private let player: AVPlayer
     private let playerItem: AVPlayerItem
     private let videoOutput: AVPlayerItemVideoOutput
-    private let driver: PlaybackTickDriver
+    /// Mutable so `PlaybackView` can swap in a `DisplayLinkTickDriver`
+    /// post-init via `setTickDriver(_:)`. Always read/written under
+    /// `lock`. Invariant: `driver` is non-nil for the lifetime of the
+    /// source.
+    private var driver: PlaybackTickDriver
     private let assetID: AssetID
     private let sourceURL: URL
     private let _frames: AsyncStream<Frame>
@@ -180,9 +102,73 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         if let obs = eofObservation {
             NotificationCenter.default.removeObserver(obs)
         }
-        driver.stop()
+        currentDriver().stop()
         continuation.finish()
     }
+
+    // MARK: - Driver injection
+
+    /// Swap the tick driver. Used by `PlaybackView` to install a
+    /// `DisplayLinkTickDriver` bound to its host view once the view is
+    /// attached. The default `TaskTickDriver` injected at `init` time keeps
+    /// headless use (no view, e.g. dataset processing) working out of the
+    /// box; `PlaybackView` overrides it for screen-synced ticks.
+    ///
+    /// **Behavior.** If the source is currently `.running`, the new driver
+    /// is started and the old driver is stopped atomically — playback
+    /// stays uninterrupted across the swap. Otherwise the new driver is
+    /// installed but not started; the next `play()` will start it.
+    ///
+    /// **Idempotency.** Passing the currently-installed driver is a no-op
+    /// — checked via `ObjectIdentifier` because `PlaybackTickDriver` is a
+    /// class-bound protocol in practice (`Sendable` + reference semantics).
+    public func setTickDriver(_ newDriver: PlaybackTickDriver) {
+        lock.lock()
+        let oldDriver = driver
+        let isRunning: Bool = {
+            if case .running = _state { return true }
+            return false
+        }()
+        // Identity-equal — nothing to do.
+        if ObjectIdentifier(oldDriver as AnyObject) == ObjectIdentifier(newDriver as AnyObject) {
+            lock.unlock()
+            return
+        }
+        self.driver = newDriver
+        lock.unlock()
+
+        if isRunning {
+            newDriver.start { [weak self] in
+                self?.tick()
+            }
+        }
+        oldDriver.stop()
+    }
+
+    /// Lock-guarded read of the current driver. The driver reference can
+    /// change post-init via `setTickDriver(_:)`, so call sites that touch
+    /// `driver.start` / `driver.stop` go through this helper rather than
+    /// reading the field directly.
+    private func currentDriver() -> PlaybackTickDriver {
+        lock.lock()
+        defer { lock.unlock() }
+        return driver
+    }
+
+    // MARK: - Preview
+
+    /// The underlying `AVPlayer`. Exposed for `PlaybackView` to attach to
+    /// the `AVPlayerLayer` backing its host view — the AVF API takes an
+    /// `AVPlayer`, so the view representable needs the reference.
+    ///
+    /// **Deliberately named for the use case.** This is the documented
+    /// escape hatch for the player/layer attach seam (parallels
+    /// `AVCapturePreviewSource.connect(to:)` on the capture side). Callers
+    /// should not stash this reference for general AVF poking — playback
+    /// controls (`play`/`pause`/`seek`/`step`) and state observation go
+    /// through `PlaybackSource`'s own API. The legitimate use is exactly
+    /// one read at `PlaybackView.makeUIView` / `makeNSView` time.
+    public var playerForPreview: AVPlayer { player }
 
     /// Build the YUV-bi-planar `AVPlayerItemVideoOutput` Iris uses. Uses
     /// the typed `CVPixelBuffer.Attributes` initializer (Swift-only,
@@ -223,7 +209,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     /// Finish the frame stream and release observers. The instance should
     /// not be reused.
     public func invalidate() async {
-        driver.stop()
+        currentDriver().stop()
         player.pause()
         clearEofObservation()
         setState(.stopped)
@@ -238,7 +224,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         let alreadyRunning = enterRunningStateIfNeeded()
         if alreadyRunning { return }
 
-        driver.start { [weak self] in
+        currentDriver().start { [weak self] in
             self?.tick()
         }
         player.play()
@@ -247,7 +233,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     /// Pause playback. Stops the tick driver and pauses the player.
     /// Idempotent — returns to `.idle` per the Phase 1 state contract.
     public func pause() async {
-        driver.stop()
+        currentDriver().stop()
         player.pause()
         setState(.idle)
     }
@@ -458,7 +444,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     }
 
     private func handleEndOfItem() {
-        driver.stop()
+        currentDriver().stop()
         clearEofObservation()
         setState(.stopped)
         continuation.finish()
