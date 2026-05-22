@@ -25,16 +25,13 @@ final class SampleBufferRouter:
 
     private let continuation: AsyncStream<Frame>.Continuation
     private let cameraID: CameraDevice.ID
-    private let rotation: @Sendable () async -> CGFloat
 
     init(
         continuation: AsyncStream<Frame>.Continuation,
-        cameraID: CameraDevice.ID,
-        rotation: @escaping @Sendable () async -> CGFloat
+        cameraID: CameraDevice.ID
     ) {
         self.continuation = continuation
         self.cameraID = cameraID
-        self.rotation = rotation
     }
 
     nonisolated func captureOutput(
@@ -51,11 +48,18 @@ final class SampleBufferRouter:
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
 
-        // Per-frame angle lookup against `rotationCoordinator` is a deferred
-        // optimization (see runtime-pipeline-architecture/RECOMMENDATIONS.md
-        // §"Open items deferred"). For now the connection's
-        // `videoRotationAngle` is what AVF actually rotates the buffer by;
-        // tag the frame with the EXIF-up baseline.
+        // The data-output connection's `videoRotationAngle` is what AVF
+        // actually rotates the buffer by — set in
+        // `CaptureSession.configureSession` from
+        // `RotationCoordinator.videoRotationAngleForHorizonLevelCapture`,
+        // and kept in sync via KVO. The frame is therefore already
+        // horizon-level by the time it reaches us; tag with the EXIF-up
+        // baseline rather than re-deriving an angle here.
+        //
+        // M3 Phase 1 cleanup: the previous design plumbed a per-frame
+        // `rotation: @Sendable () async -> CGFloat` closure into this
+        // router as a deferred optimization, but it was never read. Removed
+        // — the connection-level rotation is the source of truth.
         let frame = Frame(
             pixelBuffer: pixelBuffer,
             timestamp: timestamp,

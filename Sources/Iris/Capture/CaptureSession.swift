@@ -175,10 +175,7 @@ public actor CaptureSession: Source {
         let cameraID = device.uniqueID
         let router = SampleBufferRouter(
             continuation: continuation,
-            cameraID: cameraID,
-            rotation: { [weak self] in
-                await self?.currentRotation() ?? 0
-            }
+            cameraID: cameraID
         )
         videoOutput.setSampleBufferDelegate(router, queue: captureQueue)
         self.router = router
@@ -227,10 +224,6 @@ public actor CaptureSession: Source {
     }
 
     // MARK: - Helpers
-
-    private func currentRotation() -> CGFloat {
-        rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 0
-    }
 
     /// Apply a new capture-side rotation angle to the data-output connection.
     /// Called from a `Task` spawned by the `RotationCoordinator` KVO observer,

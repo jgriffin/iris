@@ -15,6 +15,23 @@ import ImageIO
 ///   3. All other fields are value types or enums that are themselves Sendable.
 public struct Frame: @unchecked Sendable {
     public let pixelBuffer: CVPixelBuffer
+
+    /// Presentation timestamp. **Semantics are source-defined**, not absolute:
+    ///
+    /// - **Capture** (`CaptureSession`): host-clock time pulled from
+    ///   `CMSampleBuffer.presentationTimeStamp` — relative to the AVF
+    ///   capture clock, monotonically increasing with wall time.
+    /// - **Playback** (`PlaybackSource`): asset time pulled from
+    ///   `AVPlayerItem.currentTime()` — relative to the asset's own
+    ///   timeline, starts at `.zero`, advances with playback (so seeking
+    ///   makes it non-monotonic by design).
+    /// - **Mock** (`MockSource`): whatever the test supplies.
+    ///
+    /// The pipeline contract is per-source consistency: a `Frame` and the
+    /// `[Detection]` derived from it carry the *same* clock, so
+    /// `ResultStore` lookups stay internally coherent regardless of source.
+    /// Mixing frames or lookups across sources within a single pipeline is
+    /// a live concern tracked in [`plans/QUESTIONS.md`].
     public let timestamp: CMTime
     public let orientation: CGImagePropertyOrientation
     public let source: SourceKind
