@@ -132,6 +132,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     private let videoOutput: AVPlayerItemVideoOutput
     private let driver: PlaybackTickDriver
     private let assetID: AssetID
+    private let sourceURL: URL
     private let _frames: AsyncStream<Frame>
     private let continuation: AsyncStream<Frame>.Continuation
     private let logger = Logger(subsystem: "iris.playback", category: "source")
@@ -165,6 +166,7 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         self.player = AVPlayer(playerItem: item)
         self.driver = driver
         self.assetID = AssetID(raw: url.absoluteString)
+        self.sourceURL = url
 
         let (stream, cont) = AsyncStream.makeStream(
             of: Frame.self,
@@ -248,6 +250,144 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         driver.stop()
         player.pause()
         setState(.idle)
+    }
+
+    // MARK: - Playback controls (Phase 2 scope)
+
+    /// Frame-accurate seek to `target`. `target` is clamped silently to
+    /// `[.zero, duration]` — out-of-range input is not an error (per the
+    /// Phase 2 locked design in
+    /// [`plans/features/M3.md`](../../../plans/features/M3.md) §Phase 2).
+    ///
+    /// **State invariant:** `seek` does *not* change `SourceState`. A paused
+    /// (`.idle`) source stays paused; a `.running` source stays running.
+    /// Valid in any non-`.failed` state.
+    ///
+    /// **Stream invariant:** mid-`play()` `seek` does not finish the
+    /// `frames` stream — frame production resumes after the seek completes.
+    /// From `.idle`, a single frame at the new position is emitted (one-shot
+    /// read, independent of the tick driver).
+    public func seek(to target: CMTime) async throws {
+        try await ensureReadyToPlay()
+        let clamped = clampToAsset(target)
+
+        // AVPlayer.seek is async via a completion handler. Bridge to
+        // structured concurrency. `.zero` tolerances give frame-accurate seek.
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            player.seek(
+                to: clamped,
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            ) { _ in
+                cont.resume()
+            }
+        }
+
+        // Reset the monotonicity guard so the post-seek frame isn't dropped
+        // even when seeking backwards. Then yield one frame at the new
+        // position — required for the `.idle` (paused-on-load) flow where
+        // the tick driver isn't running. For a mid-`play()` seek, this is
+        // a harmless extra read; the running driver picks up from there.
+        resetMonotonicityGuard()
+        await emitOneShotFrame()
+    }
+
+    /// Step playback by ±`count` frames. Uses
+    /// `AVPlayerItem.step(byCount:)` for ±1-frame accuracy. Stepping past
+    /// EOF or before `.zero` is a no-op (AVF clamps internally) — no error,
+    /// no crash.
+    ///
+    /// **State invariant:** `step` does *not* change `SourceState`. A
+    /// paused (`.idle`) source stays paused; a `.running` source stays
+    /// running. Valid in any non-`.failed` state.
+    ///
+    /// **Stream invariant:** from `.idle`, the frame at the new position is
+    /// emitted via a synchronous one-shot read (independent of the tick
+    /// driver). Mid-`play()` `step` does not finish the `frames` stream.
+    public func step(by count: Int) async throws {
+        try await ensureReadyToPlay()
+
+        // `step(byCount:)` is synchronous on the item; AVF handles the
+        // EOF / before-start clamp internally.
+        playerItem.step(byCount: count)
+
+        resetMonotonicityGuard()
+        await emitOneShotFrame()
+    }
+
+    // MARK: - Phase 2 helpers
+
+    /// Wait for `playerItem.status == .readyToPlay`. AVF loads the asset
+    /// lazily; `seek` / `step` on an unloaded item are no-ops with garbage
+    /// `currentTime`. Short bounded poll — gives up after ~2s, surfacing
+    /// the failure via `SourceError.assetLoadFailed(sourceURL)` so callers don't hang on a
+    /// broken file. The Phase 1 `start()` path doesn't need this because
+    /// `play()` is itself an AVF-driven async unwind; Phase 2's controls
+    /// can be invoked *before* `play()` has ever run.
+    private func ensureReadyToPlay() async throws {
+        // Fast path: already ready.
+        if playerItem.status == .readyToPlay { return }
+
+        let deadline = ContinuousClock().now + .seconds(2)
+        while ContinuousClock().now < deadline {
+            switch playerItem.status {
+            case .readyToPlay:
+                return
+            case .failed:
+                setState(.failed(SourceError.assetLoadFailed(sourceURL)))
+                throw SourceError.assetLoadFailed(sourceURL)
+            case .unknown:
+                break
+            @unknown default:
+                break
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)  // 10ms
+        }
+        // Timed out — surface as not-ready.
+        setState(.failed(SourceError.assetLoadFailed(sourceURL)))
+        throw SourceError.assetLoadFailed(sourceURL)
+    }
+
+    /// Clamp `target` to `[.zero, duration]`. If duration is unknown
+    /// (`.indefinite` / `.invalid`) we fall through to `target` rather than
+    /// clamping against garbage — the asset-load gate in
+    /// `ensureReadyToPlay()` is supposed to prevent that.
+    private func clampToAsset(_ target: CMTime) -> CMTime {
+        let duration = playerItem.duration
+        let lower: CMTime = (CMTimeCompare(target, .zero) < 0) ? .zero : target
+        guard duration.isValid, !duration.isIndefinite else { return lower }
+        if CMTimeCompare(lower, duration) > 0 { return duration }
+        return lower
+    }
+
+    /// Reset `lastEmittedItemTime` so the monotonicity guard in `tick()`
+    /// doesn't drop a post-seek frame whose time is ≤ the previously
+    /// emitted time (e.g. a seek backwards).
+    private func resetMonotonicityGuard() {
+        lock.lock()
+        lastEmittedItemTime = .invalid
+        lock.unlock()
+    }
+
+    /// Synchronously emit one frame at the player's current item time.
+    /// Tolerates a brief decoder warm-up after seek/step by polling
+    /// `hasNewPixelBuffer(forItemTime:)` for a short bounded window.
+    /// Returns without emitting if no buffer materializes — covers the
+    /// "step backwards at zero" and "step past EOF" no-op cases.
+    private func emitOneShotFrame() async {
+        let deadline = ContinuousClock().now + .milliseconds(500)
+        while ContinuousClock().now < deadline {
+            let itemTime = playerItem.currentTime()
+            if itemTime.isValid, !itemTime.isIndefinite,
+                videoOutput.hasNewPixelBuffer(forItemTime: itemTime)
+            {
+                tick()
+                return
+            }
+            try? await Task.sleep(nanoseconds: 5_000_000)  // 5ms
+        }
+        // No buffer arrived — graceful no-op (e.g. step(-1) at .zero,
+        // step past EOF).
     }
 
     // MARK: - Tick
