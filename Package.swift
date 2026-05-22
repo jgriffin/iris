@@ -6,7 +6,10 @@ let package = Package(
     platforms: [.iOS(.v26), .macOS(.v26)],
     products: [.library(name: "Iris", targets: ["Iris"])],
     targets: [
-        .target(name: "Iris"),
+        .target(
+            name: "Iris",
+            exclude: ["Overlay/box-rendering.html"]
+        ),
         .testTarget(
             name: "IrisTests",
             dependencies: ["Iris"],

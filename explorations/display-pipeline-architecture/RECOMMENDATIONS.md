@@ -268,13 +268,13 @@ import CoreMedia
 public struct DetectionLayer: View {
     public let resultStore: ResultStore
     public let videoRect: CGRect
-    public let displayTime: CMTime
+    public let displayTime: CMTime  // _Amendment 2026-05-22 (Phase 6):_ shipped as `displayTimeSource: @Sendable () -> CMTime` — see init below.
     public let style: OverlayStyle
     public let converter: any NormalizedGeometryConverting
 
     public init(resultStore: ResultStore,
                 videoRect: CGRect,
-                displayTime: CMTime,
+                displayTime: CMTime,  // _Amendment 2026-05-22 (Phase 6):_ replaced by `displayTimeSource: @Sendable @escaping () -> CMTime = { CMClockGetTime(CMClockGetHostTimeClock()) }`. A stored `CMTime` is read once at view-construction time and never updates as the `TimelineView` ticks; a closure is re-evaluated each tick. Default reads the host clock (right for live capture); M3 playback callers pass `{ player.currentTime() }` or `{ binding.wrappedValue }` without needing a second init overload.
                 style: OverlayStyle = .default,
                 converter: any NormalizedGeometryConverting) {  // _Amendment 2026-05-22:_ default `PlayerLayerConverter()` dropped at M2 Phase 5 — a converter without a backing AVF layer has no useful runtime behavior, and the call site is the natural place to be explicit (`PreviewLayerConverter` for camera, `PlayerLayerConverter` for playback). Item 6 in §M2 below is superseded by this amendment.
         self.resultStore = resultStore

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Iris · DetectionLayer box-rendering reference</title>
+<style>
+    :root {
+        /* OverlayStyle.default — keep these in lockstep with OverlayStyle.swift. */
+        --stroke-color: rgb(51, 217, 255);   /* Color(red: 0.20, green: 0.85, blue: 1.0) */
+        --stroke-width: 1.5;
+        --label-text: #ffffff;
+        --label-bg: rgba(0, 0, 0, 0.60);
+        --label-font: 600 11px -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                      "Helvetica Neue", system-ui, sans-serif;
+        --label-padding: 3px;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        color: #222;
+        background: #f5f5f7;
+        margin: 0;
+        padding: 32px;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 20px; }
+    p.intro { margin: 0 0 24px 0; max-width: 740px; color: #555; }
+    p.intro code { background: #e8e8ed; padding: 0 4px; border-radius: 3px; }
+
+    section { margin-bottom: 28px; }
+    section h2 { font-size: 14px; margin: 0 0 8px 0; color: #333; }
+    section .meta { font-size: 12px; color: #777; margin-bottom: 8px; }
+
+    /* `.container` is the SwiftUI view bounds. */
+    .container {
+        position: relative;
+        background: #111;
+        overflow: hidden;
+    }
+    /* `.video` is the on-screen videoRect after aspect-fit. */
+    .video {
+        position: absolute;
+        background: linear-gradient(135deg, #2a2a35 0%, #1a1a22 100%);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+    /* The two bands flanking .video are the letterbox/pillarbox gutters. */
+    .letterbox {
+        position: absolute;
+        background: #000;
+    }
+
+    /* A bounding box is `.box` positioned in pixel coordinates. */
+    .box {
+        position: absolute;
+        box-sizing: border-box;
+        border: var(--stroke-width) solid var(--stroke-color);
+        pointer-events: none;
+    }
+    .label {
+        position: absolute;
+        font: var(--label-font);
+        color: var(--label-text);
+        background: var(--label-bg);
+        padding: var(--label-padding) var(--label-padding);
+        white-space: nowrap;
+        line-height: 1;
+        transform: translateY(-100%);
+        /* Anchor at the box's top-left corner. */
+        left: 0;
+        top: 0;
+    }
+</style>
+</head>
+<body>
+
+<h1>DetectionLayer · box-rendering reference</h1>
+<p class="intro">
+    Static visual reference for the boxes <code>DetectionLayer</code> draws,
+    rendered with <code>OverlayStyle.default</code>. The numbers in
+    <code>OverlayStyle.swift</code> (stroke color, stroke width, label font,
+    backplate opacity) are mirrored as CSS variables at the top of this
+    file — keep them in lockstep with any change to the defaults. Each
+    section shows the container, the post-aspect-fit videoRect, and a few
+    synthetic boxes drawn against it. Open in a browser; no build step.
+</p>
+
+<!--
+    Scene 1 — full-frame at 320×240 (no letterbox / pillarbox).
+    Container == videoRect.
+-->
+<section>
+    <h2>1 · 320×240 · full-frame (no letterbox)</h2>
+    <div class="meta">container = videoRect = (0, 0, 320, 240)</div>
+    <div class="container" style="width:320px;height:240px;">
+        <div class="video" style="left:0;top:0;width:320px;height:240px;"></div>
+        <!-- Centered easy box: x=0.30 y=0.30 w=0.40 h=0.40 (Vision coords)
+             Top-left in view: (0.30*320, (1-0.30-0.40)*240) = (96, 72), 128×96 -->
+        <div class="box" style="left:96px;top:72px;width:128px;height:96px;">
+            <span class="label">subject 94%</span>
+        </div>
+        <!-- Edge-clipped box (vision coords x=-0.05 y=0.55 w=0.30 h=0.20)
+             top-left view = (-16, 60), 96×48 — overflows left edge. -->
+        <div class="box" style="left:-16px;top:60px;width:96px;height:48px;">
+            <span class="label">edge 71%</span>
+        </div>
+        <!-- Low-confidence box (vision x=0.65 y=0.10 w=0.20 h=0.15)
+             top-left view = (208, 180), 64×36 -->
+        <div class="box" style="left:208px;top:180px;width:64px;height:36px;">
+            <span class="label">low_conf 23%</span>
+        </div>
+        <!-- Empty-label box (vision x=0.10 y=0.05 w=0.18 h=0.18)
+             top-left view = (32, 184.8), 57.6×43.2; no label backplate. -->
+        <div class="box" style="left:32px;top:184px;width:58px;height:43px;"></div>
+    </div>
+</section>
+
+<!--
+    Scene 2 — 640×480, same content scaled up.
+-->
+<section>
+    <h2>2 · 640×480 · full-frame (no letterbox)</h2>
+    <div class="meta">container = videoRect = (0, 0, 640, 480)</div>
+    <div class="container" style="width:640px;height:480px;">
+        <div class="video" style="left:0;top:0;width:640px;height:480px;"></div>
+        <div class="box" style="left:192px;top:144px;width:256px;height:192px;">
+            <span class="label">subject 94%</span>
+        </div>
+        <div class="box" style="left:-32px;top:120px;width:192px;height:96px;">
+            <span class="label">edge 71%</span>
+        </div>
+        <div class="box" style="left:416px;top:360px;width:128px;height:72px;">
+            <span class="label">low_conf 23%</span>
+        </div>
+        <div class="box" style="left:64px;top:369px;width:115px;height:86px;"></div>
+    </div>
+</section>
+
+<!--
+    Scene 3 — 1280×720 16:9, same content.
+-->
+<section>
+    <h2>3 · 1280×720 · 16:9, full-frame</h2>
+    <div class="meta">container = videoRect = (0, 0, 1280, 720)</div>
+    <div class="container" style="width:1280px;height:720px;">
+        <div class="video" style="left:0;top:0;width:1280px;height:720px;"></div>
+        <div class="box" style="left:384px;top:216px;width:512px;height:288px;">
+            <span class="label">subject 94%</span>
+        </div>
+        <div class="box" style="left:-64px;top:180px;width:384px;height:144px;">
+            <span class="label">edge 71%</span>
+        </div>
+        <div class="box" style="left:832px;top:540px;width:256px;height:108px;">
+            <span class="label">low_conf 23%</span>
+        </div>
+        <div class="box" style="left:128px;top:554px;width:230px;height:130px;"></div>
+    </div>
+</section>
+
+<!--
+    Scene 4 — Letterbox: container is 16:9 (640×360) but the video source is
+    4:3, so the videoRect is pillarboxed on the sides. (Source aspect narrower
+    than container aspect → vertical bars on left and right.)
+    videoRect = (80, 0, 480, 360).
+-->
+<section>
+    <h2>4 · 640×360 container with 4:3 source · pillarbox (vertical bars)</h2>
+    <div class="meta">container = (0, 0, 640, 360), videoRect = (80, 0, 480, 360)</div>
+    <div class="container" style="width:640px;height:360px;">
+        <!-- Side gutters. -->
+        <div class="letterbox" style="left:0;top:0;width:80px;height:360px;"></div>
+        <div class="letterbox" style="right:0;top:0;width:80px;height:360px;"></div>
+        <!-- videoRect. -->
+        <div class="video" style="left:80px;top:0;width:480px;height:360px;"></div>
+        <!-- Boxes — normalized to videoRect, then offset by videoRect.origin.x. -->
+        <!-- subject 0.30, 0.30, 0.40, 0.40 → in video: (144, 108, 192, 144);
+             on-screen: (224, 108, 192, 144) -->
+        <div class="box" style="left:224px;top:108px;width:192px;height:144px;">
+            <span class="label">subject 94%</span>
+        </div>
+        <!-- edge -0.05, 0.55, 0.30, 0.20 in video → (-24, 90, 144, 72)
+             on-screen: (56, 90, 144, 72) — overflows past the pillarbox seam. -->
+        <div class="box" style="left:56px;top:90px;width:144px;height:72px;">
+            <span class="label">edge 71%</span>
+        </div>
+        <!-- low_conf 0.65, 0.10, 0.20, 0.15 in video → (312, 270, 96, 54)
+             on-screen: (392, 270, 96, 54) -->
+        <div class="box" style="left:392px;top:270px;width:96px;height:54px;">
+            <span class="label">low_conf 23%</span>
+        </div>
+        <!-- empty-label 0.10, 0.05, 0.18, 0.18 in video → (48, 277.2, 86.4, 64.8)
+             on-screen: (128, 277, 86, 65) — no label. -->
+        <div class="box" style="left:128px;top:277px;width:86px;height:65px;"></div>
+    </div>
+</section>
+
+<!--
+    Scene 5 — Letterbox: container is 4:3 (480×360) but source is 16:9,
+    so the videoRect is letterboxed top/bottom. (Source aspect wider than
+    container aspect → horizontal bars.)
+    Source 16:9, scaled to width 480, height = 270 → centered vertically.
+    videoRect = (0, 45, 480, 270).
+-->
+<section>
+    <h2>5 · 480×360 container with 16:9 source · letterbox (horizontal bars)</h2>
+    <div class="meta">container = (0, 0, 480, 360), videoRect = (0, 45, 480, 270)</div>
+    <div class="container" style="width:480px;height:360px;">
+        <!-- Top + bottom gutters. -->
+        <div class="letterbox" style="left:0;top:0;width:480px;height:45px;"></div>
+        <div class="letterbox" style="left:0;bottom:0;width:480px;height:45px;"></div>
+        <!-- videoRect. -->
+        <div class="video" style="left:0;top:45px;width:480px;height:270px;"></div>
+        <!-- Normalized boxes mapped against videoRect, offset by videoRect.origin.y. -->
+        <!-- subject 0.30, 0.30, 0.40, 0.40 → in video: (144, 81, 192, 108);
+             on-screen: (144, 126, 192, 108) -->
+        <div class="box" style="left:144px;top:126px;width:192px;height:108px;">
+            <span class="label">subject 94%</span>
+        </div>
+        <!-- edge -0.05, 0.55, 0.30, 0.20 in video → (-24, 67.5, 144, 54)
+             on-screen: (-24, 112.5, 144, 54) — overflows container left edge. -->
+        <div class="box" style="left:-24px;top:112px;width:144px;height:54px;">
+            <span class="label">edge 71%</span>
+        </div>
+        <!-- low_conf 0.65, 0.10, 0.20, 0.15 in video → (312, 202.5, 96, 40.5)
+             on-screen: (312, 247.5, 96, 40.5) -->
+        <div class="box" style="left:312px;top:248px;width:96px;height:41px;">
+            <span class="label">low_conf 23%</span>
+        </div>
+        <!-- empty 0.10, 0.05, 0.18, 0.18 in video → (48, 207.9, 86.4, 48.6)
+             on-screen: (48, 252.9, 86.4, 48.6) — no label. -->
+        <div class="box" style="left:48px;top:253px;width:86px;height:49px;"></div>
+    </div>
+</section>
+
+<p style="color:#777;font-size:12px;max-width:740px;margin-top:32px;">
+    Why this exists: per CLAUDE.md's "favorite pattern", visual artifacts get
+    caught at the artifact level — same way unit tests catch logic bugs
+    without running the full app. If the boxes here look wrong, the boxes
+    in the SwiftUI <code>Canvas</code> will look the same wrong. Fix the
+    style here, run the test suite, then run the demo.
+</p>
+
+</body>
+</html>

@@ -35,7 +35,9 @@ struct DetectionLayerTests {
         let layer = DetectionLayer(
             store: store,
             converter: PlayerLayerConverter(),
-            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100)
+            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            style: .default,
+            displayTimeSource: { .zero }
         )
 
         // Wrap in a host view to confirm the layer composes as a SwiftUI
@@ -54,7 +56,29 @@ struct DetectionLayerTests {
             store: store,
             converter: PlayerLayerConverter(),
             videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
-            stalenessThreshold: CMTime(value: 2, timescale: 1)
+            style: .default,
+            stalenessThreshold: CMTime(value: 2, timescale: 1),
+            displayTimeSource: { .zero }
+        )
+
+        let host = HostView { layer }
+        #expect(type(of: host.body) != Never.self)
+    }
+
+    @Test
+    func customStyleAndDisplayTimeSourceCompose() {
+        // The M3 playback override path — `displayTimeSource` closure captures
+        // a CMTime from the call site. Smoke that both the custom style and
+        // the custom displayTimeSource flow through the init together.
+        let store = ResultStore()
+        let frozen = CMTime(value: 42, timescale: 60)
+        let style = OverlayStyle(strokeWidth: 3.0, labelTextColor: .yellow)
+        let layer = DetectionLayer(
+            store: store,
+            converter: PlayerLayerConverter(),
+            videoRect: CGRect(x: 0, y: 0, width: 200, height: 200),
+            style: style,
+            displayTimeSource: { frozen }
         )
 
         let host = HostView { layer }
