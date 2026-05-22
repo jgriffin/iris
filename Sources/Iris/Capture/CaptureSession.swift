@@ -20,6 +20,14 @@ import os
 /// Public preview surface is `previewSource` (a `nonisolated let
 /// PreviewSource`) — the SwiftUI `CameraPreview` view consumes it via
 /// `connect(to:)` without ever touching the underlying `AVCaptureSession`.
+///
+/// **Rotation responsibility split.** This actor owns the *capture*-side
+/// `RotationCoordinator` only — its `videoRotationAngleForHorizonLevelCapture`
+/// is applied to the data-output connection so Vision sees horizon-level
+/// pixels. *Preview*-side rotation lives in `PreviewView` (the MainActor
+/// site that holds the `AVCaptureVideoPreviewLayer`), because
+/// `videoRotationAngleForHorizonLevelPreview` only compensates correctly
+/// when the coordinator is initialized with the real preview layer.
 public actor CaptureSession: Source {
 
     // MARK: - Executor
@@ -44,7 +52,6 @@ public actor CaptureSession: Source {
     private var router: SampleBufferRouter?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var captureRotationObservation: NSKeyValueObservation?
-    private var previewRotationObservation: NSKeyValueObservation?
     private let continuation: AsyncStream<Frame>.Continuation
     private let logger = Logger(subsystem: "iris.capture", category: "session")
 
@@ -112,11 +119,6 @@ public actor CaptureSession: Source {
     public func invalidate() async {
         captureRotationObservation?.invalidate()
         captureRotationObservation = nil
-        previewRotationObservation?.invalidate()
-        previewRotationObservation = nil
-        if let avSource = previewSource as? AVCapturePreviewSource {
-            avSource.finishAngleStream()
-        }
         continuation.finish()
         if session.isRunning {
             session.stopRunning()
@@ -186,30 +188,26 @@ public actor CaptureSession: Source {
         }
         session.addOutput(videoOutput)
 
-        // Rotation: own one `RotationCoordinator` and route its two angles
-        // independently per display-pipeline-architecture decision 18 —
-        //   videoRotationAngleForHorizonLevelCapture  → data-output connection
-        //   videoRotationAngleForHorizonLevelPreview  → preview-layer connection
-        //                                              (via PreviewSource.previewAngles)
+        // Capture-side rotation: this coordinator's
+        // `videoRotationAngleForHorizonLevelCapture` is independent of any
+        // preview layer, so `previewLayer: nil` is correct here. The
+        // *preview*-side coordinator lives in `PreviewView` (see its
+        // doc-comment) because the preview-angle property only returns the
+        // layer-orientation-compensated value when initialized with the
+        // actual preview layer.
         let coordinator = AVCaptureDevice.RotationCoordinator(
             device: device,
             previewLayer: nil
         )
         self.rotationCoordinator = coordinator
 
-        // Apply initial angles.
         if let dataConnection = videoOutput.connection(with: .video) {
             dataConnection.videoRotationAngle = coordinator.videoRotationAngleForHorizonLevelCapture
             dataConnection.isVideoMirrored = false
         }
-        if let avSource = previewSource as? AVCapturePreviewSource {
-            avSource.publishPreviewAngle(coordinator.videoRotationAngleForHorizonLevelPreview)
-        }
 
-        // Observe ongoing changes. KVO callbacks arrive on an arbitrary
-        // queue — for the capture side, hop back to the actor's executor
-        // before mutating the connection; for the preview side, just yield
-        // into the AsyncStream (the continuation is thread-safe).
+        // KVO callbacks arrive on an arbitrary queue — hop back to the
+        // actor's executor before mutating the data-output connection.
         captureRotationObservation = coordinator.observe(
             \.videoRotationAngleForHorizonLevelCapture,
             options: [.new]
@@ -218,14 +216,6 @@ public actor CaptureSession: Source {
             Task { [weak self] in
                 await self?.applyCaptureAngle(newAngle)
             }
-        }
-        previewRotationObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelPreview,
-            options: [.new]
-        ) { [weak self] _, change in
-            guard let newAngle = change.newValue else { return }
-            guard let avSource = self?.previewSource as? AVCapturePreviewSource else { return }
-            avSource.publishPreviewAngle(newAngle)
         }
 
         // TODO M1+: interruption recovery wiring. The AVF notifications

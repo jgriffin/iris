@@ -12,14 +12,6 @@ public protocol PreviewSource: Sendable {
     /// on `@MainActor` — typical caller is `CameraPreview.makeUIView` which
     /// is already `@MainActor`-isolated by `UIViewRepresentable`.
     @MainActor func connect(to target: PreviewTarget)
-
-    /// Preview-side rotation angles in degrees, sourced from
-    /// `AVCaptureDevice.RotationCoordinator.videoRotationAngleForHorizonLevelPreview`.
-    /// Yields the current angle on subscribe and again whenever the device
-    /// rotates. Consumers apply the angle to their preview layer's
-    /// `connection?.videoRotationAngle` on `@MainActor`. `.bufferingNewest(1)`
-    /// — only the latest angle matters.
-    var previewAngles: AsyncStream<CGFloat> { get }
 }
 
 /// The receiving side of the preview indirection. Implemented by the

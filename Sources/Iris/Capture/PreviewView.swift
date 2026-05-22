@@ -11,6 +11,16 @@ import UIKit
 /// Conforms to `PreviewTarget` so `AVCapturePreviewSource` can hand it the
 /// session on `@MainActor`.
 ///
+/// **Preview rotation** is owned here. When `setSession(_:)` is called, the
+/// view spins up its own `AVCaptureDevice.RotationCoordinator` bound to
+/// `self.previewLayer` and the session's input device, then observes
+/// `videoRotationAngleForHorizonLevelPreview` to keep the preview
+/// horizon-level. Initializing the coordinator with the actual preview layer
+/// (rather than `previewLayer: nil`) is required for the angle to
+/// compensate for the layer's interface orientation; with `nil` the property
+/// returns 0 in portrait, leaving the preview rotated 90° counterclockwise.
+/// This matches Apple's AVCam sample.
+///
 /// Public only because it's the `UIViewType` exposed by `CameraPreview`
 /// (Swift requires the type to be at least as visible as the public
 /// `makeUIView` return). It is not part of the intended consumer surface
@@ -27,28 +37,51 @@ public final class PreviewView: UIView, PreviewTarget {
         layer as! AVCaptureVideoPreviewLayer
     }
 
-    private var rotationTask: Task<Void, Never>?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservation: NSKeyValueObservation?
 
     public func setSession(_ session: AVCaptureSession) {
         previewLayer.session = session
+        installRotationCoordinator(session: session)
         // videoGravity is set by `CameraPreview` after `connect(to:)` so it
         // can be configured by consumers.
     }
 
-    /// Subscribe to a stream of preview rotation angles (in degrees) and
-    /// apply each to the preview layer's connection on MainActor. Replaces
-    /// any prior subscription.
-    @MainActor func observePreviewAngles(_ stream: AsyncStream<CGFloat>) {
-        rotationTask?.cancel()
-        rotationTask = Task { @MainActor [weak self] in
-            for await angle in stream {
-                self?.previewLayer.connection?.videoRotationAngle = angle
+    /// Bind a `RotationCoordinator` to `self.previewLayer` and the session's
+    /// input device, apply the initial preview-side angle, and observe
+    /// changes. Replaces any prior coordinator.
+    @MainActor private func installRotationCoordinator(session: AVCaptureSession) {
+        rotationObservation?.invalidate()
+        rotationObservation = nil
+
+        guard
+            let input = session.inputs.first as? AVCaptureDeviceInput
+        else {
+            return
+        }
+
+        let coordinator = AVCaptureDevice.RotationCoordinator(
+            device: input.device,
+            previewLayer: previewLayer
+        )
+        self.rotationCoordinator = coordinator
+
+        let initialAngle = coordinator.videoRotationAngleForHorizonLevelPreview
+        previewLayer.connection?.videoRotationAngle = initialAngle
+
+        rotationObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelPreview,
+            options: [.new]
+        ) { [weak self] _, change in
+            guard let newAngle = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                self?.previewLayer.connection?.videoRotationAngle = newAngle
             }
         }
     }
 
     deinit {
-        rotationTask?.cancel()
+        rotationObservation?.invalidate()
     }
 }
 
