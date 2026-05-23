@@ -271,6 +271,7 @@ struct ContentView: View {
                         converter: converter,
                         videoRect: playerLayer.videoRect,
                         stalenessThreshold: resultStore.playbackStalenessThreshold,
+                        tuning: tuningModel,
                         displayTimeSource: { [controller] in
                             controller.currentTime
                         }
@@ -378,6 +379,20 @@ struct ContentView: View {
         // `detect(in:cache:tuning:)` below.
         let newTuning = TuningModel(detector: initialDetector, cache: resultStore)
 
+        // M4 polish: pause-emit hook. A `.detector`-tier change clears
+        // the cache; if the source is paused, no frames flow → cache
+        // stays empty → overlay reads nil → detections disappear
+        // mid-tuning. Seeking to the current time re-emits a one-shot
+        // frame through `PlaybackSource.emitOneShotFrame()` (the same
+        // primitive M3 Phase 2 uses for `seek` / `step`), giving the
+        // pipeline a frame to re-run under the new detector.
+        newTuning.onDetectorTierChange = { [weak newController] in
+            guard let controller = newController else { return }
+            let source = controller.source
+            let target = controller.currentTime
+            Task { try? await source.seek(to: target) }
+        }
+
         // Spawn the detector loop. Per the runtime decisions doc the
         // `for await` loop owns task lifetime — we cancel by canceling
         // the wrapping Task. The pipeline owns cache write-through on
@@ -427,6 +442,12 @@ struct ContentView: View {
 
         let priorSource = controller?.source
         let priorScopedURL = scopedURL
+
+        // Clear the pause-emit hook before dropping the model reference
+        // — defensive: the closure captures `newController` weakly, but
+        // dropping the slot eliminates any chance of a stale fire
+        // crossing the swap boundary.
+        tuningModel?.onDetectorTierChange = nil
 
         controller = nil
         playerLayer = nil

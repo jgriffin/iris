@@ -123,6 +123,16 @@ private final class RecordingTunableDetector: TunableDetector, @unchecked Sendab
     }
 }
 
+/// `@MainActor`-isolated counter so the `@Sendable @MainActor () -> Void`
+/// callback under test can mutate it without tripping
+/// captured-`var`-in-Sendable diagnostics. The closure captures the
+/// instance reference; mutation happens through `bump()` on the actor.
+@MainActor
+private final class FireCounter {
+    private(set) var value: Int = 0
+    func bump() { value += 1 }
+}
+
 // MARK: - View-tier
 
 @Test
@@ -303,6 +313,84 @@ func detectorTierWithNilRebuildKeepsCurrentDetectorButInvalidates() async throws
 
     #expect(model.detector === detector)  // unchanged on nil rebuild
     #expect(cache.contains(timestamp: timestamp) == false)
+}
+
+// MARK: - onDetectorTierChange callback
+
+@Test
+@MainActor
+func onDetectorTierChangeFiresOnDetectorTier() async throws {
+    // The pause-emit hook is the M4-polish symptom-fix for "detector-tier
+    // change while paused drops detections forever." Consumers wire it to
+    // a one-shot re-emit on their frame source; the model itself just
+    // promises to fire it on every `.detector` transition, after the
+    // cache invalidation has been scheduled.
+    let detector = RecordingTunableDetector()
+    let rebuilt = RecordingTunableDetector()
+    detector.verdict = { _ in .detector(rebuilt: rebuilt) }
+    let cache = ResultStore()
+    let model = TuningModel(detector: detector, cache: cache)
+
+    let counter = FireCounter()
+    model.onDetectorTierChange = { counter.bump() }
+
+    model.update(\.threshold, to: 0.9)
+    // The hook fires inside a `Task { @MainActor in ... }` that also
+    // awaits `cache.invalidateAll()`. Yield until that lands.
+    for _ in 0..<8 where counter.value == 0 {
+        await Task.yield()
+    }
+
+    #expect(counter.value == 1)
+    #expect(model.lastApplyTier == .detector)
+}
+
+@Test
+@MainActor
+func onDetectorTierChangeDoesNotFireOnViewOrFilterTier() async throws {
+    let detector = RecordingTunableDetector()
+    let cache = ResultStore()
+    let model = TuningModel(detector: detector, cache: cache)
+
+    let counter = FireCounter()
+    model.onDetectorTierChange = { counter.bump() }
+
+    // View tier.
+    detector.verdict = { _ in .view }
+    model.update(\.threshold, to: 0.6)
+    await Task.yield()
+    await Task.yield()
+    #expect(counter.value == 0)
+
+    // Filter tier.
+    detector.verdict = { _ in .filter }
+    model.update(\.threshold, to: 0.7)
+    await Task.yield()
+    await Task.yield()
+    #expect(counter.value == 0)
+}
+
+@Test
+@MainActor
+func onDetectorTierChangeFiresEvenWithoutCache() async throws {
+    // Capture-only / cache-less consumers that wire `TuningModel` for
+    // hot-swap also benefit from the hook (the symptom here is "live
+    // capture detector swap, but the next-frame inference races the
+    // detector reference swap"). Verify it fires even when `cache: nil`.
+    let detector = RecordingTunableDetector()
+    let rebuilt = RecordingTunableDetector()
+    detector.verdict = { _ in .detector(rebuilt: rebuilt) }
+    let model = TuningModel(detector: detector, cache: nil)
+
+    let counter = FireCounter()
+    model.onDetectorTierChange = { counter.bump() }
+
+    model.update(\.threshold, to: 0.9)
+    for _ in 0..<8 where counter.value == 0 {
+        await Task.yield()
+    }
+
+    #expect(counter.value == 1)
 }
 
 // MARK: - Pipeline picks up swapped detector

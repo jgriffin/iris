@@ -71,12 +71,29 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
     /// scrub binding through without a second init overload.
     public let displayTimeSource: @Sendable () -> CMTime
 
+    /// Optional tuning router consulted at *draw time* for an output-stage
+    /// filter predicate.
+    ///
+    /// **Why draw-time, not pipeline-time alone.** `DetectorPipeline` already
+    /// applies `tuning.filter` to its own return value (both cache-hit and
+    /// fresh-inference paths). But the overlay reads `ResultStore.lookup(at:)`
+    /// directly on every `TimelineView` tick — independent of pipeline runs.
+    /// When the source is paused, no frames flow → no pipeline runs → filter
+    /// changes are invisible. Consulting the router here makes filter-tier
+    /// knob changes reactive even when the source is idle: the overlay
+    /// redraws on the next animation tick with the new predicate applied.
+    ///
+    /// `nil` (the default) preserves pre-M4 behavior — every cached detection
+    /// in `lookup(at:)` is drawn unfiltered.
+    public let tuning: (any TuningRouter)?
+
     public init(
         store: ResultStore,
         converter: Converter,
         videoRect: CGRect,
         style: OverlayStyle = .default,
         stalenessThreshold: CMTime? = nil,
+        tuning: (any TuningRouter)? = nil,
         displayTimeSource: @Sendable @escaping () -> CMTime = {
             CMClockGetTime(CMClockGetHostTimeClock())
         }
@@ -86,13 +103,15 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         self.videoRect = videoRect
         self.style = style
         self.stalenessThreshold = stalenessThreshold
+        self.tuning = tuning
         self.displayTimeSource = displayTimeSource
     }
 
     public var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
             let displayTime = displayTimeSource()
-            let detections = store.lookup(at: displayTime, stale: stalenessThreshold)
+            let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
+            let detections = Self.applyFilter(tuning?.filter, to: raw)
 
             Canvas { gc, _ in
                 for detection in detections {
@@ -108,6 +127,24 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
             .drawingGroup()
             .allowsHitTesting(false)
         }
+    }
+
+    /// Apply an optional output-stage filter predicate to a detection list.
+    /// Pulled out as a `static` helper so unit tests can exercise the
+    /// filter-application path without rendering — SwiftUI's `Canvas` body
+    /// is opaque to tests, but this helper takes the same `(filter, raw)`
+    /// inputs the body uses and returns the filtered list.
+    ///
+    /// `filter == nil` returns the input array by identity — no allocation
+    /// for the common no-filter case (the overwhelming majority of capture
+    /// call sites).
+    @inlinable
+    public static func applyFilter(
+        _ filter: (@Sendable (Detection) -> Bool)?,
+        to detections: [Detection]
+    ) -> [Detection] {
+        guard let filter else { return detections }
+        return detections.filter(filter)
     }
 
     // MARK: - Drawing

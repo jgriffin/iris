@@ -142,6 +142,31 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
     /// view in Phase 3 or later).
     public var filter: (@Sendable (Detection) -> Bool)?
 
+    /// Optional callback invoked *after* `cache?.invalidateAll()` on a
+    /// `.detector`-tier transition (and after the detector reference
+    /// swap, if any).
+    ///
+    /// **Why this hook exists.** Detector-tier changes invalidate the
+    /// playback cache so the next inference produces fresh entries
+    /// under the new settings. When the source is *playing*, frames
+    /// flow naturally and the new detector picks up on the next
+    /// arrival. When the source is *paused*, no frames flow — the
+    /// cache is empty, the overlay reads nil, nothing draws, and the
+    /// user has no way to recover without un-pausing.
+    ///
+    /// Consumers wire this to a one-shot re-emit on their frame
+    /// source (e.g. `PlaybackSource.emitOneShotFrame()` via
+    /// `seek(to: source.currentTime)`) so the pipeline gets a frame
+    /// to re-run against. The callback fires on `MainActor` since
+    /// frame-source state is typically `@MainActor`-isolated.
+    ///
+    /// Fires **only** on `.detector` tiers — not on `.view` or
+    /// `.filter`. View/filter tiers don't invalidate the cache and
+    /// don't require a fresh inference; their effects show through
+    /// either via SwiftUI observation (`.view`) or via the
+    /// `DetectionLayer.tuning` / pipeline filter pass (`.filter`).
+    public var onDetectorTierChange: (@Sendable @MainActor () -> Void)?
+
     // MARK: - Stored
 
     /// Cache invalidation hook. `update(_:to:)` calls
@@ -251,8 +276,26 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
                 )
             }
             if let cache {
+                // Cache invalidation + pause-emit hook fire in the same
+                // Task so the hook always runs *after* the cache is
+                // cleared (the hook's typical wiring is a frame re-emit;
+                // an out-of-order race would re-emit *before* the cache
+                // was empty, producing a hit on the stale entry instead
+                // of a fresh inference under the new detector).
+                let hook = onDetectorTierChange
                 Task { @MainActor in
                     await cache.invalidateAll()
+                    hook?()
+                }
+            } else {
+                // No cache → no invalidation to order against. Still
+                // surface the tier transition so consumers that wire a
+                // pause-emit even in cache-less configurations (capture-
+                // only setups using `TuningModel` for hot-swap) get the
+                // callback.
+                let hook = onDetectorTierChange
+                Task { @MainActor in
+                    hook?()
                 }
             }
         }

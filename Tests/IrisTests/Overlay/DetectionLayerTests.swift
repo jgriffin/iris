@@ -66,6 +66,82 @@ struct DetectionLayerTests {
     }
 
     @Test
+    func applyFilterPassesThroughWhenNil() {
+        // No filter → input array returned unchanged. This is the
+        // pre-M4 default behavior — every cached detection at the
+        // looked-up timestamp is drawn.
+        let detections = [
+            Detection(
+                boundingBox: CGRect(x: 0, y: 0, width: 0.2, height: 0.2),
+                label: "lo",
+                confidence: 0.2,
+                sourceModelID: "detection-layer-tests"
+            ),
+            Detection(
+                boundingBox: CGRect(x: 0.3, y: 0.3, width: 0.2, height: 0.2),
+                label: "hi",
+                confidence: 0.9,
+                sourceModelID: "detection-layer-tests"
+            ),
+        ]
+        let result = DetectionLayer<PlayerLayerConverter>.applyFilter(nil, to: detections)
+        #expect(result.count == 2)
+        #expect(result.map(\.label) == ["lo", "hi"])
+    }
+
+    @Test
+    func applyFilterDropsDetectionsFailingPredicate() {
+        // M4 polish: the body's draw-time filter pass is the symptom
+        // fix for "filter-tier slider changes are invisible while
+        // paused." `DetectorPipeline` only applies `tuning.filter` when
+        // frames flow; with the source paused, the overlay reads
+        // `ResultStore` directly. This helper is the per-tick filter
+        // application the body uses — exercising it directly covers
+        // the symptom without rendering a Canvas.
+        let detections = [
+            Detection(
+                boundingBox: CGRect(x: 0, y: 0, width: 0.2, height: 0.2),
+                label: "lo",
+                confidence: 0.2,
+                sourceModelID: "detection-layer-tests"
+            ),
+            Detection(
+                boundingBox: CGRect(x: 0.3, y: 0.3, width: 0.2, height: 0.2),
+                label: "hi",
+                confidence: 0.9,
+                sourceModelID: "detection-layer-tests"
+            ),
+        ]
+        let predicate: @Sendable (Detection) -> Bool = { $0.confidence >= 0.5 }
+        let result = DetectionLayer<PlayerLayerConverter>.applyFilter(
+            predicate,
+            to: detections
+        )
+        #expect(result.map(\.label) == ["hi"])
+    }
+
+    @Test
+    func tuningParameterFlowsThroughInit() {
+        // The `tuning:` parameter must be nil-defaultable (preserves
+        // pre-M4 call sites) and accept any `TuningRouter` (the
+        // protocol-erased shape `TuningModel` conforms to).
+        let store = ResultStore()
+        let detector = VisionRectanglesDetector()
+        let model = TuningModel(detector: detector)
+        let layer = DetectionLayer(
+            store: store,
+            converter: PlayerLayerConverter(),
+            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            style: .default,
+            stalenessThreshold: nil,
+            tuning: model,
+            displayTimeSource: { .zero }
+        )
+        let host = HostView { layer }
+        #expect(type(of: host.body) != Never.self)
+    }
+
+    @Test
     func customStyleAndDisplayTimeSourceCompose() {
         // The M3 playback override path — `displayTimeSource` closure captures
         // a CMTime from the call site. Smoke that both the custom style and
