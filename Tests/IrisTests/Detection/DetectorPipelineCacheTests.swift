@@ -106,11 +106,14 @@ func cacheMissRunsDetectorAndWritesThrough() async throws {
     #expect(cache.contains(timestamp: timestamp))
 }
 
-/// Two invocations at the *same* timestamp: the first writes through, the
-/// second hits the cache and skips the detector entirely.
+/// On cache hit: detector dispatch is skipped *and* the cached
+/// detections are returned (not `[]`). Pre-seed the cache with a known
+/// `TimestampedDetections` at t=1.000s, then call `detect(in:cache:)` at
+/// the same timestamp and assert both behaviors — no detector run, and
+/// the returned `[Detection]` equals the seeded detections.
 @Test
 @MainActor
-func cacheHitSkipsDetector() async throws {
+func cacheHitSkipsDetectorAndReturnsCachedDetections() async throws {
     let counter = CallCounter()
     let detector = RecordingDetector(counter: counter, detections: [makeDetection()])
     let pipeline = DetectorPipeline(detector)
@@ -118,10 +121,18 @@ func cacheHitSkipsDetector() async throws {
     let timestamp = CMTime(value: 1000, timescale: 1000)  // 1.000s
     let frame = makeSyntheticFrame(timestamp: timestamp)
 
-    _ = try await pipeline.detect(in: frame, cache: cache)
-    _ = try await pipeline.detect(in: frame, cache: cache)
+    // Pre-seed with a sentinel detection that cannot have come from the
+    // recording detector — distinct label makes the source unambiguous.
+    let sentinel = makeDetection(label: "cached-sentinel")
+    cache.append(TimestampedDetections(timestamp: timestamp, detections: [sentinel]))
 
-    #expect(await counter.count == 1)
+    let result = try await pipeline.detect(in: frame, cache: cache)
+
+    // Detector skipped.
+    #expect(await counter.count == 0)
+    // Returned value is the cached entry, not `[]`.
+    #expect(result.map(\.label) == ["cached-sentinel"])
+    #expect(result.first?.boundingBox == sentinel.boundingBox)
 }
 
 /// Two invocations at timestamps that map to the same 30 fps quantization

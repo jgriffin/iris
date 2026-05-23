@@ -3,10 +3,12 @@ import CoreMedia
 /// Skip-gate + write-through interface that `DetectorPipeline` uses to
 /// avoid re-running detectors on timestamps it has already seen.
 ///
-/// The pipeline consults `contains(timestamp:)` before dispatching its
-/// detectors; on hit, the dispatch is skipped entirely. On miss, the
-/// pipeline runs the detectors as normal and feeds the result back through
-/// `append(_:)` before returning.
+/// The pipeline consults `fetch(timestamp:)` before dispatching its
+/// detectors; on hit, the dispatch is skipped entirely and the cached
+/// entry's detections are returned directly. On miss, the pipeline runs
+/// the detectors as normal and feeds the result back through `append(_:)`
+/// before returning. `contains(timestamp:)` is retained as a cheaper
+/// probe-only call for callers that don't need the cached value.
 ///
 /// **Why a protocol here.** `DetectorPipeline` lives in
 /// `Sources/Iris/Detection/`; the concrete cache (`ResultStore`) lives in
@@ -27,9 +29,20 @@ import CoreMedia
 public protocol DetectionCache: Sendable {
 
     /// Cheap probe: does the cache hold an entry for the bucket containing
-    /// `timestamp`? The pipeline uses this as a skip-gate — a `true` result
-    /// means "skip detector dispatch; the cached entry stands."
+    /// `timestamp`? A `true` result means "skip detector dispatch; the
+    /// cached entry stands." Callers that *also* need the cached value
+    /// should use `fetch(timestamp:)` instead, which is a single
+    /// hit-or-miss probe that returns the entry.
     func contains(timestamp: CMTime) async -> Bool
+
+    /// Bucket-exact lookup: returns the cached entry for the bucket
+    /// containing `timestamp`, or `nil` if no entry has been written to
+    /// that bucket. This is *not* the overlay's nearest-neighbor
+    /// `lookup(at:stale:)` read path — `fetch` is the bucket-exact probe
+    /// the pipeline uses to decide hit-or-miss and retrieve the cached
+    /// value in one call, so a cache hit can return the cached detections
+    /// directly rather than the semantically ambiguous `[]`.
+    func fetch(timestamp: CMTime) async -> TimestampedDetections?
 
     /// Write-through entry point. The pipeline calls this on cache miss
     /// after running its detectors, so the next visit to the same

@@ -109,6 +109,34 @@ struct ResultStoreTests {
         #expect(!store.contains(timestamp: CMTime(seconds: 5.000, preferredTimescale: 600)))
     }
 
+    // 4b. `fetch(timestamp:)` — bucket-exact lookup that returns the
+    //     cached entry (or `nil`). Used by `DetectorPipeline` so a cache
+    //     hit returns the cached detections instead of `[]`. Bucket-aware
+    //     for free via the shared quantization path.
+    @Test
+    func fetchReturnsCachedEntryForBucketAndNilOtherwise() {
+        let store = ResultStore()  // default 1/30s quantization
+        let seed = timestamped(seconds: 1.000, label: "seed")
+        store.append(seed)
+
+        // Bucket-exact hit at the same timestamp.
+        let exact = store.fetch(timestamp: CMTime(seconds: 1.000, preferredTimescale: 600))
+        #expect(exact?.detections.first?.label == "seed")
+        #expect(exact?.timestamp == seed.timestamp)
+
+        // Quantization-equivalent hit — 1.012s lands in the same 30 fps
+        // bucket as 1.000s. Returns the same cached entry.
+        let bucketEquivalent = store.fetch(
+            timestamp: CMTime(seconds: 1.012, preferredTimescale: 600)
+        )
+        #expect(bucketEquivalent?.detections.first?.label == "seed")
+        #expect(bucketEquivalent?.timestamp == seed.timestamp)
+
+        // Empty bucket — far enough away to land in a distinct bucket.
+        let miss = store.fetch(timestamp: CMTime(seconds: 5.000, preferredTimescale: 600))
+        #expect(miss == nil)
+    }
+
     // 5. `clear()` empties the cache.
     @Test
     func clearEmptiesTheCache() {

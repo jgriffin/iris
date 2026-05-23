@@ -105,12 +105,31 @@ public final class ResultStore: DetectionCache {
     }
 
     /// Cheap probe: does the cache hold an entry for the bucket containing
-    /// `timestamp`? Used by the detector pipeline as a skip-gate (Phase 2
-    /// of the playback-detection-cache feature). Bucket-aware — distinct
+    /// `timestamp`? Used by callers that don't need the cached value
+    /// (e.g. a write-only sink deciding whether to skip its detector
+    /// dispatch when no read is required). Bucket-aware — distinct
     /// floating-point timestamps within the same quantization bucket all
-    /// return the same answer.
+    /// return the same answer. Equivalent to `fetch(timestamp:) != nil`
+    /// but avoids materializing the entry.
     public func contains(timestamp: CMTime) -> Bool {
         entries[bucket(timestamp)] != nil
+    }
+
+    /// Bucket-exact lookup: returns the cached `TimestampedDetections`
+    /// for the bucket containing `timestamp`, or `nil` if no entry has
+    /// been written to that bucket. Bucket-aware — any timestamp within
+    /// the same quantization bucket as a prior `append(_:)` returns that
+    /// entry. Used by `DetectorPipeline.detect(in:cache:)` as the skip-
+    /// gate-and-fetch probe, so a cache hit can return the cached
+    /// detections directly rather than `[]`.
+    ///
+    /// This is *not* the overlay's nearest-neighbor read path — use
+    /// `lookup(at:stale:)` for that. `fetch` is strictly bucket-exact:
+    /// a timestamp two buckets away from any cached entry returns `nil`,
+    /// even though `lookup(at:)` may still surface a neighbor inside its
+    /// adaptive window.
+    public func fetch(timestamp: CMTime) -> TimestampedDetections? {
+        entries[bucket(timestamp)]
     }
 
     // MARK: - Private
