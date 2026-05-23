@@ -50,10 +50,48 @@ public struct DetectorPipeline: Detector {
     /// resulting `[Detection]` is the concatenation of each detector's
     /// output in the order the detectors were supplied to `init` — not
     /// the order tasks happened to complete.
+    ///
+    /// `Detector`-protocol entry point. Equivalent to calling
+    /// `detect(in: frame, cache: nil)` — always runs the detectors, never
+    /// consults a cache. Cache-aware callers (playback) should use the
+    /// `detect(in:cache:)` overload below.
     public func detect(in frame: Frame) async throws -> [Detection] {
-        try await withThrowingTaskGroup(
+        try await detect(in: frame, cache: nil)
+    }
+
+    /// Cache-aware per-frame entry point used by callers that have a
+    /// `DetectionCache` to dedupe by `Frame.timestamp` (playback). On
+    /// cache hit (`cache.contains(timestamp: frame.timestamp) == true`),
+    /// the detector dispatch is skipped entirely and the empty `[]` is
+    /// returned — the cached entry is already the source of truth and the
+    /// overlay reads it from the same store on its own tick (see
+    /// `DetectionLayer`'s `TimelineView` lookup, which is independent of
+    /// `append` events). On cache miss, runs the detectors as today and
+    /// writes through to the cache before returning.
+    ///
+    /// `cache == nil` reproduces the un-cached behavior exactly — every
+    /// frame runs through every detector, no skip, no write-through.
+    /// Capture call sites that have no cache (or that want every host-
+    /// clock timestamp re-detected) pass `nil`.
+    ///
+    /// Locked decision: feature plan
+    /// `plans/features/playback-detection-cache.md`, Phase 2.
+    public func detect(
+        in frame: Frame,
+        cache: (any DetectionCache)?
+    ) async throws -> [Detection] {
+        // Skip-gate: cache hit returns immediately with no detector
+        // dispatch. The overlay's `DetectionLayer` reads `ResultStore`
+        // every TimelineView tick via `displayTimeSource`, so re-render
+        // does not depend on `append` re-firing — the cached entry is
+        // already on-screen for this timestamp bucket.
+        if let cache, await cache.contains(timestamp: frame.timestamp) {
+            return []
+        }
+
+        let detections = try await withThrowingTaskGroup(
             of: (offset: Int, detections: [Detection]).self
-        ) { group in
+        ) { group -> [Detection] in
             for (offset, detector) in detectors.enumerated() {
                 group.addTask {
                     let dets = try await detector.detect(in: frame)
@@ -67,5 +105,15 @@ public struct DetectorPipeline: Detector {
             }
             return slots.flatMap { $0 }
         }
+
+        // Write-through on miss so the next visit to this timestamp
+        // bucket hits.
+        if let cache {
+            await cache.append(
+                TimestampedDetections(timestamp: frame.timestamp, detections: detections)
+            )
+        }
+
+        return detections
     }
 }

@@ -29,7 +29,7 @@ import Foundation
 /// dataset workflows put long-form footage through the pipeline.
 @MainActor
 @Observable
-public final class ResultStore {
+public final class ResultStore: DetectionCache {
 
     /// Quantization unit for timestamp bucketing. Defaults to one frame
     /// at 30 fps (`CMTime(value: 1, timescale: 30)`). Callers driving a

@@ -277,31 +277,28 @@ struct PlaybackContentView: View {
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
-        let detector = VisionRectanglesDetector(
-            minimumAspectRatio: 0.3,
-            maximumAspectRatio: 1.0,
-            minimumSize: 0.1,
-            minimumConfidence: 0.7,
-            label: "rect"
+        let pipeline = DetectorPipeline(
+            VisionRectanglesDetector(
+                minimumAspectRatio: 0.3,
+                maximumAspectRatio: 1.0,
+                minimumSize: 0.1,
+                minimumConfidence: 0.7,
+                label: "rect"
+            )
         )
 
         // Spawn detector loop. Same shape as the macOS demo's
-        // `openVideo(at:)` — `resultStore` is `@MainActor`, hop on each
-        // append.
+        // `openVideo(at:)` — the pipeline owns the cache write-through on
+        // miss (playback-detection-cache Phase 2), so this loop no longer
+        // calls `store.append` itself. Cache hits on revisited timestamps
+        // skip the detector dispatch entirely; the overlay reads
+        // `resultStore` on its own TimelineView tick.
         let store = resultStore
         let task = Task {
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
-                    let detections = try await detector.detect(in: frame)
-                    await MainActor.run {
-                        store.append(
-                            TimestampedDetections(
-                                timestamp: frame.timestamp,
-                                detections: detections
-                            )
-                        )
-                    }
+                    _ = try await pipeline.detect(in: frame, cache: store)
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"

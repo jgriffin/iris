@@ -180,32 +180,28 @@ struct ContentView: View {
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
-        let detector = VisionRectanglesDetector(
-            minimumAspectRatio: 0.3,
-            maximumAspectRatio: 1.0,
-            minimumSize: 0.1,
-            minimumConfidence: 0.7,
-            label: "rect"
+        let pipeline = DetectorPipeline(
+            VisionRectanglesDetector(
+                minimumAspectRatio: 0.3,
+                maximumAspectRatio: 1.0,
+                minimumSize: 0.1,
+                minimumConfidence: 0.7,
+                label: "rect"
+            )
         )
 
         // Spawn the detector loop. Per the runtime decisions doc the
         // `for await` loop owns task lifetime — we cancel by canceling
-        // the wrapping Task. `resultStore` is `@MainActor`, so we hop on
-        // each append.
+        // the wrapping Task. The pipeline owns cache write-through on
+        // miss (playback-detection-cache Phase 2); cache hits on
+        // revisited timestamps skip the detector dispatch entirely so
+        // backward seeks into already-played regions paint instantly.
         let store = resultStore
         let task = Task {
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
-                    let detections = try await detector.detect(in: frame)
-                    await MainActor.run {
-                        store.append(
-                            TimestampedDetections(
-                                timestamp: frame.timestamp,
-                                detections: detections
-                            )
-                        )
-                    }
+                    _ = try await pipeline.detect(in: frame, cache: store)
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
