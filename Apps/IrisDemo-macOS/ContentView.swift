@@ -62,6 +62,20 @@ struct ContentView: View {
     /// last path component when one is loaded; empty otherwise.
     @State private var activeLabel: String = ""
 
+    /// M4 Phase 3: live tuning model for the active Vision rectangle
+    /// detector. One instance per `ContentView`; `swapToExternal`
+    /// rebuilds it alongside the detector so the model's settings
+    /// reflect the fresh detector. The `.inspector`-hosted
+    /// `VisionRectanglesTuningView` binds to this; writes route
+    /// through `model.binding(_:)` → `update(_:to:)` → tier classifier
+    /// → cache invalidation on `.detector` tiers.
+    @State private var tuningModel: TuningModel<VisionRectanglesDetector>?
+
+    /// Whether the inspector panel is showing. Gear-icon toolbar
+    /// toggle flips this; the inspector hosts the live
+    /// `VisionRectanglesTuningView` over `tuningModel`.
+    @State private var showTuning = false
+
     var body: some View {
         NavigationSplitView {
             sidebar
@@ -70,6 +84,36 @@ struct ContentView: View {
             detailArea
         }
         .frame(minWidth: 880, minHeight: 480)
+        .inspector(isPresented: $showTuning) {
+            // M4 Phase 3: live tuning inspector. Hosts
+            // `VisionRectanglesTuningView` over the active session's
+            // `tuningModel`. Empty state shows when no session is
+            // loaded — gear button stays toggleable so users learn
+            // where the panel lives even on an empty workspace.
+            Group {
+                if let tuningModel {
+                    VisionRectanglesTuningView(model: tuningModel)
+                } else {
+                    ContentUnavailableView(
+                        "No session",
+                        systemImage: "slider.horizontal.3",
+                        description: Text("Open a video to start tuning.")
+                    )
+                }
+            }
+            .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showTuning.toggle()
+                } label: {
+                    Label("Tune", systemImage: "slider.horizontal.3")
+                }
+                .help("Toggle tuning inspector")
+                .disabled(tuningModel == nil)
+            }
+        }
         .fileImporter(
             isPresented: $showFilePicker,
             allowedContentTypes: Self.movieContentTypes,
@@ -317,15 +361,22 @@ struct ContentView: View {
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
-        let pipeline = DetectorPipeline(
-            VisionRectanglesDetector(
-                minimumAspectRatio: 0.3,
-                maximumAspectRatio: 1.0,
-                minimumSize: 0.1,
-                minimumConfidence: 0.7,
-                label: "rect"
-            )
+        let initialDetector = VisionRectanglesDetector(
+            minimumAspectRatio: 0.3,
+            maximumAspectRatio: 1.0,
+            minimumSize: 0.1,
+            minimumConfidence: 0.7,
+            label: "rect"
         )
+        let pipeline = DetectorPipeline(initialDetector)
+
+        // M4 Phase 3: bind the live tuning model to the same detector
+        // the pipeline runs through. `cache: resultStore` means
+        // `.detector`-tier knob changes invalidate the playback cache
+        // so the next decode produces fresh detections under the new
+        // settings. The model is passed as the `tuning:` argument to
+        // `detect(in:cache:tuning:)` below.
+        let newTuning = TuningModel(detector: initialDetector, cache: resultStore)
 
         // Spawn the detector loop. Per the runtime decisions doc the
         // `for await` loop owns task lifetime — we cancel by canceling
@@ -334,11 +385,11 @@ struct ContentView: View {
         // revisited timestamps skip the detector dispatch entirely so
         // backward seeks into already-played regions paint instantly.
         let store = resultStore
-        let task = Task {
+        let task = Task { [tuning = newTuning] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
-                    _ = try await pipeline.detect(in: frame, cache: store)
+                    _ = try await pipeline.detect(in: frame, cache: store, tuning: tuning)
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
@@ -351,6 +402,7 @@ struct ContentView: View {
         self.activeLabel = url.lastPathComponent
         self.controller = newController
         self.detectionTask = task
+        self.tuningModel = newTuning
         self.errorText = nil
         self.playerLayer = nil  // re-bound when PlaybackView attaches
 
@@ -380,6 +432,7 @@ struct ContentView: View {
         playerLayer = nil
         scopedURL = nil
         activeLabel = ""
+        tuningModel = nil
         resultStore.clear()
 
         // Detach AVF observers + finish the frame stream, then release the

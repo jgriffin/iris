@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 import os
 
 // MARK: - TuningRouter
@@ -255,6 +256,35 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
                 }
             }
         }
+    }
+
+    // MARK: - SwiftUI bindings
+
+    /// SwiftUI binding factory that routes mutations through
+    /// `update(_:to:)` instead of mutating `settings` directly.
+    ///
+    /// **Why a helper, not a direct `Bindable`-style projection.** SwiftUI's
+    /// `$model.settings.minimumConfidence` would write to the property
+    /// in place, *bypassing* the tier classifier — which means a
+    /// `.detector`-tier change would silently leave the cache stale.
+    /// Forcing writes through `update(_:to:)` keeps the tier verdict +
+    /// cache invalidation on every transition.
+    ///
+    /// **Concurrency.** `@MainActor`-isolated like the rest of the
+    /// model; `Binding` getter/setter are read on the main runloop by
+    /// SwiftUI, so the actor hop is implicit. The returned binding
+    /// captures `self` weakly is *not* required here: `TuningModel`
+    /// outlives every view that binds to it (the views are owned by
+    /// the SwiftUI tree, the model is owned by the demo / consumer
+    /// scope), and the binding's strong capture is the same shape
+    /// `@Bindable` uses on `@Observable` references.
+    public func binding<T: Sendable & Equatable>(
+        _ keyPath: WritableKeyPath<Detector.Settings, T>
+    ) -> Binding<T> {
+        Binding(
+            get: { self.settings[keyPath: keyPath] },
+            set: { newValue in self.update(keyPath, to: newValue) }
+        )
     }
 
     // MARK: - Private helpers

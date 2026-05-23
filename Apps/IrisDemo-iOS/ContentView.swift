@@ -192,6 +192,20 @@ struct PlaybackContentView: View {
     @State private var detectionTask: Task<Void, Never>?
     @State private var errorText: String?
 
+    /// M4 Phase 3: live tuning model for the active Vision rectangle
+    /// detector. One instance per `PlaybackContentView`; `startSession`
+    /// rebuilds it alongside the detector so the model's settings
+    /// reflect the fresh detector. The `.sheet`-hosted
+    /// `VisionRectanglesTuningView` binds to this; writes route
+    /// through `model.binding(_:)` → `update(_:to:)` → tier classifier
+    /// → cache invalidation on `.detector` tiers.
+    @State private var tuningModel: TuningModel<VisionRectanglesDetector>?
+
+    /// Whether the tuning sheet is presented. Gear-icon toolbar button
+    /// flips this on the Playback tab; the sheet hosts the live
+    /// `VisionRectanglesTuningView` over `tuningModel`.
+    @State private var showTuning = false
+
     /// The URL currently held under a security scope, if any. nil when the
     /// active source is the bundled fixture (no scope needed). Every
     /// transition that mutates this must balance start/stop in pairs —
@@ -232,6 +246,20 @@ struct PlaybackContentView: View {
             }
             .ignoresSafeArea()
         }
+        .sheet(isPresented: $showTuning) {
+            if let tuningModel {
+                NavigationStack {
+                    VisionRectanglesTuningView(model: tuningModel)
+                        .navigationTitle("Detector tuning")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showTuning = false }
+                            }
+                        }
+                }
+            }
+        }
         .task {
             // First-launch / first-appear behavior: if the user hasn't
             // picked anything yet AND the MRU is empty, fall back to the
@@ -261,6 +289,19 @@ struct PlaybackContentView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
+            // M4 Phase 3: live tuning sheet. Disabled until a session
+            // is loaded — the tuning model is built alongside the
+            // detector inside `startSession`.
+            Button {
+                showTuning = true
+            } label: {
+                Label("Tune", systemImage: "slider.horizontal.3")
+                    .labelStyle(.iconOnly)
+            }
+            .controlSize(.small)
+            .disabled(tuningModel == nil)
+            .accessibilityLabel("Tune detector")
+
             Button {
                 showPicker = true
             } label: {
@@ -455,15 +496,22 @@ struct PlaybackContentView: View {
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
-        let pipeline = DetectorPipeline(
-            VisionRectanglesDetector(
-                minimumAspectRatio: 0.3,
-                maximumAspectRatio: 1.0,
-                minimumSize: 0.1,
-                minimumConfidence: 0.7,
-                label: "rect"
-            )
+        let initialDetector = VisionRectanglesDetector(
+            minimumAspectRatio: 0.3,
+            maximumAspectRatio: 1.0,
+            minimumSize: 0.1,
+            minimumConfidence: 0.7,
+            label: "rect"
         )
+        let pipeline = DetectorPipeline(initialDetector)
+
+        // M4 Phase 3: bind the live tuning model to the same detector
+        // the pipeline runs through. `cache: resultStore` means
+        // `.detector`-tier knob changes invalidate the playback cache
+        // so the next decode produces fresh detections under the new
+        // settings. The model is captured by the detector task below
+        // and passed as the `tuning:` argument to `detect(in:cache:tuning:)`.
+        let newTuning = TuningModel(detector: initialDetector, cache: resultStore)
 
         // Spawn detector loop. Same shape as the macOS demo's
         // `openVideo(at:)` — the pipeline owns the cache write-through on
@@ -472,11 +520,11 @@ struct PlaybackContentView: View {
         // skip the detector dispatch entirely; the overlay reads
         // `resultStore` on its own TimelineView tick.
         let store = resultStore
-        let task = Task {
+        let task = Task { [tuning = newTuning] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
-                    _ = try await pipeline.detect(in: frame, cache: store)
+                    _ = try await pipeline.detect(in: frame, cache: store, tuning: tuning)
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
@@ -487,6 +535,7 @@ struct PlaybackContentView: View {
 
         self.controller = newController
         self.detectionTask = task
+        self.tuningModel = newTuning
         self.errorText = nil
         self.playerLayer = nil  // re-bound when PlaybackView attaches
         self.activeLabel = label
@@ -514,6 +563,8 @@ struct PlaybackContentView: View {
         controller = nil
         playerLayer = nil
         scopedURL = nil
+        tuningModel = nil
+        showTuning = false
         resultStore.clear()
 
         // Detach AVF observers + finish the frame stream, then release the
