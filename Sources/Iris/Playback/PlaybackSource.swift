@@ -21,11 +21,39 @@ import os
 /// - `Frame.timestamp` carries **asset time** (`AVPlayerItem.currentTime()`),
 ///   not host clock. Documented on
 ///   [`Frame`](../Frame.swift) — the per-source semantics live there.
-/// - `AsyncStream` buffering policy is `.bufferingNewest(1)` per
-///   [`plans/DECISIONS.md`](../../../plans/DECISIONS.md) §"Runtime frame
-///   pipeline".
 /// - The stream finishes on EOF (`AVPlayerItem.didPlayToEndTimeNotification`)
 ///   so a `for await frame in source.frames { … }` loop terminates naturally.
+///
+/// **Buffering policy: `.bufferingNewest(3)` (deliberate divergence).**
+/// [`plans/DECISIONS.md`](../../../plans/DECISIONS.md) §"Runtime frame
+/// pipeline" locks the capture-side policy at `.bufferingNewest(1)` — the
+/// hot path can shed the previous frame freely because every captured frame
+/// is a fresh sample of the live world; dropping one is harmless.
+///
+/// Playback diverges because playback frames carry **semantic** meaning
+/// that capture frames don't:
+///
+/// - Seek-emit (`emitOneShotFrame()` after `seek(to:)`) — the *only* frame
+///   that reflects the user's new scrub position. Dropping it produces a
+///   visible detection gap until the next tick.
+/// - Frame-step (same path, after `step(by:)`) — by definition a one-shot
+///   request from the user.
+///
+/// With `.bufferingNewest(1)`, a detector that is mid-inference when a
+/// seek-emitted frame lands in the buffer will see that frame silently
+/// dropped on the next tick — backward seek into a never-played region
+/// then produces no detection. `.bufferingNewest(3)` is sized for a
+/// 100ms-per-frame detector at the 30fps source cadence (~3 frames of
+/// in-flight backlog before the consumer catches up). Higher would
+/// tolerate slower detectors at the cost of latency; lower won't survive
+/// even moderate inference.
+///
+/// Capture-side `CaptureSession` is **untouched** — the `(1)` policy there
+/// remains correct for live frames. See
+/// [`plans/features/playback-detection-cache.md`](../../../plans/features/playback-detection-cache.md)
+/// §Phase 3 for the full rationale. Revisit the buffer size when Core ML
+/// or Foundation Models detectors with higher per-frame inference cost
+/// land in M6.
 ///
 /// **Phase 1 scope is intentionally narrow:** `init(url:)`, `start()`,
 /// `stop()`, `pause()`, `play()`, `invalidate()`. `seek(to:)` and
@@ -90,9 +118,15 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         self.assetID = AssetID(raw: url.absoluteString)
         self.sourceURL = url
 
+        // `.bufferingNewest(3)` — deliberate divergence from the capture-side
+        // `(1)` contract in `plans/DECISIONS.md`. See this type's class doc
+        // for the rationale; in short, playback's seek-emit and frame-step
+        // frames carry user-visible semantics that capture frames don't, and
+        // a `(1)` buffer drops the seek-emitted frame whenever the consumer
+        // is mid-inference on the previous frame.
         let (stream, cont) = AsyncStream.makeStream(
             of: Frame.self,
-            bufferingPolicy: .bufferingNewest(1)
+            bufferingPolicy: .bufferingNewest(3)
         )
         self._frames = stream
         self.continuation = cont
