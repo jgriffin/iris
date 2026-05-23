@@ -120,6 +120,38 @@ struct CaptureContentView: View {
                 }
             }
         }
+        .onDisappear {
+            teardown()
+        }
+    }
+
+    /// Tear down the `CaptureSession` when the Capture tab disappears
+    /// (e.g. user switches to the Playback tab).
+    ///
+    /// Without this, the underlying `AVCaptureSession` stays alive while
+    /// the view is offscreen — iOS posts `videoDeviceNotAvailableInBackground`
+    /// (and sometimes `videoDeviceInUseByAnotherClient` if the system
+    /// briefly hands the camera elsewhere), the interruption-recovery path
+    /// logs both, and on tab return a *second* `CaptureSession` races the
+    /// still-alive first one. Net effect: spurious interruption logs and
+    /// noticeable detection gaps after switching tabs.
+    ///
+    /// `invalidate()` stops AVF + finishes the frame stream, so the
+    /// detector's `for await` exits naturally. The `.task` modifier's own
+    /// cancellation only stops the Swift task — it doesn't stop AVF.
+    @MainActor
+    private func teardown() {
+        let priorSession = session
+        session = nil
+        converter = nil
+        resultStore.clear()
+        errorText = nil
+
+        if let priorSession {
+            Task {
+                await priorSession.invalidate()
+            }
+        }
     }
 }
 
