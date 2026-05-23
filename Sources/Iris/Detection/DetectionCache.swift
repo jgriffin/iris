@@ -48,4 +48,12 @@ public protocol DetectionCache: Sendable {
     /// after running its detectors, so the next visit to the same
     /// timestamp bucket hits.
     func append(_ result: TimestampedDetections) async
+
+    /// Drop every cached entry. The M4 tuning channel calls this on a
+    /// detector-tier change — the cache holds answers produced under
+    /// the *old* settings and the new detector instance will re-produce
+    /// them as frames flow through. Phase 2 ships the simplest correct
+    /// shape (full clear); the per-entry fingerprint upgrade is the
+    /// conditional M4 Phase 4. See `plans/features/M4.md`.
+    func invalidateAll() async
 }

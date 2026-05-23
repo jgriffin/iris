@@ -56,7 +56,7 @@ public struct DetectorPipeline: Detector {
     /// consults a cache. Cache-aware callers (playback) should use the
     /// `detect(in:cache:)` overload below.
     public func detect(in frame: Frame) async throws -> [Detection] {
-        try await detect(in: frame, cache: nil)
+        try await detect(in: frame, cache: nil, tuning: nil)
     }
 
     /// Cache-aware per-frame entry point used by callers that have a
@@ -79,30 +79,91 @@ public struct DetectorPipeline: Detector {
     ///
     /// Locked decision: feature plan
     /// `plans/features/playback-detection-cache.md`, Phase 2.
+    ///
+    /// Source-stable shim onto `detect(in:cache:tuning:)`. Pre-M4
+    /// call sites pass `cache:` only; the new `tuning:` parameter
+    /// lands on the four-arg overload below.
     public func detect(
         in frame: Frame,
         cache: (any DetectionCache)?
     ) async throws -> [Detection] {
+        try await detect(in: frame, cache: cache, tuning: nil)
+    }
+
+    /// Cache- + tuning-aware entry point used by the M4 channel.
+    ///
+    /// **Tuning routing.** When `tuning` is non-nil:
+    ///
+    ///   1. If `await tuning.currentDetector` returns a non-nil
+    ///      detector, the pipeline runs that detector *instead* of
+    ///      its own `detectors` array. This is how the hot-swap
+    ///      doctrine surfaces: `TuningModel` replaces the detector
+    ///      reference internally, and the pipeline picks up the new
+    ///      instance on the next call. Falls back to the
+    ///      pipeline's own detector array when the router has none
+    ///      (e.g. a filter-only router).
+    ///   2. After the detection list is assembled — *either* from a
+    ///      cache hit *or* from a fresh inference — the optional
+    ///      `await tuning.filter` predicate is applied to the
+    ///      output. This is intentionally on the *output* path,
+    ///      not the write-through path: the cache stays a record
+    ///      of what the detector actually produced (not what
+    ///      passed the filter), so filter-tier knob changes can
+    ///      re-apply without re-running inference.
+    ///
+    /// `tuning == nil` reproduces the pre-M4 behavior exactly — the
+    /// pipeline's own detectors run, no output filter, no
+    /// hot-swap.
+    public func detect(
+        in frame: Frame,
+        cache: (any DetectionCache)?,
+        tuning: (any TuningRouter)?
+    ) async throws -> [Detection] {
+        // Snapshot the tuning router's two read-side properties up
+        // front. Both are `@MainActor`-isolated; doing the hops here
+        // (once per call) is cheaper than re-hopping at each use site,
+        // and gives us a stable view through the rest of the function.
+        let routerDetector: (any Detector)?
+        let outputFilter: (@Sendable (Detection) -> Bool)?
+        if let tuning {
+            (routerDetector, outputFilter) = await MainActor.run {
+                (tuning.currentDetector, tuning.filter)
+            }
+        } else {
+            routerDetector = nil
+            outputFilter = nil
+        }
+
         // Skip-gate + retrieve: cache hit returns the cached detections
         // immediately with no detector dispatch. Returning the cached
         // value (instead of `[]`) keeps the contract unambiguous: an
         // empty return now strictly means "the detectors ran and found
-        // nothing," never "the detectors didn't run."
+        // nothing," never "the detectors didn't run." Apply the
+        // tuning filter on the *output* of the cache hit so filter-tier
+        // knob changes show through on already-cached frames without
+        // re-running inference.
         if let cache, let cached = await cache.fetch(timestamp: frame.timestamp) {
-            return cached.detections
+            return applyFilter(outputFilter, to: cached.detections)
         }
+
+        // Pick the detector set: tuning router's current detector if
+        // present (post-hot-swap), else the pipeline's own array.
+        let effectiveDetectors: [any Detector] = {
+            if let routerDetector { return [routerDetector] }
+            return detectors
+        }()
 
         let detections = try await withThrowingTaskGroup(
             of: (offset: Int, detections: [Detection]).self
         ) { group -> [Detection] in
-            for (offset, detector) in detectors.enumerated() {
+            for (offset, detector) in effectiveDetectors.enumerated() {
                 group.addTask {
                     let dets = try await detector.detect(in: frame)
                     return (offset, dets)
                 }
             }
 
-            var slots: [[Detection]] = Array(repeating: [], count: detectors.count)
+            var slots: [[Detection]] = Array(repeating: [], count: effectiveDetectors.count)
             for try await result in group {
                 slots[result.offset] = result.detections
             }
@@ -110,13 +171,26 @@ public struct DetectorPipeline: Detector {
         }
 
         // Write-through on miss so the next visit to this timestamp
-        // bucket hits.
+        // bucket hits. The cached payload is the *unfiltered* output —
+        // see the doc comment above for why.
         if let cache {
             await cache.append(
                 TimestampedDetections(timestamp: frame.timestamp, detections: detections)
             )
         }
 
-        return detections
+        return applyFilter(outputFilter, to: detections)
+    }
+
+    /// Apply an optional output-stage filter. Pulled out so the
+    /// cache-hit and cache-miss return paths share one site, and so
+    /// the no-filter case is a single identity reference (no
+    /// allocation for `filter == nil`).
+    private func applyFilter(
+        _ filter: (@Sendable (Detection) -> Bool)?,
+        to detections: [Detection]
+    ) -> [Detection] {
+        guard let filter else { return detections }
+        return detections.filter(filter)
     }
 }

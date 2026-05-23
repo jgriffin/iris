@@ -72,6 +72,15 @@ public final class ResultStore: DetectionCache {
         entries.removeAll(keepingCapacity: true)
     }
 
+    /// `DetectionCache` conformance — the M4 tuning channel's
+    /// detector-tier invalidation hook. Forwards to `clear()` so there's
+    /// one storage-mutation site to reason about. The async signature is
+    /// the protocol's requirement (matches `append(_:)` / `fetch(_:)`);
+    /// the body itself is a synchronous `@MainActor` call.
+    public func invalidateAll() {
+        clear()
+    }
+
     /// Nearest-neighbor cache entry to `displayTime`, within an adaptive
     /// window of `min(2 × quantization, stale)`. Returns `[]` if no
     /// bucket falls inside that window. `stale` (when omitted) defaults

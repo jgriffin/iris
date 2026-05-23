@@ -95,6 +95,27 @@ public struct VisionRectanglesSettings: DetectorSettings {
     /// to generic schema consumers. TODO M4 Phase 2: add
     /// `SettingKind.string(default:)` when the tuning UI actually
     /// surfaces label editing.
+    /// KeyPath ↔ schema-key bridge — see `DetectorSettings.key(for:)`
+    /// for the rationale. One entry per stored property the schema
+    /// surfaces; `label` is intentionally absent (no `.string` knob
+    /// variant yet, so `TuningModel.update(\.label, to:)` still
+    /// participates in the classifier as a worst-case-fallback path
+    /// rather than going through the schema). `DetectorSettingsTests`
+    /// audits the schema-vs-property drift; this map is a parallel
+    /// drift surface that should stay in lockstep.
+    public static func key(for keyPath: PartialKeyPath<Self>) -> String? {
+        switch keyPath {
+        case \Self.minimumAspectRatio: return "minimumAspectRatio"
+        case \Self.maximumAspectRatio: return "maximumAspectRatio"
+        case \Self.minimumSize: return "minimumSize"
+        case \Self.maximumObservations: return "maximumObservations"
+        case \Self.quadratureToleranceDegrees: return "quadratureToleranceDegrees"
+        case \Self.minimumConfidence: return "minimumConfidence"
+        case \Self.label: return "label"
+        default: return nil
+        }
+    }
+
     public static var schema: SettingSchema {
         SettingSchema(knobs: [
             SettingSchema.Knob(

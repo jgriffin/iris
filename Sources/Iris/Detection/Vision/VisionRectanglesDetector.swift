@@ -224,6 +224,16 @@ public struct VisionRectanglesDetector: TunableDetector {
             return .view
         }
 
+        // Compute the post-change settings snapshot once. Every
+        // `.detector` arm below builds a fresh detector from this
+        // value (M4 Phase 2 wiring: hot-swap by reference per the
+        // 2026-05-20 doctrine). `.filter` / `.view` arms still
+        // benefit from the centralized projection — the caller's
+        // `TuningModel` has already mutated its own settings copy;
+        // this local is the in-detector mirror used to construct
+        // the rebuilt instance.
+        let newSettings = projectedSettings(applying: change)
+
         switch change.key {
         case "minimumConfidence":
             // Vision uses this as a model parameter (see `detect(in:)`
@@ -231,30 +241,30 @@ public struct VisionRectanglesDetector: TunableDetector {
             // Raising hides detections we already have → `.filter`.
             // Lowering needs detections the model never emitted →
             // detector-tier rebuild.
-            return classifyFloatRaiseFilterLowerDetector(change)
+            return classifyFloatRaiseFilterLowerDetector(change, newSettings: newSettings)
 
         case "minimumAspectRatio":
             // Lower bound of an acceptance window. Raising narrows
             // (filter); lowering widens (detector).
-            return classifyFloatRaiseFilterLowerDetector(change)
+            return classifyFloatRaiseFilterLowerDetector(change, newSettings: newSettings)
 
         case "maximumAspectRatio":
             // Upper bound of an acceptance window. Raising widens
             // (detector); lowering narrows (filter).
-            return classifyFloatRaiseDetectorLowerFilter(change)
+            return classifyFloatRaiseDetectorLowerFilter(change, newSettings: newSettings)
 
         case "minimumSize":
             // Lower bound on size. Raising narrows (filter); lowering
             // widens (detector).
-            return classifyFloatRaiseFilterLowerDetector(change)
+            return classifyFloatRaiseFilterLowerDetector(change, newSettings: newSettings)
 
         case "quadratureToleranceDegrees":
             // Upper bound on angular skew. Raising widens (detector);
             // lowering narrows (filter).
-            return classifyFloatRaiseDetectorLowerFilter(change)
+            return classifyFloatRaiseDetectorLowerFilter(change, newSettings: newSettings)
 
         case "maximumObservations":
-            return classifyMaximumObservations(change)
+            return classifyMaximumObservations(change, newSettings: newSettings)
 
         case "label":
             // Pure relabel pass over existing detections. Cache stays
@@ -263,11 +273,12 @@ public struct VisionRectanglesDetector: TunableDetector {
 
         default:
             // Unknown key — fall back to the worst-case static tier
-            // from the schema. The cache is *correct* under
-            // `.detector` (rebuilds clear it); it's just expensive.
-            // TODO M4 Phase 2: this is where the rebuilt-detector
-            // payload gets wired through.
-            return .detector(rebuilt: nil)
+            // from the schema. We can't project the change into
+            // `settings` (the key isn't a known knob), so the
+            // rebuilt detector here is just the current settings;
+            // the caller's `TuningModel` should never reach this
+            // arm via its keyPath surface.
+            return .detector(rebuilt: VisionRectanglesDetector(settings: settings))
         }
     }
 
@@ -277,23 +288,25 @@ public struct VisionRectanglesDetector: TunableDetector {
     /// acceptance window: raising narrows the cache-subset (filter),
     /// lowering widens beyond the cache (detector).
     private func classifyFloatRaiseFilterLowerDetector(
-        _ change: SettingChange
+        _ change: SettingChange,
+        newSettings: VisionRectanglesSettings
     ) -> ApplyResult {
         guard
             case .float(let old) = change.oldValue,
             case .float(let new) = change.newValue
         else {
             // Type-incompatible payload — fall back to worst-case.
-            // TODO M4 Phase 2: rebuilt detector.
-            return .detector(rebuilt: nil)
+            // The rebuilt payload carries the unchanged settings;
+            // the next inference re-establishes the cache.
+            return .detector(rebuilt: VisionRectanglesDetector(settings: settings))
         }
         if new > old {
             return .filter
         } else {
             // new < old (equal already short-circuited at function entry).
-            // TODO M4 Phase 2: build a fresh detector with the new
-            // settings and thread it through the rebuilt payload.
-            return .detector(rebuilt: nil)
+            // Hot-swap doctrine: build a fresh detector with the
+            // post-change settings.
+            return .detector(rebuilt: VisionRectanglesDetector(settings: newSettings))
         }
     }
 
@@ -301,18 +314,17 @@ public struct VisionRectanglesDetector: TunableDetector {
     /// acceptance window: raising widens beyond the cache (detector),
     /// lowering narrows the cache-subset (filter).
     private func classifyFloatRaiseDetectorLowerFilter(
-        _ change: SettingChange
+        _ change: SettingChange,
+        newSettings: VisionRectanglesSettings
     ) -> ApplyResult {
         guard
             case .float(let old) = change.oldValue,
             case .float(let new) = change.newValue
         else {
-            // TODO M4 Phase 2: rebuilt detector.
-            return .detector(rebuilt: nil)
+            return .detector(rebuilt: VisionRectanglesDetector(settings: settings))
         }
         if new > old {
-            // TODO M4 Phase 2: rebuilt detector.
-            return .detector(rebuilt: nil)
+            return .detector(rebuilt: VisionRectanglesDetector(settings: newSettings))
         } else {
             return .filter
         }
@@ -321,14 +333,14 @@ public struct VisionRectanglesDetector: TunableDetector {
     /// `maximumObservations` has the `0 = unlimited` special case
     /// woven in. See the verdict table in `apply(_:)` for the matrix.
     private func classifyMaximumObservations(
-        _ change: SettingChange
+        _ change: SettingChange,
+        newSettings: VisionRectanglesSettings
     ) -> ApplyResult {
         guard
             case .int(let old) = change.oldValue,
             case .int(let new) = change.newValue
         else {
-            // TODO M4 Phase 2: rebuilt detector.
-            return .detector(rebuilt: nil)
+            return .detector(rebuilt: VisionRectanglesDetector(settings: settings))
         }
 
         // Normalize `0` (unlimited) to `Int.max` for comparison.
@@ -338,10 +350,43 @@ public struct VisionRectanglesDetector: TunableDetector {
         let oldCap = (old == 0) ? Int.max : old
         let newCap = (new == 0) ? Int.max : new
         if newCap > oldCap {
-            // TODO M4 Phase 2: rebuilt detector.
-            return .detector(rebuilt: nil)
+            return .detector(rebuilt: VisionRectanglesDetector(settings: newSettings))
         } else {
             return .filter
         }
+    }
+
+    /// Build a `VisionRectanglesSettings` projection that applies
+    /// `change` to the detector's current settings. Used by `apply(_:)`
+    /// to construct the rebuilt-detector payload without forcing the
+    /// caller's `TuningModel` to thread the post-change settings
+    /// through a side channel — the detector reads its own current
+    /// settings + the change, and produces the new value itself.
+    ///
+    /// Unknown keys / type-incompatible payloads return the existing
+    /// settings unchanged; the caller's classifier arm then routes to
+    /// the worst-case `.detector` fallback, which rebuilds with the
+    /// *current* settings (a no-op rebuild — correct under the cache-
+    /// invalidate-everything Phase 2 shape, just slightly wasteful).
+    private func projectedSettings(
+        applying change: SettingChange
+    ) -> VisionRectanglesSettings {
+        var next = settings
+        switch (change.key, change.newValue) {
+        case ("minimumAspectRatio", .float(let v)): next.minimumAspectRatio = v
+        case ("maximumAspectRatio", .float(let v)): next.maximumAspectRatio = v
+        case ("minimumSize", .float(let v)): next.minimumSize = v
+        case ("maximumObservations", .int(let v)): next.maximumObservations = v
+        case ("quadratureToleranceDegrees", .float(let v)): next.quadratureToleranceDegrees = v
+        case ("minimumConfidence", .float(let v)): next.minimumConfidence = v
+        default:
+            // `label` (no SettingKind.string variant yet) and unknown
+            // keys land here. The classifier arms above route `label`
+            // to `.filter` (no rebuild) and unknown keys to the
+            // worst-case `.detector` arm where we rebuild with the
+            // unchanged settings.
+            break
+        }
+        return next
     }
 }

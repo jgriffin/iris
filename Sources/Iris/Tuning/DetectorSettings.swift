@@ -25,6 +25,36 @@ public protocol DetectorSettings: Sendable {
     /// type. The schema is the channel between the concrete type and
     /// generic UIs / serialization / change-routing.
     static var schema: SettingSchema { get }
+
+    /// Map a `PartialKeyPath<Self>` (the typed mutation surface
+    /// `TuningModel.update(_:to:)` uses) to its schema `key` string.
+    ///
+    /// **Why hand-rolled.** Swift's `_kvcKeyPathString` is `nil` for
+    /// plain stored properties on Swift `struct`s (KVC interop
+    /// requires `@objc`, which `Sendable` Swift settings types don't
+    /// adopt). The tuning channel keys changes by the schema's
+    /// `Knob.key`, so each conformer needs an explicit
+    /// keyPath-to-key bridge. One small table per settings type —
+    /// drift risk identical to the static `schema` itself, and
+    /// `DetectorSettingsTests`-style audits pin both.
+    ///
+    /// Returns `nil` for keyPaths that don't map to a schema knob
+    /// (e.g. derived computed properties, future additions before
+    /// the bridge is updated). `TuningModel.update(_:to:)` then
+    /// emits a `SettingChange` with an empty key, which the
+    /// classifier handles via the worst-case fallback arm.
+    static func key(for keyPath: PartialKeyPath<Self>) -> String?
+}
+
+extension DetectorSettings {
+    /// Default implementation: no keyPath knows its key. Conformers
+    /// override to provide the mapping. The default exists so a
+    /// settings type that hasn't yet been wired for `TuningModel`-
+    /// driven mutation still satisfies the protocol — the
+    /// `TuningModel` falls back to the empty-key path described above.
+    public static func key(for _: PartialKeyPath<Self>) -> String? {
+        nil
+    }
 }
 
 // MARK: - SettingSchema
