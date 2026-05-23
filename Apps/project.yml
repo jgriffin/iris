@@ -43,6 +43,13 @@ targets:
                   - "Info.plist"
                   - "**/*.xcconfig"
                   - "**/*.xcconfig.template"
+            # Shared demo-side code consumed by both targets (e.g.
+            # `RecentVideos` — demo-ergonomics Phase 1). Lives outside
+            # the SwiftPM library so it doesn't pollute Iris's public
+            # surface with `UserDefaults` / bookmark concerns.
+            - path: Shared
+              excludes:
+                  - "**/*.md"
             # Bundle the M3 Phase 1 fixture clip into the iOS demo so the
             # Playback tab can load it via `Bundle.main.url(forResource:…)`
             # without a file picker. Referenced by path (no duplication) —
@@ -73,6 +80,10 @@ targets:
                   - "**/*.xcconfig"
                   - "**/*.xcconfig.template"
                   - "**/*.entitlements"
+            # Shared demo-side code (see iOS target above for rationale).
+            - path: Shared
+              excludes:
+                  - "**/*.md"
         configFiles:
             Debug: IrisDemo-macOS/Shared.xcconfig
             Release: IrisDemo-macOS/Shared.xcconfig

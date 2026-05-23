@@ -12,6 +12,8 @@
 		7C0D8530C9919FD70A380B51 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 0EB7A0FB41B5268DBEA5747D /* Iris */; };
 		80FFD62CD539847D349D137F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */; };
 		AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */; };
+		B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
+		BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
 /* End PBXBuildFile section */
@@ -22,6 +24,7 @@
 		1B460BBC0A9FF30933C587AA /* IrisDemo-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IrisDemo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5FE11DED63C51AD082CD66F7 /* iris */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iris; path = ..; sourceTree = SOURCE_ROOT; };
+		8486F9C7159F774FB48A6C3B /* RecentVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentVideos.swift; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
 		D03976040AAEAF22317D9BE0 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
@@ -66,6 +69,14 @@
 			path = IrisTests;
 			sourceTree = "<group>";
 		};
+		5FBD4C9628708F6440C039F8 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				8486F9C7159F774FB48A6C3B /* RecentVideos.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		6E3744837A6FA0938B83AB4D = {
 			isa = PBXGroup;
 			children = (
@@ -73,6 +84,7 @@
 				CE858ABB7F3E111D7782482A /* IrisDemo-iOS */,
 				B111C293A33F72EA2657344F /* IrisDemo-macOS */,
 				CFBBE3B1248C4031EBBC2802 /* Packages */,
+				5FBD4C9628708F6440C039F8 /* Shared */,
 				7BEE022844E8B9BA693309A0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -230,6 +242,7 @@
 			files = (
 				80FFD62CD539847D349D137F /* ContentView.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
+				B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -239,6 +252,7 @@
 			files = (
 				BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,
+				BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
