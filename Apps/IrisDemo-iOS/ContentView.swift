@@ -155,22 +155,35 @@ struct CaptureContentView: View {
     }
 }
 
-// MARK: - Playback tab (M3 Phase 6 parity smoke)
+// MARK: - Playback tab (M3 Phase 6 + demo-ergonomics Phase 2)
 
-/// Bundled-fixture playback → Vision rectangle detector → `ResultStore` →
-/// `DetectionLayer` overlay + `Scrubber`. Mirrors `IrisDemo-macOS`'s
-/// playback wiring (M3 Phase 5), differing only in source URL: the iOS
-/// demo loads `clipboard-blank-page.mp4` from `Bundle.main` (no file
-/// picker per the brief) while macOS uses `.fileImporter`.
+/// Playback tab with file picker + MRU. Pipeline is unchanged from
+/// M3 Phase 6 (Vision rectangle detector → `ResultStore` →
+/// `DetectionLayer` + `Scrubber`); demo-ergonomics Phase 2 adds:
 ///
-/// Lifecycle is simpler than the macOS demo's: there's no security-scoped
-/// resource to acquire (the asset is inside the app bundle), and no swap
-/// flow (the clip is fixed for the lifetime of the tab). Teardown still
-/// cancels the detector task and `invalidate()`s the source on view
-/// disappear so the AVF observers and frame stream don't leak.
+/// 1. A "Pick video" button presenting `DocumentPicker` (wraps
+///    `UIDocumentPickerViewController(forOpeningContentTypes: [.movie])`).
+/// 2. An MRU list backed by `RecentVideos` (Phase 1 shared model). Tap
+///    a row → resolve bookmark → swap controller source.
+/// 3. The bundled `clipboard-blank-page.mp4` fixture remains as the
+///    first-launch default — loaded automatically if `RecentVideos` is
+///    empty AND the user hasn't picked anything yet. Once the user picks
+///    OR taps an MRU row, the fixture stops being the source of truth
+///    for the tab.
 ///
-/// `videoRect` for `DetectionLayer` is read from `playerLayer.videoRect`
-/// each TimelineView tick — same pattern as the macOS demo (M3 Phase 5).
+/// **Security-scope accounting.** The bundled fixture is inside the app
+/// bundle — no security scope needed. External URLs (picker + MRU) require
+/// `startAccessingSecurityScopedResource()`; the matching `stop` runs
+/// either in `teardown()` (tab disappear) or just before acquiring a new
+/// scope (mid-session swap). `scopedURL` holds the currently-scoped URL
+/// (nil if the active source is the bundled fixture); `swapToFixture()` /
+/// `swapToExternal(url:)` are the two entry points that guarantee
+/// balanced start/stop.
+///
+/// `RecentVideos` is bound via `@Bindable` so SwiftUI re-renders when the
+/// MRU list mutates. The model lives at the tab level (one instance per
+/// `PlaybackContentView`); swapping tabs creates a fresh view but
+/// `UserDefaults` persistence makes it look identical.
 struct PlaybackContentView: View {
     @State private var controller: PlaybackController?
     @State private var resultStore = ResultStore()
@@ -179,6 +192,22 @@ struct PlaybackContentView: View {
     @State private var detectionTask: Task<Void, Never>?
     @State private var errorText: String?
 
+    /// The URL currently held under a security scope, if any. nil when the
+    /// active source is the bundled fixture (no scope needed). Every
+    /// transition that mutates this must balance start/stop in pairs —
+    /// see `swapToExternal(url:)` and `teardown()`.
+    @State private var scopedURL: URL?
+
+    /// MRU model. Persists across tab disappears via `UserDefaults`.
+    @State private var recentVideos = RecentVideos()
+
+    /// Document-picker sheet binding.
+    @State private var showPicker = false
+
+    /// Display-only: human-readable label of the active source. "Bundled
+    /// fixture" when fixture; the URL's last path component otherwise.
+    @State private var activeLabel: String = ""
+
     var body: some View {
         VStack(spacing: 0) {
             if let controller {
@@ -186,6 +215,9 @@ struct PlaybackContentView: View {
 
                 Scrubber(model: controller)
                     .background(Color(.systemBackground))
+
+                controlBar
+                mruSection
             } else if let errorText {
                 errorView(errorText)
             } else {
@@ -193,11 +225,98 @@ struct PlaybackContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .sheet(isPresented: $showPicker) {
+            DocumentPicker { url in
+                showPicker = false
+                swapToExternal(url: url)
+            }
+            .ignoresSafeArea()
+        }
         .task {
-            loadFixture()
+            // First-launch / first-appear behavior: if the user hasn't
+            // picked anything yet AND the MRU is empty, fall back to the
+            // bundled fixture. `controller` being non-nil means we've
+            // already loaded *something* (re-appear after a tab switch
+            // would already have a controller... except `onDisappear`
+            // tears it down, so re-appear hits this path too).
+            if controller == nil {
+                loadFixture()
+            }
         }
         .onDisappear {
             teardown()
+        }
+    }
+
+    // MARK: - Control bar + MRU list
+
+    /// "Pick video" button + a label for the active source. Sits below the
+    /// scrubber; on phone-sized screens this reads cleanly as a single row.
+    @ViewBuilder
+    private var controlBar: some View {
+        HStack {
+            Text(activeLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Button {
+                showPicker = true
+            } label: {
+                Label("Pick video", systemImage: "folder.badge.plus")
+            }
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(.secondarySystemBackground))
+    }
+
+    /// MRU list below the control bar. Empty state shows a hint to use the
+    /// picker (no separate placeholder — the picker button is the CTA).
+    ///
+    /// `recentVideos.resolve()` is called on every render — that's a
+    /// `UserDefaults` round-trip + bookmark resolution for each entry. The
+    /// list is capped at ~10, so this is acceptable; promoting to a cached
+    /// `@State` snapshot would buy nothing here.
+    ///
+    /// Swipe-to-delete is intentionally omitted. `RecentVideos` exposes no
+    /// `remove(_:)` API as of Phase 1, and the Phase 2 brief says: skip
+    /// swipe-to-delete rather than expand `RecentVideos` (deferred).
+    @ViewBuilder
+    private var mruSection: some View {
+        let recents = recentVideos.resolve()
+        if !recents.isEmpty {
+            List {
+                Section("Recent videos") {
+                    ForEach(recents, id: \.self) { url in
+                        Button {
+                            swapToExternal(url: url)
+                        } label: {
+                            HStack {
+                                Image(systemName: "play.rectangle")
+                                    .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(url.lastPathComponent)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .foregroundStyle(.primary)
+                                    Text(url.deletingLastPathComponent().path)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .frame(maxHeight: 240)
         }
     }
 
@@ -254,8 +373,10 @@ struct PlaybackContentView: View {
 
     // MARK: - Lifecycle
 
-    /// Resolve the bundled fixture URL, construct controller + detector
-    /// pipeline, kick off playback. Called once from the view's `.task`.
+    /// Resolve the bundled fixture URL and load it as the active source.
+    /// Called once from the view's `.task` on first appear (and on
+    /// re-appear after a tab-switch teardown). The bundled asset lives
+    /// inside the app bundle — no security scope to acquire.
     @MainActor
     private func loadFixture() {
         guard
@@ -274,6 +395,63 @@ struct PlaybackContentView: View {
             errorText = message
             return
         }
+
+        // Bundled fixture has no security scope. Pass `acquireScope: false`
+        // so `startSession(url:)` doesn't try to acquire one.
+        startSession(url: url, label: "Bundled fixture", acquireScope: false)
+    }
+
+    /// Swap the active source to an external (user-picked or MRU) URL.
+    ///
+    /// Order matters: tear down the prior session FIRST (which releases
+    /// any prior `scopedURL`), THEN acquire the new security scope and
+    /// build the new controller. Reversing the order would double-scope
+    /// or leak the prior scope across the swap.
+    ///
+    /// Also registers `url` with `RecentVideos` so picking promotes the
+    /// entry to the top of the MRU and tapping an existing MRU row
+    /// re-promotes it (deduplicates inside `addOrPromote`).
+    @MainActor
+    private func swapToExternal(url: URL) {
+        // Tear down BEFORE acquiring the new scope — otherwise the prior
+        // URL's scope outlives its usefulness, and a same-URL re-tap
+        // would double-acquire without a matching `stop`.
+        teardown()
+
+        guard url.startAccessingSecurityScopedResource() else {
+            let message = "Could not access \(url.lastPathComponent) (security scope denied)."
+            Logger.demo.error(
+                "startAccessingSecurityScopedResource failed for \(url.path, privacy: .public)"
+            )
+            errorText = message
+            return
+        }
+
+        // Register in MRU. `addOrPromote` is idempotent — tapping an
+        // existing MRU row moves it to the front without duplicating.
+        recentVideos.addOrPromote(url)
+
+        // `acquireScope: false` here because we already acquired it
+        // ourselves above (couldn't do it inside `startSession` because
+        // the guard-fail path needs to early-return on scope denial).
+        startSession(url: url, label: url.lastPathComponent, acquireScope: false)
+        // Record the scope so `teardown()` can balance it.
+        scopedURL = url
+    }
+
+    /// Common construction path for both fixture + external sources.
+    /// Builds `PlaybackController` + detector pipeline, kicks off playback.
+    /// Caller is responsible for security-scope acquisition (if any) and
+    /// for tearing down any prior session before invoking.
+    ///
+    /// `acquireScope` is currently always `false` at call sites — kept as
+    /// a parameter to make the contract explicit ("this method does not
+    /// touch security scope"). The two callers each handle scope in their
+    /// own way (`loadFixture` skips it; `swapToExternal` acquires it
+    /// before calling and assigns `scopedURL` after).
+    @MainActor
+    private func startSession(url: URL, label: String, acquireScope: Bool) {
+        _ = acquireScope  // Documentation parameter; see doc comment.
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
@@ -311,27 +489,43 @@ struct PlaybackContentView: View {
         self.detectionTask = task
         self.errorText = nil
         self.playerLayer = nil  // re-bound when PlaybackView attaches
+        self.activeLabel = label
 
         // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
         newController.togglePlay()
     }
 
-    /// Tear down the playback session on view-disappear. Order: cancel
-    /// detector → invalidate source. No security-scoped resource here
-    /// since the asset lives in the app bundle.
+    /// Tear down the active playback session. Idempotent.
+    ///
+    /// Order: cancel detector → invalidate source → release security
+    /// scope. Each step releases a hold on the file URL; reversing the
+    /// order would briefly let AVF read from a URL whose security scope
+    /// has already been dropped. `invalidate()` is `async`, so the
+    /// security-scope release runs after it inside the same `Task` to
+    /// preserve ordering — mirrors the macOS demo's `teardown()` exactly.
     @MainActor
     private func teardown() {
         detectionTask?.cancel()
         detectionTask = nil
 
         let priorSource = controller?.source
+        let priorScopedURL = scopedURL
+
         controller = nil
         playerLayer = nil
+        scopedURL = nil
         resultStore.clear()
 
-        if let priorSource {
-            Task {
+        // Detach AVF observers + finish the frame stream, then release the
+        // security scope. Capturing `priorSource` + `priorScopedURL`
+        // locally lets a follow-up `swapToExternal` reset `@State` to the
+        // new session synchronously while AVF tears the old one down.
+        Task {
+            if let priorSource {
                 await priorSource.invalidate()
+            }
+            if let priorScopedURL {
+                priorScopedURL.stopAccessingSecurityScopedResource()
             }
         }
     }
