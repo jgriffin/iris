@@ -2,6 +2,13 @@
 
 <!-- Append-only. Newest at bottom. -->
 
+<!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
+✅ **M4 — IrisTuning** (P1 ✅ · P2 ✅ · P3 ✅ · P4 🚫 cancelled) — closed; 📋 **M5 — IrisDataset** ← next up
+👉 Next: Open M5 — `IrisDataset` (`BRIEF.md` §6): `DatasetSink` protocol, one-tap frame + COCO sidecar. → [`STATUS.md`](./STATUS.md)
+<!-- /STATUS -->
+
+---
+
 ## 2026-05-21
 - Did: migrated to the `plans/` workflow described in [`WORKFLOW.md`](./WORKFLOW.md). Moved `BRIEF.md` from repo root into `plans/`. Pulled "Open design questions" and "Milestone path" out of [`../CLAUDE.md`](../CLAUDE.md) — questions now live in [`QUESTIONS.md`](./QUESTIONS.md), milestones in [`BRIEF.md`](./BRIEF.md). Created [`DECISIONS.md`](./DECISIONS.md) capturing the M0 exploration verdicts.
 - Did: deleted `explorations/RECOMMENDATIONS-PRIOR-ART.md` — judged an anti-pattern after auditing the rollup against the per-arc files. Updated the four references that pointed at it.
