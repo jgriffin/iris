@@ -18,6 +18,11 @@ changes. In short:
 - [`plans/LOG.md`](./plans/LOG.md) — append a dated entry at the end of each work block
 - `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`
 
+**Surfacing status in conversation** ("what's next?", mid-block check-ins, handoffs)
+→ lead with the status tree per [`plans/WORKFLOW.md`](./plans/WORKFLOW.md) §"Status
+trees" (focus tree if a milestone is active, overview tree at a boundary), *then*
+the recommendation and an offer.
+
 This file (`CLAUDE.md`) is the **constitution**: stack, conventions, and
 invariants that constrain how code gets written. Anything more volatile —
 design intent, decisions, open questions, work log — lives under `plans/`.
