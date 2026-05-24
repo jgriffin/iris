@@ -36,16 +36,24 @@ public protocol TuningRouter: AnyObject, Sendable {
     /// `detectors` array when this returns `nil`.
     var currentDetector: (any Detector)? { get }
 
-    /// Optional filter predicate applied to the *output* of both cache
-    /// lookups and fresh inferences before the pipeline returns. `nil`
-    /// disables the pass entirely.
+    /// Optional output-stage transform applied to the *output* of both
+    /// cache lookups and fresh inferences before the pipeline returns,
+    /// and again at overlay draw time. `nil` disables the pass
+    /// entirely.
+    ///
+    /// **Why a `[Detection] -> [Detection]` transform, not a
+    /// per-detection predicate.** The transform shape lets the
+    /// detector encode label rewrites (`map` the list) and
+    /// `maximumObservations`-style truncation (`prefix` the list) in
+    /// the same closure as the standard predicate filter, without the
+    /// router needing to know which knob is in play.
     ///
     /// **Why output-stage, not write-time.** Keeping the cache as a
     /// record of what the detector actually produced (not what passed
-    /// the filter) means filter-tier knob changes can be re-applied
+    /// the transform) means filter-tier knob changes can be re-applied
     /// without re-running inference. The cache stays the model's
-    /// ground truth; the filter is a re-renderable view onto it.
-    var filter: (@Sendable (Detection) -> Bool)? { get }
+    /// ground truth; the transform is a re-renderable view onto it.
+    var transform: (@Sendable ([Detection]) -> [Detection])? { get }
 }
 
 // MARK: - TuningModel
@@ -56,20 +64,22 @@ public protocol TuningRouter: AnyObject, Sendable {
 /// **Responsibilities.**
 ///
 ///   1. Hold the live `settings` snapshot. SwiftUI binds to this and
-///      mutates it via `update(_:to:)` (or — for filter installation —
-///      assigns to `filter` directly).
+///      mutates it via `update(_:to:)`.
 ///   2. Translate every property write into a `SettingChange`, route
 ///      it through `detector?.apply(_:)`, and consume the
 ///      `ApplyResult` per tier:
 ///        - `.view`  — no-op at the model. The consuming SwiftUI
 ///                     `View` re-renders because it observes
-///                     `settings` directly.
-///        - `.filter` — settings already mutated; the pipeline picks
-///                     up the new value via the next `filter`
-///                     closure read (if the consumer installs one
-///                     keyed off `settings`).
+///                     `settings` directly. The existing `transform`
+///                     (if any) is preserved — view-tier changes by
+///                     definition don't affect what's drawn.
+///        - `.filter(transform:)` — install the detector-supplied
+///                     transform into `self.transform`. The pipeline
+///                     and overlay read the slot on their next pass.
 ///        - `.detector(rebuilt:)` — swap `currentDetector` to the
-///                     rebuilt instance and call
+///                     rebuilt instance, clear `self.transform` (the
+///                     rebuilt detector hasn't yielded any transform
+///                     context yet), and call
 ///                     `cache?.invalidateAll()`. Simplest correct
 ///                     shape per the M4 brief; the conditional Phase
 ///                     4 upgrade is per-entry fingerprinting.
@@ -87,8 +97,8 @@ public protocol TuningRouter: AnyObject, Sendable {
 /// model.
 ///
 /// **Concurrency.** `@MainActor` per the M3 precedent. SwiftUI binds
-/// directly to `settings` and `filter`; pipeline reads happen via the
-/// `TuningRouter` protocol, with the actor hop landing at the
+/// directly to `settings` and `transform`; pipeline reads happen via
+/// the `TuningRouter` protocol, with the actor hop landing at the
 /// pipeline call site.
 ///
 /// **No persistence in Phase 2.** Settings live in memory only. The
@@ -134,13 +144,20 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
     /// the `TunableDetector` associatedtype rippling through.
     public var currentDetector: (any Iris.Detector)? { detector }
 
-    /// Optional output-stage filter. The pipeline applies this to
-    /// both cache lookups and fresh inferences before returning. UIs
-    /// install / clear this directly; the M4 channel doesn't derive
-    /// it automatically (concrete settings-to-filter projections are
-    /// detector-specific and land alongside each detector's tuning
-    /// view in Phase 3 or later).
-    public var filter: (@Sendable (Detection) -> Bool)?
+    /// Optional output-stage transform. The pipeline applies this to
+    /// both cache lookups and fresh inferences before returning; the
+    /// overlay applies it again at draw time so filter-tier knob
+    /// changes show up even when the source is paused (no frames
+    /// flowing → no pipeline runs).
+    ///
+    /// **Auto-installed by `update(_:to:)`.** On every `.filter`-tier
+    /// transition the detector returns a projection of the *current*
+    /// settings; `update(_:to:)` installs it here. Consumers
+    /// generally don't need to touch this slot directly, but it is
+    /// `public var` so a host that wants a different projection
+    /// (e.g. a stricter UI-side filter on top of the detector's) can
+    /// override or wrap the auto-installed value.
+    public var transform: (@Sendable ([Detection]) -> [Detection])?
 
     /// Optional callback invoked *after* `cache?.invalidateAll()` on a
     /// `.detector`-tier transition (and after the detector reference
@@ -164,7 +181,7 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
     /// `.filter`. View/filter tiers don't invalidate the cache and
     /// don't require a fresh inference; their effects show through
     /// either via SwiftUI observation (`.view`) or via the
-    /// `DetectionLayer.tuning` / pipeline filter pass (`.filter`).
+    /// `DetectionLayer.tuning` / pipeline transform pass (`.filter`).
     public var onDetectorTierChange: (@Sendable @MainActor () -> Void)?
 
     // MARK: - Stored
@@ -250,11 +267,19 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
         lastApplyTier = result.tier
 
         switch result {
-        case .view, .filter:
-            // Detector unchanged; cache unchanged. The settings write
-            // already happened; SwiftUI views observing `settings`
-            // (or the filter closure derived from it) tick on the
-            // `@Observable` edge.
+        case .view:
+            // Detector unchanged; cache unchanged; transform unchanged.
+            // The settings write already happened; SwiftUI views
+            // observing `settings` tick on the `@Observable` edge.
+            return
+
+        case .filter(let t):
+            // Detector unchanged; cache unchanged. Install the
+            // detector-supplied transform — every filter-tier change
+            // projects the current settings, so a single write here
+            // replaces any previously-installed transform with the
+            // newest projection.
+            self.transform = t
             return
 
         case .detector(let rebuilt):
@@ -268,6 +293,14 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
             // means the detector's `settings.minimumConfidence`
             // computed forward isn't picked up until rebuild, but
             // safer than ignoring the tier verdict entirely.
+            // Detector-tier rebuild implicitly "starts fresh" — the
+            // newly-built detector hasn't yielded any transform
+            // context yet, so the prior projection (which was
+            // derived from the *pre-rebuild* settings) is no longer
+            // valid. Clear it; the next filter-tier change will
+            // re-install a current projection.
+            self.transform = nil
+
             if let rebuilt = rebuilt as? Detector {
                 self.detector = rebuilt
             } else if rebuilt != nil {

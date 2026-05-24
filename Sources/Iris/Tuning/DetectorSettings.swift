@@ -229,9 +229,25 @@ public enum ApplyResult: Sendable {
     /// View-tier — re-render only. No filter pass, no rebuild.
     case view
 
-    /// Filter-tier — install a pre-overlay filter pass for this
-    /// transition. Cache stays valid; detector unchanged.
-    case filter
+    /// Filter-tier — install an output-stage transform that projects
+    /// the current settings onto a previously-cached `[Detection]`.
+    /// Cache stays valid; detector unchanged.
+    ///
+    /// **Why the detector carries the transform.** The projection from
+    /// settings to "which cached detections should still be visible"
+    /// is detector-family specific — only the conformer knows which
+    /// knobs map to which predicates (e.g. Vision's
+    /// `minimumConfidence` is a confidence floor; another detector
+    /// might project the same knob differently). Returning the
+    /// transform here lets `TuningModel` install it directly into the
+    /// pipeline / overlay filter slot, so filter-tier slider changes
+    /// take effect on the next frame / draw without the consumer
+    /// having to hand-wire a per-knob projection.
+    ///
+    /// The closure takes the whole `[Detection]` (not a per-detection
+    /// predicate) so it can also handle label rewrites and
+    /// `maximumObservations`-style truncation in one pass.
+    case filter(transform: @Sendable ([Detection]) -> [Detection])
 
     /// Detector-tier — rebuild the detector and invalidate cache
     /// entries produced under the old settings.
@@ -243,8 +259,8 @@ public enum ApplyResult: Sendable {
     case detector(rebuilt: (any Detector)?)
 
     /// The tier the channel should assume from this result. Strips the
-    /// rebuilt-detector payload — useful for routing logic that
-    /// doesn't care about the payload, and for test assertions.
+    /// payload — useful for routing logic that doesn't care about the
+    /// payload, and for test assertions.
     public var tier: ChangeTier {
         switch self {
         case .view: .view

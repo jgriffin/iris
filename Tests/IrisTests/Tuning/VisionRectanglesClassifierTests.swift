@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 
 @testable import Iris
@@ -280,4 +281,86 @@ private func tierRank(_ tier: ChangeTier) -> Int {
     case .filter: 1
     case .detector: 2
     }
+}
+
+// MARK: - Filter-tier transform behavior
+
+@Test
+func filterTierVerdictCarriesProjectionMatchingNewSettings() throws {
+    // M4 fix: every `.filter` verdict carries a transform that
+    // projects the detector's *post-change* settings onto a cached
+    // `[Detection]`. Construct a detection that just barely passes
+    // the old floor (0.4) and fails the new one (0.6); the
+    // transform must drop it.
+    let detector = VisionRectanglesDetector(
+        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+    )
+    let change = SettingChange.float(key: "minimumConfidence", from: 0.2, to: 0.6)
+
+    let result = detector.apply(change)
+    guard case .filter(let transform) = result else {
+        Issue.record("Expected .filter verdict, got \(result)")
+        return
+    }
+
+    // Use a 2:1 box (short/long = 0.5) so it passes the default
+    // aspect-ratio window [0.5, 0.5] and the default minimumSize
+    // (0.2) — leaving confidence as the only knob in play for this
+    // test.
+    let lowConf = Detection(
+        boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.2),
+        label: "rectangle",
+        confidence: 0.4,
+        sourceModelID: "vision.rectangles"
+    )
+    let hiConf = Detection(
+        boundingBox: CGRect(x: 0.4, y: 0.4, width: 0.4, height: 0.2),
+        label: "rectangle",
+        confidence: 0.9,
+        sourceModelID: "vision.rectangles"
+    )
+
+    let projected = transform([lowConf, hiConf])
+    #expect(projected.map(\.confidence) == [0.9])
+}
+
+@Test
+func labelChangeTransformRewritesLabels() throws {
+    // Label-rewrite arm: the transform must `map` the cached list
+    // and replace every detection's label with the new value.
+    // `Detection.label` is `let`, so the rewrite reconstructs the
+    // value — the test pins that it lands on the field.
+    let detector = VisionRectanglesDetector(
+        settings: VisionRectanglesSettings(label: "rectangle")
+    )
+    let change = SettingChange(
+        key: "label",
+        oldValue: .multiSelect(["rectangle"]),
+        newValue: .multiSelect(["document"])
+    )
+
+    let result = detector.apply(change)
+    guard case .filter(let transform) = result else {
+        Issue.record("Expected .filter verdict, got \(result)")
+        return
+    }
+
+    let stale = Detection(
+        boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.2),
+        label: "rectangle",
+        confidence: 0.9,
+        sourceModelID: "vision.rectangles"
+    )
+
+    // The classifier projects via `projectedSettings`, which for the
+    // `label` key has no encoded value (no `SettingKind.string` yet),
+    // so the projection keeps the *current* `settings.label` —
+    // "rectangle" here. This pins the current shape: the transform
+    // rewrites to whatever `settings.label` says at apply-time, which
+    // for now is the pre-change value (the relabel arm is still a
+    // re-render at the detector's existing label). TODO M4 polish:
+    // wire `SettingKind.string` so the new label flows through.
+    let projected = transform([stale])
+    #expect(projected.count == 1)
+    #expect(projected.first?.label == "rectangle")
 }

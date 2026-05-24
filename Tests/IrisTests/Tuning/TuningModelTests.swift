@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 
 @testable import Iris
@@ -102,20 +103,97 @@ func updateWithIdenticalValueIsNoOp() {
     #expect(model.lastChange?.oldValue == baseline?.oldValue)
 }
 
-// MARK: - Filter slot
+// MARK: - Transform slot
 
 @Test
 @MainActor
-func filterSlotIsAssignableAndReadable() {
+func transformSlotIsAssignableAndReadable() {
     let detector = VisionRectanglesDetector()
     let model = TuningModel(detector: detector)
 
-    #expect(model.filter == nil)
+    #expect(model.transform == nil)
 
-    let predicate: @Sendable (Detection) -> Bool = { $0.confidence >= 0.5 }
-    model.filter = predicate
+    let transform: @Sendable ([Detection]) -> [Detection] = { input in
+        input.filter { $0.confidence >= 0.5 }
+    }
+    model.transform = transform
 
-    #expect(model.filter != nil)
+    #expect(model.transform != nil)
+}
+
+@Test
+@MainActor
+func filterTierUpdatePopulatesTransform() {
+    // The M4 fix: every filter-tier `update` installs the
+    // detector-supplied projection into `model.transform` so the
+    // overlay / pipeline pick up the new settings without the
+    // consumer having to wire a per-knob predicate.
+    let detector = VisionRectanglesDetector(
+        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+    )
+    let model = TuningModel(detector: detector)
+    #expect(model.transform == nil)
+
+    // Raising minimumConfidence is filter-tier per the classifier.
+    model.update(\.minimumConfidence, to: 0.6)
+
+    #expect(model.lastApplyTier == .filter)
+    #expect(model.transform != nil)
+}
+
+@Test
+@MainActor
+func filterTierTransformReflectsCurrentSettings() throws {
+    // The installed transform should behave like the post-change
+    // settings — a detection that no longer passes the new floor
+    // should be dropped on the next overlay tick.
+    let detector = VisionRectanglesDetector(
+        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+    )
+    let model = TuningModel(detector: detector)
+    model.update(\.minimumConfidence, to: 0.6)
+
+    // 2:1 box → short/long = 0.5 → passes the default aspect-ratio
+    // window [0.5, 0.5] and the default minimumSize (0.2). Leaves
+    // confidence as the only knob in play.
+    let lowConf = Detection(
+        boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.2),
+        label: "rectangle",
+        confidence: 0.4,
+        sourceModelID: "vision.rectangles"
+    )
+    let hiConf = Detection(
+        boundingBox: CGRect(x: 0.4, y: 0.4, width: 0.4, height: 0.2),
+        label: "rectangle",
+        confidence: 0.9,
+        sourceModelID: "vision.rectangles"
+    )
+
+    let installed = try #require(model.transform)
+    let projected = installed([lowConf, hiConf])
+    #expect(projected.map(\.confidence) == [0.9])
+}
+
+@Test
+@MainActor
+func detectorTierUpdateClearsTransform() {
+    // Detector-tier rebuild implicitly "starts fresh" — the rebuilt
+    // detector hasn't yielded any transform context yet, so the
+    // prior projection (derived from pre-rebuild settings) is
+    // cleared.
+    let detector = VisionRectanglesDetector(
+        settings: VisionRectanglesSettings(minimumConfidence: 0.6)
+    )
+    let model = TuningModel(detector: detector)
+
+    // First, install a transform via a filter-tier change.
+    model.update(\.minimumConfidence, to: 0.8)
+    #expect(model.transform != nil)
+
+    // Then a detector-tier change should clear it.
+    model.update(\.minimumConfidence, to: 0.1)
+    #expect(model.lastApplyTier == .detector)
+    #expect(model.transform == nil)
 }
 
 // MARK: - TuningRouter conformance

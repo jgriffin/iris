@@ -104,11 +104,11 @@ public struct DetectorPipeline: Detector {
     ///      (e.g. a filter-only router).
     ///   2. After the detection list is assembled — *either* from a
     ///      cache hit *or* from a fresh inference — the optional
-    ///      `await tuning.filter` predicate is applied to the
+    ///      `await tuning.transform` closure is applied to the
     ///      output. This is intentionally on the *output* path,
     ///      not the write-through path: the cache stays a record
     ///      of what the detector actually produced (not what
-    ///      passed the filter), so filter-tier knob changes can
+    ///      passed the transform), so filter-tier knob changes can
     ///      re-apply without re-running inference.
     ///
     /// `tuning == nil` reproduces the pre-M4 behavior exactly — the
@@ -124,14 +124,14 @@ public struct DetectorPipeline: Detector {
         // (once per call) is cheaper than re-hopping at each use site,
         // and gives us a stable view through the rest of the function.
         let routerDetector: (any Detector)?
-        let outputFilter: (@Sendable (Detection) -> Bool)?
+        let outputTransform: (@Sendable ([Detection]) -> [Detection])?
         if let tuning {
-            (routerDetector, outputFilter) = await MainActor.run {
-                (tuning.currentDetector, tuning.filter)
+            (routerDetector, outputTransform) = await MainActor.run {
+                (tuning.currentDetector, tuning.transform)
             }
         } else {
             routerDetector = nil
-            outputFilter = nil
+            outputTransform = nil
         }
 
         // Skip-gate + retrieve: cache hit returns the cached detections
@@ -139,11 +139,11 @@ public struct DetectorPipeline: Detector {
         // value (instead of `[]`) keeps the contract unambiguous: an
         // empty return now strictly means "the detectors ran and found
         // nothing," never "the detectors didn't run." Apply the
-        // tuning filter on the *output* of the cache hit so filter-tier
-        // knob changes show through on already-cached frames without
-        // re-running inference.
+        // tuning transform on the *output* of the cache hit so
+        // filter-tier knob changes show through on already-cached
+        // frames without re-running inference.
         if let cache, let cached = await cache.fetch(timestamp: frame.timestamp) {
-            return applyFilter(outputFilter, to: cached.detections)
+            return applyTransform(outputTransform, to: cached.detections)
         }
 
         // Pick the detector set: tuning router's current detector if
@@ -179,18 +179,18 @@ public struct DetectorPipeline: Detector {
             )
         }
 
-        return applyFilter(outputFilter, to: detections)
+        return applyTransform(outputTransform, to: detections)
     }
 
-    /// Apply an optional output-stage filter. Pulled out so the
+    /// Apply an optional output-stage transform. Pulled out so the
     /// cache-hit and cache-miss return paths share one site, and so
-    /// the no-filter case is a single identity reference (no
-    /// allocation for `filter == nil`).
-    private func applyFilter(
-        _ filter: (@Sendable (Detection) -> Bool)?,
+    /// the no-transform case is a single identity reference (no
+    /// allocation for `transform == nil`).
+    private func applyTransform(
+        _ transform: (@Sendable ([Detection]) -> [Detection])?,
         to detections: [Detection]
     ) -> [Detection] {
-        guard let filter else { return detections }
-        return detections.filter(filter)
+        guard let transform else { return detections }
+        return transform(detections)
     }
 }

@@ -66,8 +66,8 @@ struct DetectionLayerTests {
     }
 
     @Test
-    func applyFilterPassesThroughWhenNil() {
-        // No filter → input array returned unchanged. This is the
+    func applyTransformPassesThroughWhenNil() {
+        // No transform → input array returned unchanged. This is the
         // pre-M4 default behavior — every cached detection at the
         // looked-up timestamp is drawn.
         let detections = [
@@ -84,20 +84,23 @@ struct DetectionLayerTests {
                 sourceModelID: "detection-layer-tests"
             ),
         ]
-        let result = DetectionLayer<PlayerLayerConverter>.applyFilter(nil, to: detections)
+        let result = DetectionLayer<PlayerLayerConverter>.applyTransform(
+            nil,
+            to: detections
+        )
         #expect(result.count == 2)
         #expect(result.map(\.label) == ["lo", "hi"])
     }
 
     @Test
-    func applyFilterDropsDetectionsFailingPredicate() {
-        // M4 polish: the body's draw-time filter pass is the symptom
+    func applyTransformProjectsDetectionList() {
+        // M4 polish: the body's draw-time transform pass is the symptom
         // fix for "filter-tier slider changes are invisible while
-        // paused." `DetectorPipeline` only applies `tuning.filter` when
-        // frames flow; with the source paused, the overlay reads
-        // `ResultStore` directly. This helper is the per-tick filter
-        // application the body uses — exercising it directly covers
-        // the symptom without rendering a Canvas.
+        // paused." `DetectorPipeline` only applies `tuning.transform`
+        // when frames flow; with the source paused, the overlay reads
+        // `ResultStore` directly. This helper is the per-tick
+        // transform application the body uses — exercising it directly
+        // covers the symptom without rendering a Canvas.
         let detections = [
             Detection(
                 boundingBox: CGRect(x: 0, y: 0, width: 0.2, height: 0.2),
@@ -112,9 +115,11 @@ struct DetectionLayerTests {
                 sourceModelID: "detection-layer-tests"
             ),
         ]
-        let predicate: @Sendable (Detection) -> Bool = { $0.confidence >= 0.5 }
-        let result = DetectionLayer<PlayerLayerConverter>.applyFilter(
-            predicate,
+        let transform: @Sendable ([Detection]) -> [Detection] = { input in
+            input.filter { $0.confidence >= 0.5 }
+        }
+        let result = DetectionLayer<PlayerLayerConverter>.applyTransform(
+            transform,
             to: detections
         )
         #expect(result.map(\.label) == ["hi"])

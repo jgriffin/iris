@@ -139,8 +139,8 @@ func settingChangeBuildersProducePayloadVariantsMatchingTheBuilder() {
 }
 
 @Test
-func applyResultTierStripsRebuiltDetectorPayload() {
+func applyResultTierStripsPayloads() {
     #expect(ApplyResult.view.tier == .view)
-    #expect(ApplyResult.filter.tier == .filter)
+    #expect(ApplyResult.filter(transform: { $0 }).tier == .filter)
     #expect(ApplyResult.detector(rebuilt: nil).tier == .detector)
 }

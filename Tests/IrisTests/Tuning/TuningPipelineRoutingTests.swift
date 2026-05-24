@@ -171,7 +171,9 @@ func viewTierChangeDoesNotRebuildOrInvalidate() async throws {
 @MainActor
 func filterTierLeavesDetectorAndCacheIntact() async throws {
     let detector = RecordingTunableDetector()
-    detector.verdict = { _ in .filter }
+    // Routing-shape test — the no-op transform `{ $0 }` keeps the
+    // cached payload visible while still exercising the install path.
+    detector.verdict = { _ in .filter(transform: { $0 }) }
     let cache = ResultStore()
     let model = TuningModel(detector: detector, cache: cache)
 
@@ -189,6 +191,10 @@ func filterTierLeavesDetectorAndCacheIntact() async throws {
     #expect(model.lastApplyTier == .filter)
     #expect(model.detector === detector)
     #expect(cache.contains(timestamp: timestamp))
+    // Filter-tier verdict installs the detector-supplied transform
+    // into the model's slot — this is the M4 fix for "filter sliders
+    // produce no visible change."
+    #expect(model.transform != nil)
 }
 
 @Test
@@ -210,8 +216,8 @@ func pipelineAppliesTuningFilterOnCacheHit() async throws {
         )
     )
 
-    // Install a confidence-floor filter via the tuning model's slot.
-    model.filter = { $0.confidence >= 0.5 }
+    // Install a confidence-floor transform via the tuning model's slot.
+    model.transform = { input in input.filter { $0.confidence >= 0.5 } }
 
     let pipeline = DetectorPipeline(detector)
     let frame = makeSyntheticFrame(timestamp: timestamp)
@@ -238,7 +244,7 @@ func pipelineAppliesTuningFilterOnFreshInference() async throws {
     ]
     let cache = ResultStore()
     let model = TuningModel(detector: detector, cache: cache)
-    model.filter = { $0.confidence >= 0.5 }
+    model.transform = { input in input.filter { $0.confidence >= 0.5 } }
 
     let pipeline = DetectorPipeline(detector)
     let timestamp = CMTime(value: 2000, timescale: 1000)
@@ -363,7 +369,7 @@ func onDetectorTierChangeDoesNotFireOnViewOrFilterTier() async throws {
     #expect(counter.value == 0)
 
     // Filter tier.
-    detector.verdict = { _ in .filter }
+    detector.verdict = { _ in .filter(transform: { $0 }) }
     model.update(\.threshold, to: 0.7)
     await Task.yield()
     await Task.yield()

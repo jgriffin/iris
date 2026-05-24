@@ -269,7 +269,7 @@ public struct VisionRectanglesDetector: TunableDetector {
         case "label":
             // Pure relabel pass over existing detections. Cache stays
             // valid; one filter-pass rewrite.
-            return .filter
+            return .filter(transform: Self.transform(for: newSettings))
 
         default:
             // Unknown key — fall back to the worst-case static tier
@@ -301,7 +301,7 @@ public struct VisionRectanglesDetector: TunableDetector {
             return .detector(rebuilt: VisionRectanglesDetector(settings: settings))
         }
         if new > old {
-            return .filter
+            return .filter(transform: Self.transform(for: newSettings))
         } else {
             // new < old (equal already short-circuited at function entry).
             // Hot-swap doctrine: build a fresh detector with the
@@ -326,7 +326,7 @@ public struct VisionRectanglesDetector: TunableDetector {
         if new > old {
             return .detector(rebuilt: VisionRectanglesDetector(settings: newSettings))
         } else {
-            return .filter
+            return .filter(transform: Self.transform(for: newSettings))
         }
     }
 
@@ -352,7 +352,7 @@ public struct VisionRectanglesDetector: TunableDetector {
         if newCap > oldCap {
             return .detector(rebuilt: VisionRectanglesDetector(settings: newSettings))
         } else {
-            return .filter
+            return .filter(transform: Self.transform(for: newSettings))
         }
     }
 
@@ -388,5 +388,115 @@ public struct VisionRectanglesDetector: TunableDetector {
             break
         }
         return next
+    }
+
+    // MARK: - Filter-tier transform builder
+
+    /// Build the output-stage transform that projects `settings` onto a
+    /// previously-cached `[Detection]`. Every `.filter`-tier verdict
+    /// returns the same shape: re-run the current settings as a view
+    /// over what the detector already produced. Centralizing the
+    /// projection here keeps every `.filter` arm in `apply(_:)` one
+    /// line and pins the predicate semantics in one place for tests.
+    ///
+    /// **What's covered.**
+    /// - `minimumConfidence` — drop detections below the new floor.
+    /// - `minimumAspectRatio` / `maximumAspectRatio` — drop detections
+    ///   whose short/long axis ratio falls outside the new window.
+    ///   Normalized boxes; ratio computed as `min(w,h)/max(w,h)` so it
+    ///   matches Vision's own short-over-long convention.
+    /// - `minimumSize` — drop detections whose shortest normalized
+    ///   side is below the new floor. Vision's `minimumSize` is "as a
+    ///   fraction of the shortest *image* dimension"; at overlay time
+    ///   we only have normalized boxes ([0,1] on both axes), where the
+    ///   shortest image dimension is 1.0 in normalized terms, so the
+    ///   `min(w,h)` comparison reduces to the same predicate.
+    /// - `maximumObservations` — truncate to the new cap (0 =
+    ///   unlimited). Pre-sorts by confidence descending so the cap
+    ///   keeps the most-confident detections regardless of the cached
+    ///   list's order.
+    /// - `label` — rewrite every surviving detection's label to the
+    ///   current `settings.label`. `Detection.label` is `let`, so the
+    ///   rewrite reconstructs the value.
+    ///
+    /// **What's *not* covered yet.** `quadratureToleranceDegrees` —
+    /// the cache holds axis-aligned bounding boxes plus four corner
+    /// keypoints; computing the actual corner-angle deviation from
+    /// keypoints is non-trivial enough that getting it subtly wrong
+    /// would be worse than skipping it for now. The classifier's
+    /// `.detector`-on-raise arm still triggers a full re-inference
+    /// when the user widens the tolerance; the `.filter`-on-lower
+    /// arm passes the surviving boxes through unchanged. Re-smoke
+    /// after this lands; tighten the predicate if it matters in
+    /// practice. (TODO M4 polish.)
+    public static func transform(
+        for settings: VisionRectanglesSettings
+    ) -> @Sendable ([Detection]) -> [Detection] {
+        let predicate = predicate(for: settings)
+        let label = settings.label
+        let maxObs = settings.maximumObservations
+        return { detections in
+            var out = detections.compactMap { d -> Detection? in
+                guard predicate(d) else { return nil }
+                guard d.label != label else { return d }
+                return Detection(
+                    boundingBox: d.boundingBox,
+                    label: label,
+                    confidence: d.confidence,
+                    keypoints: d.keypoints,
+                    mask: d.mask,
+                    sourceModelID: d.sourceModelID
+                )
+            }
+            if maxObs > 0 && out.count > maxObs {
+                // RectangleObservation ordering isn't formally
+                // documented; sort here so the cap keeps the top-N
+                // by confidence regardless of cached order.
+                out.sort { $0.confidence > $1.confidence }
+                out = Array(out.prefix(maxObs))
+            }
+            return out
+        }
+    }
+
+    /// Settings-aware predicate factory used by `transform(for:)`.
+    /// Pulled out so tests can exercise the per-detection predicate
+    /// independently of the truncation / relabel pipeline.
+    static func predicate(
+        for settings: VisionRectanglesSettings
+    ) -> @Sendable (Detection) -> Bool {
+        let minConfidence = settings.minimumConfidence
+        let minAR = settings.minimumAspectRatio
+        let maxAR = settings.maximumAspectRatio
+        let minSize = settings.minimumSize
+        return { detection in
+            guard detection.confidence >= minConfidence else { return false }
+
+            let w = abs(detection.boundingBox.width)
+            let h = abs(detection.boundingBox.height)
+            guard w > 0, h > 0 else { return false }
+
+            // Short/long aspect ratio — matches Vision's own short-over-
+            // long convention so the predicate threshold is interpreted
+            // identically to the model parameter at inference time.
+            let shortSide = min(w, h)
+            let longSide = max(w, h)
+            let ar = Float(shortSide / longSide)
+            guard ar >= minAR, ar <= maxAR else { return false }
+
+            // `minimumSize` is "fraction of the shortest image dimension";
+            // in normalized [0,1]² that's just `min(w,h)`.
+            guard Float(shortSide) >= minSize else { return false }
+
+            return true
+        }
+    }
+
+    /// Convenience: the transform built from this instance's current
+    /// settings. Symmetric to the static `transform(for:)`; useful for
+    /// call sites that already hold the detector reference and want
+    /// the predicate without retyping `Self.transform(for: d.settings)`.
+    public func currentTransform() -> @Sendable ([Detection]) -> [Detection] {
+        Self.transform(for: settings)
     }
 }

@@ -72,16 +72,16 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
     public let displayTimeSource: @Sendable () -> CMTime
 
     /// Optional tuning router consulted at *draw time* for an output-stage
-    /// filter predicate.
+    /// transform.
     ///
     /// **Why draw-time, not pipeline-time alone.** `DetectorPipeline` already
-    /// applies `tuning.filter` to its own return value (both cache-hit and
-    /// fresh-inference paths). But the overlay reads `ResultStore.lookup(at:)`
+    /// applies `tuning.transform` to its own return value (both cache-hit
+    /// and fresh-inference paths). But the overlay reads `ResultStore.lookup(at:)`
     /// directly on every `TimelineView` tick — independent of pipeline runs.
     /// When the source is paused, no frames flow → no pipeline runs → filter
     /// changes are invisible. Consulting the router here makes filter-tier
     /// knob changes reactive even when the source is idle: the overlay
-    /// redraws on the next animation tick with the new predicate applied.
+    /// redraws on the next animation tick with the new transform applied.
     ///
     /// `nil` (the default) preserves pre-M4 behavior — every cached detection
     /// in `lookup(at:)` is drawn unfiltered.
@@ -111,7 +111,7 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
             let displayTime = displayTimeSource()
             let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
-            let detections = Self.applyFilter(tuning?.filter, to: raw)
+            let detections = Self.applyTransform(tuning?.transform, to: raw)
 
             Canvas { gc, _ in
                 for detection in detections {
@@ -129,22 +129,23 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         }
     }
 
-    /// Apply an optional output-stage filter predicate to a detection list.
+    /// Apply an optional output-stage transform to a detection list.
     /// Pulled out as a `static` helper so unit tests can exercise the
-    /// filter-application path without rendering — SwiftUI's `Canvas` body
-    /// is opaque to tests, but this helper takes the same `(filter, raw)`
-    /// inputs the body uses and returns the filtered list.
+    /// transform-application path without rendering — SwiftUI's `Canvas`
+    /// body is opaque to tests, but this helper takes the same
+    /// `(transform, raw)` inputs the body uses and returns the
+    /// projected list.
     ///
-    /// `filter == nil` returns the input array by identity — no allocation
-    /// for the common no-filter case (the overwhelming majority of capture
-    /// call sites).
+    /// `transform == nil` returns the input array by identity — no
+    /// allocation for the common no-transform case (the overwhelming
+    /// majority of capture call sites).
     @inlinable
-    public static func applyFilter(
-        _ filter: (@Sendable (Detection) -> Bool)?,
+    public static func applyTransform(
+        _ transform: (@Sendable ([Detection]) -> [Detection])?,
         to detections: [Detection]
     ) -> [Detection] {
-        guard let filter else { return detections }
-        return detections.filter(filter)
+        guard let transform else { return detections }
+        return transform(detections)
     }
 
     // MARK: - Drawing
