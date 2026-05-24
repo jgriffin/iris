@@ -9,6 +9,7 @@ CLAUDE.md                    # constitution: stack, conventions, invariants
 plans/
   WORKFLOW.md                # this document — how the planning files work
   BRIEF.md                   # north star: what & why (1 page, rarely changes)
+  STATUS.md                  # at-a-glance snapshot: milestone tree, the one next, open Qs (links to sources)
   DECISIONS.md               # settled questions, with refs to explorations
   QUESTIONS.md               # open questions with lifecycle tags
   LOG.md                     # append-only work-block journal
@@ -32,6 +33,7 @@ The rule: match the file to the **volatility** of the content.
 | ---------------- | ------------ | --------------------------------------------------------------------------------------- |
 | `CLAUDE.md`      | rarely       | invariants that constrain all future code                                               |
 | `BRIEF.md`       | rarely       | problem, success criteria, non-goals                                                    |
+| `STATUS.md`      | per block    | derived snapshot dashboard — milestone/phase tree, the one `👉 next`, rolled-up open questions & decisions; links to each source of truth. Rewritten (not appended) each block. |
 | `DECISIONS.md`   | per decision | dated paragraphs with enough context to act on; link to exploration RECOMMENDATIONS.md for the deep case |
 | `QUESTIONS.md`   | per question | `[open]` / `[exploring]` / `[answered]`                                                 |
 | `LOG.md`         | per block    | append-only, dated headers                                                              |
@@ -40,6 +42,36 @@ The rule: match the file to the **volatility** of the content.
 If you're tempted to add something to CLAUDE.md, ask: *does this constrain how code gets written, forever?* If no, it belongs somewhere in `plans/`.
 
 **File references should be clickable markdown links** — both within `plans/` (e.g. `[`DECISIONS.md`](./DECISIONS.md)`) and out to explorations (e.g. `[`explorations/.../RECOMMENDATIONS.md`](../explorations/...)`). It's much easier to navigate a workflow when every cross-reference is one click away.
+
+## Status at a glance
+
+`plans/STATUS.md` is the project's `git status`: a hand-maintained snapshot of
+where work stands, rewritten each block. `LOG.md` is the history; `STATUS.md` is
+the current frame. It **links to** the source of truth for every line — it
+points, never copies.
+
+A shared emoji vocabulary keeps state scannable here and across the other files
+(annotate `LOG.md` entries, `QUESTIONS.md` tags, and `features/<slug>.md` phase
+headings the same way):
+
+- **State** (one per item): 📋 queued · 🟡 in-progress · ⏸ paused · ✅ done · 🚫 abandoned
+- **Markers**: 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs human verification · ℹ️ note · 🚩 issue · 🗓 deferred
+
+**One `👉 next`.** Exactly one *live* `next` exists at a time — the "just keep
+going" pointer, canonical in `STATUS.md`. Advancing *consumes* it (move it, don't
+append). Past blocks' logged `Next:` lines are frozen history; don't let live
+`next` pointers accumulate.
+
+### Surfacing status in conversation
+
+Use the same vocabulary when reporting to the human, not only in files:
+
+- **Mid-block** — lead with the tactical header: current milestone + one-line
+  description, phase states (`P1 ✅ · P2 🟡 ← here`), and the `👉 next`.
+- **Asking questions** — tag each item `👀` (needs their verification) or `ℹ️`
+  (just a note) so it's clear what actually needs their eyes.
+- **Clear-point / handoff** — render the full work tree (milestones → phases with
+  state) and the single `👉 next`.
 
 ## Lifecycle
 
@@ -54,6 +86,7 @@ decision made          → plans/DECISIONS.md (refs RECOMMENDATIONS.md)
                          plans/QUESTIONS.md → [answered]
 affects all code       → CLAUDE.md
 end of work block      → append plans/LOG.md
+                         rewrite plans/STATUS.md + advance the one 👉 next
 ```
 
 ## CLAUDE.md hookup
@@ -65,6 +98,7 @@ Add this block near the top of `CLAUDE.md` so Claude Code wires into the workflo
 
 This project uses the planning structure described in `plans/WORKFLOW.md`. Read it before making non-trivial changes. In short:
 
+- `plans/STATUS.md` — where work stands now (read first); rewrite at the end of each block
 - `plans/BRIEF.md` — what & why
 - `plans/DECISIONS.md` — settled questions (check before proposing architectural changes)
 - `plans/QUESTIONS.md` — open questions (land new ones here, don't speculate in code)
@@ -138,17 +172,50 @@ The shape: an `### YYYY-MM-DD — Short title` header, one paragraph that gives 
 - [answered 2026-05-19] <question> — see [`DECISIONS.md`](./DECISIONS.md)
 ```
 
+### `plans/STATUS.md`
+
+```markdown
+<!-- Hand-maintained snapshot, rewritten each block. Links to the source of truth
+     for every line — points, never copies. One 👉 next only. -->
+
+# <Project> — Status
+_Snapshot · <date>_
+
+## Milestones
+- ✅ **M1 — <name>** · <one line>. → [`features/M1.md`](./features/M1.md)
+- 🟡 **M2 — <name>** · <one line>. → [`features/M2.md`](./features/M2.md)   ← cursor
+  - ✅ Phase 1 — <name>
+  - 🟡 Phase 2 — <name>
+- 📋 **M3 — <name>** · <one line>. → [`BRIEF.md`](./BRIEF.md)
+
+## 👉 Next
+<the one next thing>. → [`LOG.md`](./LOG.md)
+
+## ❓ Open  →  [`QUESTIONS.md`](./QUESTIONS.md)
+- ⚖️ <question title>
+
+## 📌 Recent  →  [`DECISIONS.md`](./DECISIONS.md)
+- <decision title>
+```
+
 ### `plans/LOG.md`
 
 ```markdown
 # Work log
 
-<!-- Append-only. Newest at bottom. -->
+<!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
+🟡 **M2 — <name>** (P1 ✅ · P2 🟡 ← here)
+👉 Next: <the one thing>. → [`STATUS.md`](./STATUS.md)
+<!-- /STATUS -->
+
+---
+<!-- Below: append-only, newest at bottom. -->
 
 ## 2026-05-21
 - Did: <thing>
-- Learned: <thing>
-- Next: <thing>
+- 💡 Learned: <thing>
+- 🗓 Deferred: <thing>
+- 👉 Next: <thing>
 ```
 
 ### `explorations/YYYY-MM-DD-topic/QUESTIONS.md`

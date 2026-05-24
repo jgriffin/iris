@@ -11,6 +11,7 @@ This project uses the planning structure described in
 [`plans/WORKFLOW.md`](./plans/WORKFLOW.md). Read it before making non-trivial
 changes. In short:
 
+- [`plans/STATUS.md`](./plans/STATUS.md) — where work stands now (read first); rewrite at the end of each block
 - [`plans/BRIEF.md`](./plans/BRIEF.md) — what & why (design intent, components, milestones)
 - [`plans/DECISIONS.md`](./plans/DECISIONS.md) — settled questions (check before proposing architectural changes)
 - [`plans/QUESTIONS.md`](./plans/QUESTIONS.md) — open questions (land new ones here, don't speculate in code)
