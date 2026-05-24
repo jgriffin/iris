@@ -43,35 +43,101 @@ If you're tempted to add something to CLAUDE.md, ask: *does this constrain how c
 
 **File references should be clickable markdown links** — both within `plans/` (e.g. `[`DECISIONS.md`](./DECISIONS.md)`) and out to explorations (e.g. `[`explorations/.../RECOMMENDATIONS.md`](../explorations/...)`). It's much easier to navigate a workflow when every cross-reference is one click away.
 
-## Status at a glance
+## Status trees
 
-`plans/STATUS.md` is the project's `git status`: a hand-maintained snapshot of
-where work stands, rewritten each block. `LOG.md` is the history; `STATUS.md` is
-the current frame. It **links to** the source of truth for every line — it
-points, never copies.
+`plans/STATUS.md` is the project's `git status` — where work stands right now,
+rewritten each block (`LOG.md` is the history). It's built from two reusable
+components — the **focus tree** and the **overview tree** — that also appear in
+handoffs and inline whenever you ask *"what's next?"*. They're building blocks,
+not whole answers: a reply leads with the right tree, then adds the recommendation
+and an offer. Annotate `LOG.md` entries, `QUESTIONS.md` tags, and
+`features/<slug>.md` phase headings with the same vocabulary.
 
-A shared emoji vocabulary keeps state scannable here and across the other files
-(annotate `LOG.md` entries, `QUESTIONS.md` tags, and `features/<slug>.md` phase
-headings the same way):
+One shared vocabulary — a readiness→growth lifecycle:
 
-- **State** (one per item): 📋 queued · 🟡 in-progress · ⏸ paused · ✅ done · 🚫 abandoned
-- **Markers**: 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs human verification · ℹ️ note · 🚩 issue · 🗓 deferred
+```
+✏️ penciled in ──define──▶ 📋 defined ──start──▶ 🌱 in-progress ──▶ ✅ done
+```
 
-**One `👉 next`.** Exactly one *live* `next` exists at a time — the "just keep
-going" pointer, canonical in `STATUS.md`. Advancing *consumes* it (move it, don't
-append). Past blocks' logged `Next:` lines are frozen history; don't let live
-`next` pointers accumulate.
+- ✏️ **penciled in** — wanted but tentative and undefined (no brief, questions open). Picking it up means **defining it first**.
+- 📋 **defined** — scoped, questions answered, ready to hand off to an agent.
+- 🌱 **in-progress** — actively growing.  ✅ **done** · ⏸ **paused** · 🚫 **abandoned**.
+- Markers (ride alongside, not states): 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs verification · ℹ️ note · 🚩 issue · 🗓 deferred.
+
+### Focus tree
+
+The active milestone and its phases — nothing else. The mid-work view: *until this
+is done, this is the status.* No older milestones, no penciled-in ideas. The
+milestone is the root line; its phases hang beneath.
+
+```
+🌱 M5 — Dataset
+├─ ✅ P1 — DatasetSink protocol
+├─ 🌱 P2 — COCO sidecar writer     ← here
+└─ 📋 P3 — curation affordances
+
+👉 next  finish P2 — write the sidecar encoder + fixture test
+```
+
+### Overview tree
+
+The whole map: every defined milestone, one line each (the active one expands into
+its phases — that's the focus tree, embedded), with penciled-in ideas in a
+delineated zone below. The boundary / big-picture view. At a clean boundary
+(nothing active) it looks like this:
+
+```
+Iris · overview tree · 2026-05-24
+├─ ✅ M1 — Capture core
+├─ ✅ M2 — Detection + overlay
+├─ ✅ M3 — Playback
+└─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
+
+penciled in — not yet defined (ideas, traceable to you)
+   ✏️ M5 — Dataset (BRIEF §6)            ← likely next
+   ✏️ M6 — Custom models + captioning (BRIEF §7)
+
+👉 next  define M5 → draft features/M5.md (discuss-phase)
+```
+
+When a milestone is active, its node expands like the focus tree:
+
+```
+└─ 🌱 M5 — Dataset
+   ├─ ✅ P1 — DatasetSink protocol
+   ├─ 🌱 P2 — COCO sidecar writer     ← here
+   └─ 📋 P3 — curation affordances
+```
+
+### Rules
+
+1. A milestone earns a place **in the tree** (`├─`/`└─`) only once it's **defined**
+   — its `features/<slug>.md` brief exists. Until then it's ✏️ penciled in, in the
+   zone below. The tree structure *is* the signal: this is the agreed skeleton.
+2. `📋` and `🌱` appear only inside the tree (a defined milestone or its phases);
+   `✏️` appears only in the penciled-in zone.
+3. The readiness axis cascades: defining a milestone produces its phases, each
+   itself ✏️ or 📋. A defined milestone can still hold ✏️ work — define before building.
+4. Penciled-in zone (overview only): flat list, `✏️ <name> (<source>)`. The source
+   is shown because ideas come from different places — `BRIEF`, a future
+   `roadmap.md`, an answered question — not one approved path. `← likely next`
+   marks the front-runner.
+5. Exactly one *live* 👉 **next**, always last. Advancing consumes it (move it,
+   don't append); past blocks' logged `Next:` lines are frozen history. At a
+   boundary it names the **define-gate** ("define M5"), not the work.
+6. One line per item, identical every time — no horizontal stacking. Predictability
+   is the whole point.
 
 ### Surfacing status in conversation
 
-Use the same vocabulary when reporting to the human, not only in files:
+Lead with the trees when reporting, not only in `STATUS.md`:
 
-- **Mid-block** — lead with the tactical header: current milestone + one-line
-  description, phase states (`P1 ✅ · P2 🟡 ← here`), and the `👉 next`.
-- **Asking questions** — tag each item `👀` (needs their verification) or `ℹ️`
-  (just a note) so it's clear what actually needs their eyes.
-- **Clear-point / handoff** — render the full work tree (milestones → phases with
-  state) and the single `👉 next`.
+- **"what's next?" (and kin)** → lead with the tree that fits: the **focus tree** if
+  a milestone is active, the **overview tree** at a boundary. *Which tree appears is
+  itself the signal* of where we are. Then the recommended move + an offer.
+- **Mid-block check-in** → the focus tree.
+- **Asking questions** → tag each item 👀 (needs your verification) or ℹ️ (just a note).
+- **Clear-point / handoff** → the overview tree + the single 👉 next.
 
 ## Lifecycle
 
@@ -174,28 +240,25 @@ The shape: an `### YYYY-MM-DD — Short title` header, one paragraph that gives 
 
 ### `plans/STATUS.md`
 
-```markdown
-<!-- Hand-maintained snapshot, rewritten each block. Links to the source of truth
-     for every line — points, never copies. One 👉 next only. -->
+The overview tree is the headline; links point to the source of truth, never copy
+it. One 👉 next, always last. (See "Status trees" above for the full format.)
 
+```markdown
 # <Project> — Status
 _Snapshot · <date>_
 
-## Milestones
-- ✅ **M1 — <name>** · <one line>. → [`features/M1.md`](./features/M1.md)
-- 🟡 **M2 — <name>** · <one line>. → [`features/M2.md`](./features/M2.md)   ← cursor
-  - ✅ Phase 1 — <name>
-  - 🟡 Phase 2 — <name>
-- 📋 **M3 — <name>** · <one line>. → [`BRIEF.md`](./BRIEF.md)
+├─ ✅ M1 — <name>
+├─ 🌱 M2 — <name>
+│  ├─ ✅ P1 — <name>
+│  └─ 🌱 P2 — <name>     ← here
+└─ 📋 M3 — <name>
 
-## 👉 Next
-<the one next thing>. → [`LOG.md`](./LOG.md)
+penciled in — not yet defined (ideas, traceable to you)
+   ✏️ M4 — <name> (<source>)     ← likely next
 
-## ❓ Open  →  [`QUESTIONS.md`](./QUESTIONS.md)
-- ⚖️ <question title>
+👉 next  <the one thing>. → [`LOG.md`](./LOG.md)
 
-## 📌 Recent  →  [`DECISIONS.md`](./DECISIONS.md)
-- <decision title>
+❓ open → [`QUESTIONS.md`](./QUESTIONS.md)   ·   📌 recent → [`DECISIONS.md`](./DECISIONS.md)
 ```
 
 ### `plans/LOG.md`
@@ -204,7 +267,7 @@ _Snapshot · <date>_
 # Work log
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-🟡 **M2 — <name>** (P1 ✅ · P2 🟡 ← here)
+🌱 **M2 — <name>** (P1 ✅ · P2 🌱 ← here)
 👉 Next: <the one thing>. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 

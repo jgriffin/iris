@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **M4 — IrisTuning** (P1 ✅ · P2 ✅ · P3 ✅ · P4 🚫 cancelled) — closed; 📋 **M5 — IrisDataset** ← next up
-👉 Next: Open M5 — `IrisDataset` (`BRIEF.md` §6): `DatasetSink` protocol, one-tap frame + COCO sidecar. → [`STATUS.md`](./STATUS.md)
+✅ **M4 — IrisTuning** closed (P1–P3 ✅ · P4 🚫)  ·  ✏️ **M5 — IrisDataset** penciled in ← likely next
+👉 Next: define M5 → draft `features/M5.md` (discuss-phase). → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
