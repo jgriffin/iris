@@ -5,6 +5,12 @@
      link to the exploration that justifies it. Leave a blank line between entries.
      The linked RECOMMENDATIONS.md carries the deep case — don't restate it here. -->
 
+### 2026-05-22 — Best-effort temporal match in `ResultStore.lookup` via timestamp-keyed cache
+
+`ResultStore` is a `[CMTime: TimestampedDetections]` dictionary keyed on *quantized* asset-time buckets (default: one 30fps frame); `lookup(at:)` is nearest-neighbor within `min(2 × quantization, stale:)`. `DetectorPipeline.detect(in:cache:)` consults the cache via a `DetectionCache` protocol (in `Sources/Iris/Detection/`) before dispatching detectors — re-visiting an already-detected timestamp returns the cached detections without re-running inference. `PlaybackSource` uses `.bufferingNewest(3)` (not `(1)`) so seek-emitted and frame-step frames survive detector congestion; the original 2026-05-20 "Runtime frame pipeline" `.bufferingNewest(1)` contract is preserved for `CaptureSession`. No eviction policy in v1 — revisit when M5's dataset workflows want long-form footage handling.
+
+→ [`features/playback-detection-cache.md`](./features/playback-detection-cache.md) (commits `c6c250f`, `75a9b88`, `3f748d4`, `aa068ee`)
+
 ### 2026-05-20 — Single SwiftPM target, folder-organized internally
 
 Iris ships as one Swift package target with a single umbrella library product.
