@@ -37,6 +37,33 @@ public protocol TunableDetector: Detector {
     /// produced it.
     var settings: Settings { get }
 
+    /// What this detector actually produces and exposes — the M5
+    /// capability descriptor that drives the tuning UI, the overlay
+    /// (P3), and the raw-data inspector (P4).
+    ///
+    /// **Why the seam is here, on `TunableDetector`, not on `Detector`
+    /// or on `Settings`.** Three candidate homes, one fit:
+    ///
+    ///   - On the base `Detector`: would force every detector — including
+    ///     non-tunable mocks and fixed backends — to author a descriptor
+    ///     they have no UI need for. `Detector` is the minimal
+    ///     frame→`[Detection]` seam (`plans/DECISIONS.md`); capability
+    ///     declaration is a tuning/inspection concern, a layer up.
+    ///   - On the `Settings` type (statically): the confidence and
+    ///     geometry axes are *detector*-intrinsic, not knob values — a
+    ///     settings struct is the wrong owner for "this model has no
+    ///     probabilistic confidence." It would also split the descriptor
+    ///     (knobs on the settings type, confidence/geometry elsewhere).
+    ///   - On `TunableDetector` (here): the exact set of detectors that
+    ///     participate in tuning UI and the inspector. `tunableKnobs`
+    ///     reuses `Settings.schema`, so the descriptor and the existing
+    ///     `DetectorSettings` channel stay one mechanism. An instance
+    ///     property (not static) leaves room for a detector whose
+    ///     capabilities depend on construction config (e.g. body pose's
+    ///     `detectsHands` toggling which joints appear) without an API
+    ///     change.
+    var capabilities: DetectorCapabilities { get }
+
     /// Per-transition tier verdict. Given a single knob's transition,
     /// return the `ApplyResult` the channel should route on.
     ///

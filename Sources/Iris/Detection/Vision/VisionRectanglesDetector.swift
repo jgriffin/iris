@@ -86,6 +86,62 @@ public struct VisionRectanglesDetector: TunableDetector {
 
     public let modelIdentifier: String = "vision.rectangles"
 
+    // MARK: - Capabilities
+
+    /// Honest capability descriptor for Vision rectangle detection.
+    ///
+    /// **Geometry: quad + box.** `RectangleObservation` carries four
+    /// oriented corners (`topLeft`…`bottomLeft`, surfaced as
+    /// `Detection.keypoints`) plus their axis-aligned hull
+    /// (`Detection.boundingBox`). Both kinds are real here, so both are
+    /// declared.
+    ///
+    /// **Confidence: `.none`.** `RectangleObservation.confidence` is a
+    /// constant `1.0` — a geometric artifact, not a probability. This is
+    /// the motivating bug of M5: declaring `.none` is what tells the
+    /// overlay (P3) to draw *no* confidence chip and the inspector (P4)
+    /// to show `—` rather than a fabricated "100%". (A quadrature/aspect
+    /// quality ratio could later be surfaced as
+    /// `.derivedScalar(label:)`; Wave 1 keeps it `.none` rather than
+    /// invent a metric no consumer reads yet.)
+    ///
+    /// **Knobs.** Reuse the settings schema verbatim — single source of
+    /// truth. When the `minimumConfidence` knob is removed from the
+    /// schema, this descriptor follows automatically.
+    ///
+    /// **Introspectable fields.** Exactly what a rectangle `Detection`
+    /// carries: the bounding box, the label, and the four corner
+    /// keypoints. No per-keypoint confidence field is listed — corner
+    /// keypoints inherit the constant observation confidence, which (per
+    /// the `.none` semantics above) is not a meaningful signal to expose.
+    public var capabilities: DetectorCapabilities {
+        DetectorCapabilities(
+            geometryKinds: [.quad, .box],
+            confidence: .none,
+            tunableKnobs: VisionRectanglesSettings.schema,
+            introspectableFields: [
+                DetectorCapabilities.IntrospectableField(
+                    key: "boundingBox",
+                    displayName: "Bounding box",
+                    valueKind: .boundingBox,
+                    source: .boundingBox
+                ),
+                DetectorCapabilities.IntrospectableField(
+                    key: "label",
+                    displayName: "Label",
+                    valueKind: .label,
+                    source: .label
+                ),
+                DetectorCapabilities.IntrospectableField(
+                    key: "corners",
+                    displayName: "Corners",
+                    valueKind: .keypoints,
+                    source: .keypoints
+                ),
+            ]
+        )
+    }
+
     // MARK: - Init
 
     /// Settings-shaped init. The hot-swap doctrine builds fresh

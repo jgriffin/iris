@@ -98,6 +98,17 @@ private final class RecordingTunableDetector: TunableDetector, @unchecked Sendab
     let availability: DetectorAvailability = .available
     let modelIdentifier: String = "recording-tunable"
 
+    // Routing tests don't inspect capabilities; a minimal honest
+    // descriptor satisfies the `TunableDetector` requirement.
+    var capabilities: DetectorCapabilities {
+        DetectorCapabilities(
+            geometryKinds: [.box],
+            confidence: .probabilistic,
+            tunableKnobs: RecordingSettings.schema,
+            introspectableFields: []
+        )
+    }
+
     // Apply verdict configuration + recording. `verdict` is a closure
     // so each test wires its tier; `recordedChanges` collects every
     // change observed.

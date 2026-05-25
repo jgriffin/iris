@@ -266,9 +266,9 @@ func classifierNeverExceedsSchemaWorstCase() {
             #expect(tierRank(baseline.apply(raise).tier) <= tierRank(knob.tier))
             #expect(tierRank(baseline.apply(lower).tier) <= tierRank(knob.tier))
             #expect(tierRank(baseline.apply(noop).tier) <= tierRank(knob.tier))
-        case .toggle, .multiSelect:
-            // No toggle/multiSelect knobs in the Vision schema yet.
-            Issue.record("Unexpected toggle/multiSelect knob in Vision schema: \(knob.key)")
+        case .toggle, .multiSelect, .string, .enum:
+            // No toggle/multiSelect/string/enum knobs in the Vision schema yet.
+            Issue.record("Unexpected non-numeric knob in Vision schema: \(knob.key)")
         }
     }
 }

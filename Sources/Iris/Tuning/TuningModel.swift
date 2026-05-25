@@ -380,9 +380,15 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
     }
 
     /// Build a `SettingChange.Value` payload from a typed value. One
-    /// branch per known `SettingKind` variant. Returns `nil` for
-    /// types outside the supported set (a hook for the
-    /// `SettingKind.string` variant once Phase 1's TODO lands).
+    /// branch per `SettingKind`-backed Swift type. Returns `nil` for
+    /// types outside the supported set.
+    ///
+    /// **`String` ordering note.** The `Set<String>` arm precedes the
+    /// `String` arm so a multi-select knob never collapses into the
+    /// free-form-string payload. `String` covers both
+    /// `SettingKind.string` (free-form) and `SettingKind.enum`
+    /// (constrained) — both store a single string at the property, and
+    /// the schema is what distinguishes them downstream.
     private func buildChange<T: Equatable>(
         key: String,
         oldValue: T,
@@ -399,6 +405,9 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
         }
         if let old = oldValue as? Set<String>, let new = newValue as? Set<String> {
             return SettingChange.multiSelect(key: key, from: old, to: new)
+        }
+        if let old = oldValue as? String, let new = newValue as? String {
+            return SettingChange.string(key: key, from: old, to: new)
         }
         return nil
     }

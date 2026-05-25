@@ -63,7 +63,7 @@ extension DetectorSettings {
 /// carries. Built once per settings type (`static var schema`) and
 /// consumed by the tuning channel + any generic UI that wants to render
 /// arbitrary detector settings without compile-time knowledge.
-public struct SettingSchema: Sendable {
+public struct SettingSchema: Sendable, Hashable {
 
     /// Every tunable knob on the parent settings type, in display order.
     public let knobs: [Knob]
@@ -74,7 +74,7 @@ public struct SettingSchema: Sendable {
 
     /// A single tunable knob — one property on the concrete settings
     /// type, surfaced for generic consumers.
-    public struct Knob: Sendable {
+    public struct Knob: Sendable, Hashable {
 
         /// Stable identifier matching the property name on the concrete
         /// settings type. Used as the lookup key in `SettingChange`.
@@ -109,11 +109,21 @@ public struct SettingSchema: Sendable {
 
 // MARK: - SettingKind
 
-/// Type + bounds + default for a single knob. Covers the four shapes a
+/// Type + bounds + default for a single knob. Covers the shapes a
 /// detector knob can take: continuous `Float`, discrete `Int`, boolean
-/// toggle, and multi-select over a fixed set of options (e.g. class
-/// allow-list for an object detector).
-public enum SettingKind: Sendable {
+/// toggle, multi-select over a fixed set of options (e.g. class
+/// allow-list for an object detector), free-form `String`, and a
+/// single-choice `enum` over a fixed option set.
+///
+/// **`.string` / `.enum` (M5).** The Vision capability audit
+/// (`explorations/2026-05-24-vision-capability-audit/`) surfaced text /
+/// symbology knobs — `RecognizeTextRequest.customWords` (string-ish),
+/// `DetectBarcodesRequest.symbologies`, `recognitionLevel`
+/// (`.fast`/`.accurate`, an enum). These are modeled here at the
+/// schema/model layer so the channel handles them; no built-in detector
+/// ships them yet, and the generic UI is Wave 2 — so they are
+/// deliberately rendered by no view today.
+public enum SettingKind: Sendable, Hashable {
     /// Continuous floating-point knob with inclusive `range` and snap
     /// `step` (the resolution UIs should use for sliders / steppers).
     case float(range: ClosedRange<Float>, step: Float, default: Float)
@@ -129,6 +139,16 @@ public enum SettingKind: Sendable {
     /// allow-list. `options` is the full universe; `default` is the
     /// initial subset.
     case multiSelect(options: [String], default: Set<String>)
+
+    /// Free-form string knob (e.g. a detection label, or a text
+    /// detector's custom-words entry). `default` is the initial value.
+    case string(default: String)
+
+    /// Single-choice over a fixed option set — e.g. a text recognition
+    /// level (`fast` / `accurate`) or a segmentation quality level.
+    /// `options` is the full universe; `default` is the initial choice
+    /// (and must be one of `options`).
+    case `enum`(options: [String], default: String)
 }
 
 // MARK: - ChangeTier
@@ -176,6 +196,11 @@ public struct SettingChange: Sendable {
         case int(Int)
         case toggle(Bool)
         case multiSelect(Set<String>)
+        /// Payload for both `SettingKind.string` and `SettingKind.enum`:
+        /// a single string carries a free-form value or a chosen option.
+        /// The schema's `SettingKind` distinguishes the two (free-form vs.
+        /// constrained-to-`options`); the change payload is the same shape.
+        case string(String)
     }
 
     public init(key: String, oldValue: Value, newValue: Value) {
@@ -210,6 +235,13 @@ public struct SettingChange: Sendable {
             oldValue: .multiSelect(old),
             newValue: .multiSelect(new)
         )
+    }
+
+    /// Convenience builder for a string / enum knob transition. Both
+    /// `SettingKind.string` and `SettingKind.enum` carry a `.string`
+    /// payload; the schema distinguishes free-form from constrained.
+    public static func string(key: String, from old: String, to new: String) -> Self {
+        SettingChange(key: key, oldValue: .string(old), newValue: .string(new))
     }
 }
 
