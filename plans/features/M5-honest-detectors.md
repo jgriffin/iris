@@ -75,7 +75,45 @@ _Shipped 2026-05-25 (`e0700a7` quad · `8ba40e6` skeleton + `VisionBodyPoseDetec
   aspect ratio / quadrature deviation; pose: joint count or none).
 - Land the body-pose skeleton viz as the proof the overlay generalizes past boxes.
 
-### P4 — Detection inspector (raw-data panel)  📋
+### P4 — Detector selection in the player  ✅
+
+_Shipped 2026-05-25 (`4443d7f`) — `DetectorCatalog` + type-erased `ActiveDetectorSession`
+in Iris, a detector picker in both demo players, capability-derived settings with no
+per-detector demo code; `TuningRouter` gained `onDetectorTierChange` for the erased
+re-emit hook. **Pending the user's visual smoke-test in the player.**_
+
+_Added 2026-05-25. The honest detectors are unreachable from the demo: it hardcodes
+`VisionRectanglesDetector` (iOS `ContentView.swift:500`, macOS `:365`) and never
+instantiates `VisionBodyPoseDetector`, so playing a video never shows the skeleton.
+This phase makes the player **select which detector is active** and tune it —
+generally, because every new detector (M6 custom models included) needs the same
+affordance. Resolves [`BRIEF.md`](../BRIEF.md) §5's "serial / parallel /
+selector-gated" as **selector-gated, one active at a time**; multi-active parallel
+stays deferred under the open "[multi-detector pipelines under `TuningModel`]"
+question in [`QUESTIONS.md`](../QUESTIONS.md)._
+
+All the machinery already exists — `DetectorPipeline` runs N detectors, `TuningModel`
+and `CapabilityTuningView` are generic over any `TunableDetector`, and hot-swap is
+wired (the pipeline reads `tuning.currentDetector` through the `TuningRouter` seam).
+The gap is a selection layer:
+
+- **`DetectorCatalog`** (Iris) — the list of available detectors: per entry a display
+  name + a factory. The built-in Vision detectors ship as default entries; downstream
+  apps register their own. Iris-level so M6 and every consumer reuse it.
+- **Type-erased active session** — bundles the running detector's `TuningModel`
+  (behind the existing type-erased `TuningRouter` seam the pipeline already reads) +
+  an `AnyView` capability-derived settings panel, built by the entry's factory (which
+  captures the concrete `TunableDetector` type in a closure). Lets the player hold
+  "current detector + its panel" without compile-time knowing the type — no general
+  `AnyTuningModel` needed.
+- **Player picker** — iOS playback control bar + macOS sidebar/inspector. On change:
+  build the detector, swap the tuning + pipeline, `invalidateAll()` the cache, re-emit
+  the paused frame.
+
+Proof: pick body pose in the player → skeleton on the dancer clip; pick rectangles →
+honest quads — each with its own capability-derived settings, no per-detector demo code.
+
+### P5 — Detection inspector (raw-data panel)  📋
 
 A panel showing the *literal* structured data each detection carries — the
 data-truth complement to P3's spatial-truth overlay. Together: "this is what
