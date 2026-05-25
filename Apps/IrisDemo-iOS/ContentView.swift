@@ -255,16 +255,46 @@ struct PlaybackContentView: View {
             .ignoresSafeArea()
         }
         .sheet(isPresented: $showTuning) {
-            if let session {
-                NavigationStack {
-                    session.settingsView
-                        .navigationTitle("Detector tuning")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button("Done") { showTuning = false }
+            NavigationStack {
+                VStack(spacing: 0) {
+                    // M5·P4 follow-up: the detector picker lives at the TOP
+                    // of the tuning pane (above the settings), not in the
+                    // control bar. Always visible whenever the sheet opens —
+                    // outside the `if let session` guard — while the settings
+                    // below stay guarded on an active session. Changing the
+                    // selection rebuilds the active `session` and restarts the
+                    // detection loop (see `.onChange(of: selectedDetectorID)`).
+                    // `settingsView` is itself a `Form`, so the picker sits in
+                    // its own header above it rather than nesting Forms.
+                    HStack {
+                        Text("Detector")
+                            .font(.headline)
+                        Spacer()
+                        Picker("Detector", selection: $selectedDetectorID) {
+                            ForEach(catalog.entries) { entry in
+                                Text(entry.displayName).tag(entry.id)
                             }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .accessibilityLabel("Active detector")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color(.secondarySystemBackground))
+
+                    if let session {
+                        session.settingsView
+                    } else {
+                        Spacer()
+                    }
+                }
+                .navigationTitle("Detector tuning")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showTuning = false }
+                    }
                 }
             }
         }
@@ -294,24 +324,14 @@ struct PlaybackContentView: View {
     @ViewBuilder
     private var controlBar: some View {
         HStack {
-            // M5·P4: detector picker driving the catalog. Changing the
-            // selection rebuilds the active `session` and restarts the
-            // detection loop bound to the new detector (see
-            // `.onChange(of: selectedDetectorID)`).
-            Picker("Detector", selection: $selectedDetectorID) {
-                ForEach(catalog.entries) { entry in
-                    Text(entry.displayName).tag(entry.id)
-                }
-            }
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .labelsHidden()
-            .accessibilityLabel("Active detector")
-
+            // M5·P4 follow-up: the detector picker moved INTO the tuning
+            // sheet (at the top of the pane). The gear "Tune" button below
+            // is the entry point; the picker is no longer in the control bar.
             Spacer()
             // M5·P4: live tuning sheet over the active session's
-            // capability-derived settings view. Disabled until a session
-            // is built (alongside the controller in `startSession`).
+            // capability-derived settings view. Hosts the detector picker
+            // at the top of the pane plus the session's settings. The gear
+            // is enabled even without a session so the picker is reachable.
             Button {
                 showTuning = true
             } label: {
@@ -319,7 +339,6 @@ struct PlaybackContentView: View {
                     .labelStyle(.iconOnly)
             }
             .controlSize(.small)
-            .disabled(session == nil)
             .accessibilityLabel("Tune detector")
 
             Button {

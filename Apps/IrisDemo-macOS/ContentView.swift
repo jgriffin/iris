@@ -88,12 +88,38 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 480)
         .inspector(isPresented: $showTuning) {
-            // M5·P4: live tuning inspector. Hosts the active session's
-            // capability-derived `settingsView` (built by the catalog).
-            // Empty state shows when no session is loaded — gear button
-            // stays toggleable so users learn where the panel lives even
-            // on an empty workspace.
-            Group {
+            // M5·P4: live tuning inspector. M5·P4 follow-up: the detector
+            // picker now lives at the TOP of the inspector (above the
+            // settings), not in the toolbar — always visible. Below it,
+            // the active session's capability-derived `settingsView` (built
+            // by the catalog); an empty state shows when no session is
+            // loaded. The gear button stays toggleable so users learn where
+            // the panel — and the picker — live even on an empty workspace.
+            VStack(spacing: 0) {
+                // Always-visible detector picker at the top of the pane.
+                // Changing the selection rebuilds the active `session` and
+                // restarts the detection loop (see
+                // `.onChange(of: selectedDetectorID)`). `settingsView` is
+                // itself a `Form`, so the picker sits in its own header above
+                // it rather than nesting Forms.
+                HStack {
+                    Text("Detector")
+                        .font(.headline)
+                    Spacer()
+                    Picker("Detector", selection: $selectedDetectorID) {
+                        ForEach(catalog.entries) { entry in
+                            Text(entry.displayName).tag(entry.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .accessibilityLabel("Active detector")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                Divider()
+
                 if let session {
                     session.settingsView
                 } else {
@@ -107,20 +133,9 @@ struct ContentView: View {
             .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
         }
         .toolbar {
-            // M5·P4: detector picker driving the catalog. Changing the
-            // selection rebuilds the active `session` and restarts the
-            // detection loop bound to the new detector (see
-            // `.onChange(of: selectedDetectorID)`).
-            ToolbarItem(placement: .principal) {
-                Picker("Detector", selection: $selectedDetectorID) {
-                    ForEach(catalog.entries) { entry in
-                        Text(entry.displayName).tag(entry.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .disabled(session == nil)
-                .help("Active detector")
-            }
+            // M5·P4 follow-up: the detector picker moved INTO the inspector
+            // (at the top of the pane); only the gear "Tune" toggle remains
+            // in the toolbar as the entry point.
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showTuning.toggle()
@@ -128,7 +143,6 @@ struct ContentView: View {
                     Label("Tune", systemImage: "slider.horizontal.3")
                 }
                 .help("Toggle tuning inspector")
-                .disabled(session == nil)
             }
         }
         .onChange(of: selectedDetectorID) {

@@ -59,4 +59,15 @@ func visionBodyPoseDetectorFiresOnDancerClip() async throws {
     #expect(readout.label == "joints")
     let jointCount = detection.keypoints?.count ?? 0
     #expect(readout.text == "\(jointCount) joints")
+
+    // M5·P4 follow-up: the default 0.3 joint-confidence floor (applied
+    // inside `detect(in:)`) drops Vision's undetected joints, which it
+    // parks at ~(0,0) with ~0 confidence. No surviving joint should sit at
+    // exactly the origin, and every surviving joint clears the floor.
+    let survivingJoints = try #require(detection.keypoints, "Pose carried no keypoints")
+    #expect(
+        survivingJoints.contains { $0.position == .zero } == false,
+        "A (0,0) phantom joint survived the default joint-confidence floor"
+    )
+    #expect(survivingJoints.allSatisfy { $0.confidence >= 0.3 })
 }

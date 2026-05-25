@@ -130,7 +130,7 @@ public struct VisionBodyPoseDetector: TunableDetector {
             orientation: frame.orientation
         )
 
-        return observations.compactMap { observation -> Detection? in
+        let detections = observations.compactMap { observation -> Detection? in
             let joints = observation.allJoints()
             guard !joints.isEmpty else { return nil }
 
@@ -180,14 +180,27 @@ public struct VisionBodyPoseDetector: TunableDetector {
                 sourceModelID: modelIdentifier
             )
         }
+        // Apply the same settings-projection the filter-tier path uses, so
+        // a fresh inference and a cached-then-filtered result agree exactly
+        // (the per-joint confidence floor). This is what makes
+        // `minimumJointConfidence` symmetric: the joint filter runs here on
+        // fresh output *and* in `transform(for:)` on cached output, from one
+        // definition. Mirrors `VisionRectanglesDetector.detect(in:)`.
+        return Self.transform(for: settings)(detections)
     }
 
     // MARK: - TunableDetector
 
-    /// Per-transition tier classifier. The sole knob, `detectsHands`,
-    /// changes which joints Vision returns — the cache can't recover the
-    /// added/removed joints without re-inference, so it is detector-tier.
-    /// A no-op transition (identical old/new) resolves to `.view`.
+    /// Per-transition tier classifier.
+    ///
+    /// `detectsHands` changes which joints Vision returns — the cache can't
+    /// recover the added/removed joints without re-inference, so it is
+    /// detector-tier. `minimumJointConfidence` is a pure post-hoc per-joint
+    /// filter over the cached detections (Vision always returns the full
+    /// joint set; this floor drops the low-confidence ones in Swift), so it
+    /// is filter-tier in both directions — symmetric and instant, mirroring
+    /// the rectangles `quadratureToleranceDegrees` knob. A no-op transition
+    /// (identical old/new) resolves to `.view`.
     public func apply(_ change: SettingChange) -> ApplyResult {
         if change.oldValue == change.newValue {
             return .view
@@ -199,15 +212,109 @@ public struct VisionBodyPoseDetector: TunableDetector {
                 // Type-incompatible payload — rebuild with current settings.
                 return .detector(rebuilt: VisionBodyPoseDetector(settings: settings))
             }
+            // Preserve the current joint-confidence floor across the rebuild.
             return .detector(
                 rebuilt: VisionBodyPoseDetector(
-                    settings: VisionBodyPoseSettings(detectsHands: new)
+                    settings: VisionBodyPoseSettings(
+                        detectsHands: new,
+                        minimumJointConfidence: settings.minimumJointConfidence
+                    )
                 )
             )
+
+        case VisionBodyPoseSettings.minimumJointConfidenceKey:
+            guard case .float(let new) = change.newValue else {
+                // Type-incompatible payload — worst-case detector-tier.
+                return .detector(rebuilt: VisionBodyPoseDetector(settings: settings))
+            }
+            // Pure post-hoc per-joint filter. Vision always returns the full
+            // joint set; tightening *or* loosening the floor just re-runs the
+            // joint filter over the cached detections — filter-tier in both
+            // directions, symmetric and instant. Mirrors rectangles'
+            // `quadratureToleranceDegrees`.
+            var newSettings = settings
+            newSettings.minimumJointConfidence = new
+            return .filter(transform: Self.transform(for: newSettings))
 
         default:
             // Unknown key — worst-case detector-tier with unchanged settings.
             return .detector(rebuilt: VisionBodyPoseDetector(settings: settings))
+        }
+    }
+
+    // MARK: - Filter-tier transform builder
+
+    /// Build the output-stage transform that projects `settings` onto a
+    /// previously-cached `[Detection]`. The `.filter`-tier verdict for
+    /// `minimumJointConfidence` returns this shape: re-run the current
+    /// settings as a view over what the detector already produced.
+    /// Centralizing the projection here keeps the `.filter` arm in
+    /// `apply(_:)` one line and pins the predicate semantics in one place
+    /// for tests. Mirrors `VisionRectanglesDetector.transform(for:)`.
+    ///
+    /// **What it does, per detection:**
+    /// - Drops keypoints whose `confidence` is below
+    ///   `settings.minimumJointConfidence`. Vision returns undetected joints
+    ///   at ~(0,0) with ~0 confidence; the default `0.3` floor cleanly drops
+    ///   those phantoms while keeping clearly-visible joints (typically
+    ///   0.8+). Dropping the keypoints fixes the stray (0,0) dot, the
+    ///   phantom skeleton edges (edges to dropped joints auto-skip in
+    ///   `DetectionLayer.skeletonSegments`), the inflated joint count, and
+    ///   the origin-pinned bounding box together.
+    /// - Recomputes the axis-aligned bounding-box envelope from the
+    ///   *remaining* keypoints.
+    /// - Recomputes the `Readout` (`"\(n) joints"`) and the mean
+    ///   `confidence` from the remaining keypoints.
+    /// - Preserves `skeleton`, `label`, and `sourceModelID`.
+    /// - Drops the whole detection if zero joints remain.
+    ///
+    /// Detections without keypoints (`nil` or `[]`) pass through unchanged
+    /// — the filter can't judge joints a detection doesn't carry (e.g. a
+    /// non-pose detection routed through the same transform).
+    public static func transform(
+        for settings: VisionBodyPoseSettings
+    ) -> @Sendable ([Detection]) -> [Detection] {
+        let floor = settings.minimumJointConfidence
+        return { detections in
+            detections.compactMap { detection -> Detection? in
+                // No keypoints to judge — pass through unchanged.
+                guard let keypoints = detection.keypoints else { return detection }
+
+                let kept = keypoints.filter { $0.confidence >= floor }
+                // Every joint dropped — drop the whole detection rather than
+                // emit an empty, origin-pinned husk.
+                guard !kept.isEmpty else { return nil }
+
+                // Unchanged set — return as-is (avoids rebuilding the value).
+                guard kept.count != keypoints.count else { return detection }
+
+                // Recompute the envelope from the remaining joints.
+                let xs = kept.map(\.position.x)
+                let ys = kept.map(\.position.y)
+                let minX = xs.min() ?? 0
+                let maxX = xs.max() ?? 0
+                let minY = ys.min() ?? 0
+                let maxY = ys.max() ?? 0
+                let bbox = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+
+                // Recompute the mean confidence from the remaining joints.
+                let meanConfidence =
+                    kept.reduce(Float(0)) { $0 + $1.confidence } / Float(kept.count)
+
+                // Recompute the joint-count readout from the remaining joints.
+                let readout = Readout(label: "joints", text: "\(kept.count) joints")
+
+                return Detection(
+                    boundingBox: bbox,
+                    label: detection.label,
+                    confidence: meanConfidence,
+                    keypoints: kept,
+                    mask: detection.mask,
+                    skeleton: detection.skeleton,
+                    readout: readout,
+                    sourceModelID: detection.sourceModelID
+                )
+            }
         }
     }
 }
