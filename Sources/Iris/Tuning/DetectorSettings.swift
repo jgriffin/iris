@@ -44,6 +44,28 @@ public protocol DetectorSettings: Sendable {
     /// emits a `SettingChange` with an empty key, which the
     /// classifier handles via the worst-case fallback arm.
     static func key(for keyPath: PartialKeyPath<Self>) -> String?
+
+    /// Read the value of the knob identified by its schema `key`, as a
+    /// type-erased `SettingChange.Value`. Returns `nil` for keys that
+    /// don't map to a stored knob.
+    ///
+    /// **Why a string-keyed value bridge (M5 Wave 2).** The
+    /// capability-derived tuning UI (`CapabilityTuningView`) renders one
+    /// control per `SettingSchema.Knob`, addressed by the knob's
+    /// `String` key — it has no compile-time keyPath for each knob.
+    /// Swift can't reconstruct a `WritableKeyPath<Self, T>` from a KVC
+    /// string on a plain `struct` (the same reason `key(for:)` is
+    /// hand-rolled), so the generic UI needs a string-keyed read/write
+    /// pair. This is the value-side complement to `key(for:)`: one small
+    /// hand-rolled table per conformer, the same drift surface the
+    /// `DetectorSettingsTests` audits already pin.
+    func value(forKey key: String) -> SettingChange.Value?
+
+    /// Write the value of the knob identified by its schema `key`. A
+    /// no-op for keys that don't map to a stored knob, or for a value
+    /// whose `SettingChange.Value` variant doesn't match the knob's
+    /// stored type (the conformer's table decides). See `value(forKey:)`.
+    mutating func setValue(_ value: SettingChange.Value, forKey key: String)
 }
 
 extension DetectorSettings {
@@ -54,6 +76,19 @@ extension DetectorSettings {
     /// `TuningModel` falls back to the empty-key path described above.
     public static func key(for _: PartialKeyPath<Self>) -> String? {
         nil
+    }
+
+    /// Default: no knob is readable by key. Conformers that want the
+    /// capability-derived UI override both `value(forKey:)` and
+    /// `setValue(_:forKey:)`. The default keeps the protocol satisfiable
+    /// for settings types not yet wired for generic rendering.
+    public func value(forKey _: String) -> SettingChange.Value? {
+        nil
+    }
+
+    /// Default: writes are dropped. See `value(forKey:)`.
+    public mutating func setValue(_: SettingChange.Value, forKey _: String) {
+        // intentionally no-op
     }
 }
 

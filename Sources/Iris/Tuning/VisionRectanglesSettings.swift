@@ -124,6 +124,39 @@ public struct VisionRectanglesSettings: DetectorSettings {
         }
     }
 
+    /// String-keyed value read — the value-side complement to
+    /// `key(for:)` that the capability-derived UI uses to address knobs
+    /// by their schema `key`. Stays in lockstep with the schema and the
+    /// keyPath bridge (the `DetectorSettingsTests` audit pins all three).
+    /// `label` is included so a future generic UI can edit it via the
+    /// `.string` kind even though the schema doesn't surface it yet.
+    public func value(forKey key: String) -> SettingChange.Value? {
+        switch key {
+        case "minimumAspectRatio": return .float(minimumAspectRatio)
+        case "maximumAspectRatio": return .float(maximumAspectRatio)
+        case "minimumSize": return .float(minimumSize)
+        case "maximumObservations": return .int(maximumObservations)
+        case "quadratureToleranceDegrees": return .float(quadratureToleranceDegrees)
+        case "label": return .string(label)
+        default: return nil
+        }
+    }
+
+    /// String-keyed value write. Mismatched payload variants (e.g. a
+    /// `.toggle` into a `.float` knob) are dropped — the conformer's
+    /// table is the authority on each knob's type.
+    public mutating func setValue(_ value: SettingChange.Value, forKey key: String) {
+        switch (key, value) {
+        case ("minimumAspectRatio", .float(let v)): minimumAspectRatio = v
+        case ("maximumAspectRatio", .float(let v)): maximumAspectRatio = v
+        case ("minimumSize", .float(let v)): minimumSize = v
+        case ("maximumObservations", .int(let v)): maximumObservations = v
+        case ("quadratureToleranceDegrees", .float(let v)): quadratureToleranceDegrees = v
+        case ("label", .string(let v)): label = v
+        default: break
+        }
+    }
+
     public static var schema: SettingSchema {
         SettingSchema(knobs: [
             SettingSchema.Knob(

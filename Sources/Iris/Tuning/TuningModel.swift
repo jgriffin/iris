@@ -256,6 +256,20 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
             return
         }
 
+        dispatch(change)
+    }
+
+    /// Route an already-built `SettingChange` through the detector's
+    /// classifier and consume the verdict per tier. Sets `lastChange`
+    /// and `lastApplyTier`. Shared by the typed-keyPath `update(_:to:)`
+    /// and the string-keyed `update(key:to:)` so both go through the
+    /// identical classifier-dispatch path.
+    ///
+    /// Precondition: `settings` has *already* been mutated to the
+    /// post-change value (both callers mutate before dispatching, so
+    /// the detector reads a consistent snapshot if it inspects
+    /// `self.settings`).
+    private func dispatch(_ change: SettingChange) {
         lastChange = change
 
         guard let detector else {
@@ -360,6 +374,54 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
         Binding(
             get: { self.settings[keyPath: keyPath] },
             set: { newValue in self.update(keyPath, to: newValue) }
+        )
+    }
+
+    // MARK: - String-keyed (capability-derived) mutation
+
+    /// String-keyed write surface for the capability-derived UI
+    /// (`CapabilityTuningView`), which addresses knobs by their schema
+    /// `key` rather than a compile-time keyPath.
+    ///
+    /// Reads the old value via `Settings.value(forKey:)`, no-ops on an
+    /// unchanged or unknown key, writes the new value through
+    /// `Settings.setValue(_:forKey:)`, then dispatches the
+    /// `SettingChange` through the same classifier path as
+    /// `update(_:to:)`. Returns silently when the key isn't a stored
+    /// knob (the bridge returned `nil`).
+    public func update(key: String, to newValue: SettingChange.Value) {
+        guard let oldValue = settings.value(forKey: key) else {
+            // Unknown key — no stored knob to mutate. The derived UI only
+            // ever passes schema keys, so this is a defensive guard.
+            logger.warning(
+                "update(key:to:): no stored knob for key \(key, privacy: .public); ignoring"
+            )
+            return
+        }
+        guard oldValue != newValue else { return }
+
+        settings.setValue(newValue, forKey: key)
+
+        dispatch(SettingChange(key: key, oldValue: oldValue, newValue: newValue))
+    }
+
+    /// String-keyed binding factory for the capability-derived UI.
+    /// Reads/writes the knob's type-erased `SettingChange.Value` by its
+    /// schema `key`; writes route through `update(key:to:)` so the tier
+    /// classifier and cache invalidation run on every transition (the
+    /// same guarantee the typed `binding(_:)` gives).
+    ///
+    /// The view layer projects the erased `Value` to the concrete
+    /// SwiftUI control binding it needs (`Float` slider, `Bool` toggle,
+    /// `String` text field / picker) via the `Binding` map helpers in
+    /// `CapabilityTuningView`.
+    public func binding(forKey key: String) -> Binding<SettingChange.Value?> {
+        Binding(
+            get: { self.settings.value(forKey: key) },
+            set: { newValue in
+                guard let newValue else { return }
+                self.update(key: key, to: newValue)
+            }
         )
     }
 
