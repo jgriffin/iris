@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **M4 — IrisTuning** closed (P1–P3 ✅ · P4 🚫)  ·  ✏️ **M5 — IrisDataset** penciled in ← likely next
-👉 Next: define M5 → draft `features/M5.md` (discuss-phase). → [`STATUS.md`](./STATUS.md)
+📋 **M5 — Honest detectors** (P1 audit · P2 capability model→UI · P3 honest overlays+ratios — all 📋)
+👉 Next: start M5·P1 — audit built-in Vision requests → capability matrix. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -328,3 +328,15 @@
     - Demo `ContentView` file-length warnings (both platforms now over the 400-line SwiftLint advisory).
 - Deferred (carryover, unchanged): `Detection.Mask` pixel-payload shape; `Detector.detectStream(in:)` 5th member; `.swift-format` ↔ `.swiftlint.yml` config alignment; detection-jitter polish; `.resizeAspectFill` vs `.resizeAspect` interaction; `PreviewSource.previewAngles` API-removal note; `AVAssetReader`-backed `OfflineSource` / prefetch-cache (M5 candidate); rotation-coord update race during in-place rotation; `PlaybackSource.swift` file-length advisory (523/400); CI workflow hardcoded `iPhone 16` simulator; cache-skip vs. detector non-determinism (M5); `ResultStore` cache eviction (M5); `RecentVideos.remove(_:)`; `emitOneShotFrame()` visibility (consumers use `seek(to: currentTime)`); `DetectionLayer` test file length.
 - Next: **M5 opens.** [`BRIEF.md`](./BRIEF.md) §6 `IrisDataset` — one-tap frame + COCO-JSON sidecar capture, working from both live and playback contexts. `DatasetSink` protocol; pluggable backends (folder on disk, iCloud, S3); "this was wrong" / "this was a near-miss" affordances. Several M5-relevant items have been accumulating in the deferred lists (cache-skip vs. detector non-determinism; `ResultStore` cache eviction; `AVAssetReader`-backed `OfflineSource` / prefetch-cache; `Detection.Mask` pixel-payload shape) — gather them at M5 discuss-phase. Likely opens with `features/M5.md` brief, not a discuss-phase first — the requirements are more concrete than M4's (one-tap capture, COCO format, sink protocol) and there's less load-bearing-taxonomy work to clarify upfront.
+
+---
+
+## 2026-05-24 (work block 7)
+- Did: User re-smoked the macOS demo (post-M4). **Double detections: not a problem — closed.** **Quadrature tolerance:** confirmed the asymmetry — stricter (lower tolerance) is a filter-tier no-op pass-through (feels "fine" but does nothing); more-permissive (raise) is a detector-tier change that dumps the cache and blanks the overlay while paused until a frame advances.
+- Did: Reframed the M4 polish items into a new milestone rather than patching them in isolation. Generalization: a **capability model** every built-in Vision detector declares, driving derived per-detector tuning UI + capability-honest overlays (render only what the model knows; ratios not percentages).
+- 📌 Decided (2 forks, via AskUserQuestion): ratios = **capability-honest** (per-detector meaningful ratio; no confidence readout when the model has none; real confidence as a ratio not a %); scope = **framework + 2 exemplars** (rectangles reworked + human body-pose skeleton; rest of the Vision surface audited + cataloged in P1, implemented later).
+- Did: **Inserted M5 — Honest detectors**; renumbered Custom models → M6, Dataset → M7 (custom models before dataset, per user). Wrote [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md) (P1 audit · P2 capability model → derived UI · P3 honest overlays + ratios). Updated BRIEF milestone path; fixed the CLAUDE.md Dataset row (M5→M7).
+- 💡 Learned: confidence=1.0 + quadrature weren't isolated polish — both are one symptom (detectors/overlays exposing capabilities the model doesn't have). The right fix is a capability model, not two patches.
+- 🗓 Deferred: quadrature-as-keypoint-filter may generalize to "shape knobs are filter-tier by construction" (the maximal-output idea) — scope-check in P2, don't let it balloon. M4 hygiene items (file lengths, schema-drift macro, `SettingKind.string`) still parked.
+- Did: Added **P4 — detection inspector (raw-data panel)** to M5 (user request): a shared `DetectionInspector` view (macOS `.inspector()` side panel + iOS sheet/popover) showing each detection's literal fields — geometry, confidence-or-`—`, label, settings snapshot, timestamp; debug-mode first, promotable later. It's the data-truth complement to P3's spatial overlay and a forcing function for an **introspectable** detection model (added as a P2 requirement: structured representation as the single source of truth for both derived UI and the inspector). Forks via AskUserQuestion: own phase P4 + shared cross-platform view.
+- 👉 Next: start M5·P1 — audit the built-in Vision request surface → capability matrix.

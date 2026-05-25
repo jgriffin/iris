@@ -155,7 +155,13 @@ and [`../explorations/swift-ecosystem/`](../explorations/swift-ecosystem/)
   playback + detection + overlay on Mac.
 - **M4 — Tuning.** `IrisTuning` — confidence slider, class filter, NMS controls
   bound via `@Observable`. "What if" mode for near-misses.
-- **M5 — Dataset.** `IrisDataset` — one-tap capture of frame + metadata to disk,
-  COCO sidecar. Works from both live and playback contexts.
+- **M5 — Honest detectors.** Capability model every built-in Vision detector
+  declares, driving derived per-detector tuning UI and capability-honest overlays —
+  render only what the model knows; ratios not percentages. Audits the built-in
+  Vision request surface; proves the model on reworked rectangles + a human
+  body-pose skeleton. Adds a raw-data inspector panel exposing the literal fields
+  each detection returns. See [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md).
 - **M6 — Custom models + captioning.** Core ML adapter with YOLO-style output
   decoder. Model swap UI. Foundation Models captioning integration.
+- **M7 — Dataset.** `IrisDataset` — one-tap capture of frame + metadata to disk,
+  COCO sidecar. Works from both live and playback contexts.

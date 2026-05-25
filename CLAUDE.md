@@ -56,7 +56,7 @@ discipline is the right level of separation. Locked verdicts in
 | `Sources/Iris/Detection/` | iOS + macOS  | `Detector` protocol; Vision / Core ML / Foundation Models    |
 | `Sources/Iris/Overlay/`   | iOS + macOS  | SwiftUI views drawing `[Detection]`; coordinate-space mgmt   |
 | `Sources/Iris/Tuning/`    | iOS + macOS  | `@Observable` filter/threshold controls — **deferred to M4** |
-| `Sources/Iris/Dataset/`   | iOS + macOS  | One-tap frame + COCO-JSON sidecar — **deferred to M5**       |
+| `Sources/Iris/Dataset/`   | iOS + macOS  | One-tap frame + COCO-JSON sidecar — **deferred to M7**       |
 
 \*Capture source files are gated by `#if os(iOS)` at the file level. On
 macOS, `import Iris` succeeds; Capture types are simply not visible.
