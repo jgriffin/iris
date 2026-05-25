@@ -100,7 +100,7 @@ private struct TuningSliderPreviewHost: View {
     let label: String
     let range: ClosedRange<Float>
     let step: Float?
-    var format: FloatingPointFormatStyle<Float>? = nil
+    var format: FloatingPointFormatStyle<Float>?
 
     var body: some View {
         TuningSlider(
