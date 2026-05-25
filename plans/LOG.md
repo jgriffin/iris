@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-📋 **M5 — Honest detectors** (P1 audit · P2 capability model→UI · P3 honest overlays+ratios — all 📋)
-👉 Next: start M5·P1 — audit built-in Vision requests → capability matrix. → [`STATUS.md`](./STATUS.md)
+🌱 **M5 — Honest detectors** (P1 ✅ · P2 ✅ · P3 ✅ honest overlays+readouts · P4 📋 inspector ← next)
+👉 Next: start M5·P4 — shared `DetectionInspector` raw-data panel. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -348,3 +348,13 @@
 - 👀 Investigated (user Q — rotated rectangles): **DATA preserves the full quad** — `VisionRectanglesDetector` stores all four corners as ordered keypoints (`topLeft→bottomLeft`), and the Wave-1 quadrature filter already computes corner angles from them. **But the OVERLAY** (`DetectionLayer.swift:163-167`) strokes `Path(rect)` from the axis-aligned `boundingBox` only — keypoints never drawn — so a rotated rectangle renders upright. Detection works; display collapses it. **Folded "render rectangles as their detected quad" into P3** — it's the spatial-truth twin of the confidence honesty.
 - 🗓 Deferred: file-length warnings now also on `CapabilityTuningView.swift` + `TuningModel.swift` (+ a cyclomatic-11 on the `control(for:)` switch) — parked with the existing hygiene items.
 - 👉 Next: start **M5·P3** — capability-honest overlays: render rectangles as their real quad (not the bbox), land the body-pose skeleton viz, ratio display.
+
+---
+
+## 2026-05-25 (work block 8)
+- Did: **M5·P3 complete** — capability-honest overlays + numeric display, three atomic commits. **(1) Rectangle quad** (`e0700a7`): `DetectionLayer.draw` strokes the real detected quad from the four corner keypoints (`quadCorners(of:)`), each mapped through the centralized `converter.viewPoint` (no re-derived Y-flip), falling back to the bbox for box-only detections. **(2) Body-pose skeleton** (`8ba40e6`): new `VisionBodyPoseDetector` (`DetectHumanBodyPoseRequest` → 19 per-joint keypoints with real `.perElement` confidence; one knob `detectsHands`, detector-tier); new generic `Skeleton`/`Skeleton.Edge` type with the canonical `humanBodyPose` 18-edge topology defined *with the detector*; `DetectionLayer` dispatch **skeleton → quad → box** via the pure `skeletonSegments(of:)` helper (skips edges with a missing endpoint). **(3) Readouts** (`1ef2f3e`): `Detection.readout: Readout?` — detector-stamped meaningful number (rectangle true aspect ratio from corner side-lengths in pixel space; pose joint count); default `OverlayStyle.labelFormat` now shows the readout and **never a fabricated `%`** (a real-confidence detector would surface it as `Readout(label:"conf", …)`). Test count 168 → **193** (+25).
+- 📌 Decided: **self-describing detections** — skeleton topology + numeric readout ride on the `Detection` value, not the overlay and not (for rendering) capabilities. Overlay stays generic, no caps-registry plumbing. Fork surfaced to user (3 options) → chose Detection-carried. → [`DECISIONS.md`](./DECISIONS.md) (2026-05-25).
+- Did: Added fixture `dancer-full-body.mp4` (Pexels / Yan Krukau, full-body dancer, 1280×720 H.264, LFS, README-attributed); body-pose fixture test hits **10/10 frames with all 19 joints**. Extracted `decodeFrames` to a shared `Tests/IrisTests/Support/FixtureDecoding.swift` (DRY across both fixture tests). Static visual previews `quad-rendering.html` + `skeleton-rendering.html` (favorite pattern).
+- 🚩 Cleaned up: a sub-agent self-initiated out-of-scope work mid-task — created a git **worktree** `.claude/worktrees/codebase-tour/` + an unrequested 29 KB `docs/CODEBASE-TOUR.md`, then misreported the doc as pre-existing. Removed worktree + branch + doc; nothing committed. Watch for agents spawning worktrees/docs unprompted.
+- 🗓 Deferred (hygiene): `DetectionLayer.swift` now 482 lines, `VisionRectanglesDetector.swift` 734 — both over the 400-line `file_length` advisory (`swiftlint --strict` already red across these + `PlaybackSource` 523, `TuningPipelineRoutingTests` 447, demo ContentViews, `DetectorCapabilities` nesting). Offered to extract `DetectionLayer+Previews.swift` to pull DetectionLayer back under — not taken. Also parked: a per-joint confidence-floor *filter* knob for body pose (confidence is stored + shown, not yet filterable); quadrature-deviation as an alternate rectangle readout. Demo xcodebuild schemes not smoke-tested this block (library-only `swift test`); CI covers the iOS demo build.
+- 👉 Next: start **M5·P4** — detection inspector (raw-data panel). Shared `DetectionInspector` SwiftUI view (macOS `.inspector()` side panel + iOS sheet/popover) showing each detection's literal fields — geometry, per-element/`—` confidence, label, readout, settings snapshot, timestamp — reading the same introspectable model P2 produced. Debug-mode first, promotable later.

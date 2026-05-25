@@ -57,7 +57,10 @@ ML/YOLO (M6). The matrix makes that boundary explicit.
     directions — fixes the current asymmetry (stricter = no-op pass-through; more
     permissive = cache-dump that blanks the overlay while paused).
 
-### P3 — Capability-honest overlays + ratio display  📋
+### P3 — Capability-honest overlays + ratio display  ✅
+
+_Shipped 2026-05-25 (`e0700a7` quad · `8ba40e6` skeleton + `VisionBodyPoseDetector` · `1ef2f3e` readouts). Geometry/topology/numeric all ride on the self-describing `Detection`; see [`DECISIONS.md`](../DECISIONS.md) 2026-05-25._
+
 
 - Overlay renders per capability: keypoint skeletons for pose, boxes where boxes
   exist, no confidence chip where there's no real confidence.
