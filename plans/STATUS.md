@@ -11,7 +11,7 @@ _Snapshot · 2026-05-25_
    ├─ ✅ P1 — Vision capability audit
    ├─ ✅ P2 — capability model → derived settings + filter UI
    ├─ ✅ P3 — honest overlays + ratio display
-   ├─ ✅ P4 — detector selection in the player   👀 needs player smoke-test
+   ├─ ✅ P4 — detector selection in the player   👀 re-smoke (joint filter + picker-in-pane fixed)
    └─ 📋 P5 — detection inspector (raw-data panel)
 
 penciled in — not yet defined (ideas, traceable to you)
