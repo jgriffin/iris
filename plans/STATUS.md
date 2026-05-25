@@ -9,7 +9,7 @@ _Snapshot · 2026-05-24_
 ├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
 └─ 🌱 M5 — Honest detectors
    ├─ ✅ P1 — Vision capability audit
-   ├─ 📋 P2 — capability model → derived settings + filter UI
+   ├─ ✅ P2 — capability model → derived settings + filter UI
    ├─ 📋 P3 — honest overlays + ratio display
    └─ 📋 P4 — detection inspector (raw-data panel)
 
@@ -17,15 +17,14 @@ penciled in — not yet defined (ideas, traceable to you)
    ✏️ M6 — Custom models + captioning (BRIEF §7)
    ✏️ M7 — Dataset (BRIEF §6)
 
-👉 next — land the capability-model decision from the [P1 audit](../explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md), then M5·P2 (capability model → derived filter UI)
+👉 next — start M5·P3: honest overlays — render rectangles as their real quad (not bbox) + body-pose skeleton + ratio display
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
-- ⚖️ Capability-model shape — decision-ready from P1 → [audit RECs](../explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel`
 - ⚖️ "What if?" mode (BRIEF §5)
-- 📌 M4 polish (Vision conf=1.0 · quadrature) — folded into M5
+- 📌 M4 polish (Vision conf=1.0 · quadrature) — fixed in M5·P2
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- Detector capability model (2026-05-24)
 - Best-effort temporal match in `ResultStore.lookup` (2026-05-22)
 - Single SwiftPM target, folder-organized (2026-05-20)
-- Runtime frame pipeline — `Source<Frame>` + `.bufferingNewest(1)` (2026-05-20)

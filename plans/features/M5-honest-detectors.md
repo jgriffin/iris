@@ -61,6 +61,13 @@ ML/YOLO (M6). The matrix makes that boundary explicit.
 
 - Overlay renders per capability: keypoint skeletons for pose, boxes where boxes
   exist, no confidence chip where there's no real confidence.
+- **Render rectangles as their detected quad** — connect the four corner keypoints
+  (`topLeft→topRight→bottomRight→bottomLeft`), not the axis-aligned `boundingBox`.
+  Today `DetectionLayer` strokes `Path(rect)` from the bbox (`DetectionLayer.swift:163-167`),
+  so a rotated/perspective rectangle renders upright — the overlay misrepresents the
+  shape (spatial dishonesty, the exact twin of fake confidence). The corners and the
+  per-point converter already exist; this is small, and a second proof (with the pose
+  skeleton) that the overlay draws real geometry.
 - Numeric display: ratios, not percentages; per-detector meaningful ratio (rectangle
   aspect ratio / quadrature deviation; pose: joint count or none).
 - Land the body-pose skeleton viz as the proof the overlay generalizes past boxes.
