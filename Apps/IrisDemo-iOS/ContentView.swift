@@ -101,6 +101,11 @@ struct CaptureContentView: View {
             // rects (Phase 3 footgun). 1.0 accepts squares too. (M5 removed
             // the `minimumConfidence` knob — Vision rectangles carry no
             // probabilistic confidence, so it filtered nothing.)
+            //
+            // M5·P4 scope note: the capture tab is intentionally left on the
+            // hardcoded rectangles detector. The catalog-driven detector
+            // picker + tuning lives only in the *playback* path
+            // (`PlaybackContentView`); rewiring capture is out of scope.
             let detector = VisionRectanglesDetector(
                 minimumAspectRatio: 0.3,
                 maximumAspectRatio: 1.0,
@@ -192,18 +197,21 @@ struct PlaybackContentView: View {
     @State private var detectionTask: Task<Void, Never>?
     @State private var errorText: String?
 
-    /// M4 Phase 3: live tuning model for the active Vision rectangle
-    /// detector. One instance per `PlaybackContentView`; `startSession`
-    /// rebuilds it alongside the detector so the model's settings
-    /// reflect the fresh detector. The `.sheet`-hosted
-    /// `VisionRectanglesTuningView` binds to this; writes route
-    /// through `model.binding(_:)` → `update(_:to:)` → tier classifier
-    /// → cache invalidation on `.detector` tiers.
-    @State private var tuningModel: TuningModel<VisionRectanglesDetector>?
+    /// M5·P4: the general detector-selection layer. `catalog` lists the
+    /// selectable detectors (built-in Vision rectangles + body pose);
+    /// `selectedDetectorID` is the picker binding; `session` is the
+    /// type-erased active detector + its capability-derived settings view,
+    /// rebuilt by `startSession` and on every picker change. The demo never
+    /// names a concrete detector or tuning view in the playback path — it
+    /// goes through the catalog. Rectangles is the default so pre-M5
+    /// behavior is preserved until the user picks Body Pose.
+    private let catalog = DetectorCatalog.builtInVision
+    @State private var selectedDetectorID: String = "vision.rectangles"
+    @State private var session: ActiveDetectorSession?
 
     /// Whether the tuning sheet is presented. Gear-icon toolbar button
-    /// flips this on the Playback tab; the sheet hosts the live
-    /// `VisionRectanglesTuningView` over `tuningModel`.
+    /// flips this on the Playback tab; the sheet hosts the active
+    /// session's capability-derived `settingsView`.
     @State private var showTuning = false
 
     /// The URL currently held under a security scope, if any. nil when the
@@ -247,9 +255,9 @@ struct PlaybackContentView: View {
             .ignoresSafeArea()
         }
         .sheet(isPresented: $showTuning) {
-            if let tuningModel {
+            if let session {
                 NavigationStack {
-                    VisionRectanglesTuningView(model: tuningModel)
+                    session.settingsView
                         .navigationTitle("Detector tuning")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
@@ -271,6 +279,9 @@ struct PlaybackContentView: View {
                 loadFixture()
             }
         }
+        .onChange(of: selectedDetectorID) {
+            swapDetector()
+        }
         .onDisappear {
             teardown()
         }
@@ -283,15 +294,24 @@ struct PlaybackContentView: View {
     @ViewBuilder
     private var controlBar: some View {
         HStack {
-            Text(activeLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            // M5·P4: detector picker driving the catalog. Changing the
+            // selection rebuilds the active `session` and restarts the
+            // detection loop bound to the new detector (see
+            // `.onChange(of: selectedDetectorID)`).
+            Picker("Detector", selection: $selectedDetectorID) {
+                ForEach(catalog.entries) { entry in
+                    Text(entry.displayName).tag(entry.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .labelsHidden()
+            .accessibilityLabel("Active detector")
+
             Spacer()
-            // M4 Phase 3: live tuning sheet. Disabled until a session
-            // is loaded — the tuning model is built alongside the
-            // detector inside `startSession`.
+            // M5·P4: live tuning sheet over the active session's
+            // capability-derived settings view. Disabled until a session
+            // is built (alongside the controller in `startSession`).
             Button {
                 showTuning = true
             } label: {
@@ -299,7 +319,7 @@ struct PlaybackContentView: View {
                     .labelStyle(.iconOnly)
             }
             .controlSize(.small)
-            .disabled(tuningModel == nil)
+            .disabled(session == nil)
             .accessibilityLabel("Tune detector")
 
             Button {
@@ -389,7 +409,7 @@ struct PlaybackContentView: View {
                         converter: converter,
                         videoRect: playerLayer.videoRect,
                         stalenessThreshold: resultStore.playbackStalenessThreshold,
-                        tuning: tuningModel,
+                        tuning: session?.router,
                         displayTimeSource: { [controller] in
                             controller.currentTime
                         }
@@ -497,49 +517,67 @@ struct PlaybackContentView: View {
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
-        let initialDetector = VisionRectanglesDetector(
-            minimumAspectRatio: 0.3,
-            maximumAspectRatio: 1.0,
-            minimumSize: 0.1,
-            label: "rect"
-        )
-        let pipeline = DetectorPipeline(initialDetector)
 
-        // M4 Phase 3: bind the live tuning model to the same detector
-        // the pipeline runs through. `cache: resultStore` means
-        // `.detector`-tier knob changes invalidate the playback cache
-        // so the next decode produces fresh detections under the new
-        // settings. The model is captured by the detector task below
-        // and passed as the `tuning:` argument to `detect(in:cache:tuning:)`.
-        let newTuning = TuningModel(detector: initialDetector, cache: resultStore)
+        self.controller = newController
+        self.errorText = nil
+        self.playerLayer = nil  // re-bound when PlaybackView attaches
+        self.activeLabel = label
 
-        // M4 polish: pause-emit hook. A `.detector`-tier change clears
-        // the cache; if the source is paused, no frames flow → cache
-        // stays empty → overlay reads nil → detections disappear
-        // mid-tuning. Seeking to the current time re-emits a one-shot
-        // frame through `PlaybackSource.emitOneShotFrame()` (the same
-        // primitive M3 Phase 2 uses for `seek` / `step`), giving the
-        // pipeline a frame to re-run under the new detector. Matches
-        // the macOS demo's wiring exactly.
-        newTuning.onDetectorTierChange = { [weak newController] in
-            guard let controller = newController else { return }
+        // M5·P4: build the active detector session from the catalog and
+        // spin up the detection loop bound to its router. The demo holds
+        // only the type-erased `ActiveDetectorSession` — no concrete
+        // detector or tuning view is named here.
+        buildSessionAndStartDetection(on: newController)
+
+        // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
+        newController.togglePlay()
+    }
+
+    /// M5·P4: build the catalog session for `selectedDetectorID`, wire its
+    /// pause-emit hook to `controller`, and (re)start the detection loop
+    /// bound to the session's router. Shared by initial session start and
+    /// detector-swap. Cancels any running loop before starting a new one.
+    @MainActor
+    private func buildSessionAndStartDetection(on controller: PlaybackController) {
+        detectionTask?.cancel()
+        session?.router.onDetectorTierChange = nil
+
+        guard
+            let entry = catalog.entries.first(where: { $0.id == selectedDetectorID })
+                ?? catalog.entries.first
+        else { return }
+
+        // `cache: resultStore` (passed into `makeSession`) means
+        // `.detector`-tier knob changes invalidate the playback cache so
+        // the next decode produces fresh detections under the new settings.
+        let newSession = entry.makeSession(resultStore)
+
+        // M4 polish: pause-emit hook. A `.detector`-tier change clears the
+        // cache; if the source is paused, no frames flow → overlay reads
+        // nil → detections disappear mid-tuning. Seeking to the current
+        // time re-emits a one-shot frame (the same primitive M3 Phase 2
+        // uses for `seek` / `step`), giving the pipeline a frame to re-run
+        // under the new detector. Matches the macOS demo's wiring.
+        newSession.router.onDetectorTierChange = { [weak controller] in
+            guard let controller else { return }
             let source = controller.source
             let target = controller.currentTime
             Task { try? await source.seek(to: target) }
         }
 
-        // Spawn detector loop. Same shape as the macOS demo's
-        // `openVideo(at:)` — the pipeline owns the cache write-through on
-        // miss (playback-detection-cache Phase 2), so this loop no longer
-        // calls `store.append` itself. Cache hits on revisited timestamps
-        // skip the detector dispatch entirely; the overlay reads
-        // `resultStore` on its own TimelineView tick.
+        // Spawn the detector loop. The pipeline owns cache write-through on
+        // miss (playback-detection-cache Phase 2). The pipeline's own
+        // detector array is empty — the router's `currentDetector` (the
+        // catalog-built detector) is what actually runs, per the
+        // `detect(in:cache:tuning:)` hot-swap contract.
         let store = resultStore
-        let task = Task { [tuning = newTuning] in
+        let pipeline = DetectorPipeline([])
+        let source = controller.source
+        let task = Task { [router = newSession.router] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
-                    _ = try await pipeline.detect(in: frame, cache: store, tuning: tuning)
+                    _ = try await pipeline.detect(in: frame, cache: store, tuning: router)
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
@@ -548,15 +586,26 @@ struct PlaybackContentView: View {
             }
         }
 
-        self.controller = newController
+        self.session = newSession
         self.detectionTask = task
-        self.tuningModel = newTuning
-        self.errorText = nil
-        self.playerLayer = nil  // re-bound when PlaybackView attaches
-        self.activeLabel = label
+    }
 
-        // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
-        newController.togglePlay()
+    /// M5·P4: handle a picker selection change. Rebuilds the session for
+    /// the newly-selected detector, invalidates the cache (old detections
+    /// are from a different detector), restarts the detection loop bound to
+    /// the new router, and re-emits the current frame so the new detector's
+    /// output appears immediately even while paused.
+    @MainActor
+    private func swapDetector() {
+        guard let controller else { return }
+        resultStore.invalidateAll()
+        buildSessionAndStartDetection(on: controller)
+        // Re-emit the visible frame so a paused player still re-runs
+        // detection under the freshly-selected detector. Same primitive as
+        // the `.detector`-tier pause-emit hook.
+        let target = controller.currentTime
+        let source = controller.source
+        Task { try? await source.seek(to: target) }
     }
 
     /// Tear down the active playback session. Idempotent.
@@ -575,16 +624,16 @@ struct PlaybackContentView: View {
         let priorSource = controller?.source
         let priorScopedURL = scopedURL
 
-        // Clear the pause-emit hook before dropping the model reference
-        // — defensive: the closure captures `newController` weakly, but
+        // Clear the pause-emit hook before dropping the session reference
+        // — defensive: the closure captures `controller` weakly, but
         // dropping the slot eliminates any chance of a stale fire
         // crossing the tab-switch boundary.
-        tuningModel?.onDetectorTierChange = nil
+        session?.router.onDetectorTierChange = nil
 
         controller = nil
         playerLayer = nil
         scopedURL = nil
-        tuningModel = nil
+        session = nil
         showTuning = false
         resultStore.clear()
 

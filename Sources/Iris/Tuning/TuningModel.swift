@@ -54,6 +54,16 @@ public protocol TuningRouter: AnyObject, Sendable {
     /// without re-running inference. The cache stays the model's
     /// ground truth; the transform is a re-renderable view onto it.
     var transform: (@Sendable ([Detection]) -> [Detection])? { get }
+
+    /// Optional callback fired *after* `cache?.invalidateAll()` on a
+    /// `.detector`-tier transition (knob change that rebuilds the
+    /// detector). Surfaced on the protocol — not just the concrete
+    /// `TuningModel` — so a type-erased holder (e.g. `DetectorCatalog`'s
+    /// `ActiveDetectorSession`) can wire a one-shot frame re-emit without
+    /// knowing the concrete `Settings` parameter. See the `TuningModel`
+    /// property of the same name for the full rationale (pause-emit so
+    /// detector-tier changes show through even when the source is paused).
+    var onDetectorTierChange: (@Sendable @MainActor () -> Void)? { get set }
 }
 
 // MARK: - TuningModel
