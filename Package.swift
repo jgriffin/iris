@@ -8,7 +8,7 @@ let package = Package(
     targets: [
         .target(
             name: "Iris",
-            exclude: ["Overlay/box-rendering.html"]
+            exclude: ["Overlay/box-rendering.html", "Overlay/quad-rendering.html"]
         ),
         .testTarget(
             name: "IrisTests",

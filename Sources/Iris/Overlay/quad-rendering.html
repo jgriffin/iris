@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Iris · DetectionLayer quad-rendering reference</title>
+<style>
+    :root {
+        /* OverlayStyle.default — keep these in lockstep with OverlayStyle.swift. */
+        --stroke-color: rgb(51, 217, 255);   /* Color(red: 0.20, green: 0.85, blue: 1.0) */
+        --stroke-width: 1.5;
+        --label-text: #ffffff;
+        --label-bg: rgba(0, 0, 0, 0.60);
+        --label-font: 600 11px -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                      "Helvetica Neue", system-ui, sans-serif;
+        --label-padding: 3px;
+        /* The "old / wrong" bbox outline, dimmed so the new quad reads as the
+           correction. */
+        --old-color: rgba(255, 120, 120, 0.85);
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        color: #222;
+        background: #f5f5f7;
+        margin: 0;
+        padding: 32px;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 20px; }
+    p.intro { margin: 0 0 24px 0; max-width: 760px; color: #555; }
+    p.intro code { background: #e8e8ed; padding: 0 4px; border-radius: 3px; }
+
+    .row { display: flex; gap: 32px; flex-wrap: wrap; }
+    section { margin-bottom: 28px; }
+    section h2 { font-size: 14px; margin: 0 0 8px 0; color: #333; }
+    section .meta { font-size: 12px; color: #777; margin-bottom: 8px; }
+
+    /* `.container` is the SwiftUI view bounds; here it equals videoRect
+       (full-frame, no letterbox) to keep the focus on quad vs bbox. */
+    .container {
+        position: relative;
+        background: linear-gradient(135deg, #2a2a35 0%, #1a1a22 100%);
+        overflow: visible;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    /* SVG sits on top of the container, same pixel coordinate system. */
+    svg { position: absolute; left: 0; top: 0; overflow: visible; }
+    .quad   { fill: none; stroke: var(--stroke-color); stroke-width: var(--stroke-width); }
+    .bbox   { fill: none; stroke: var(--old-color); stroke-width: var(--stroke-width);
+              stroke-dasharray: 4 3; }
+    .corner { fill: var(--stroke-color); }
+
+    .label {
+        position: absolute;
+        font: var(--label-font);
+        color: var(--label-text);
+        background: var(--label-bg);
+        padding: var(--label-padding) var(--label-padding);
+        white-space: nowrap;
+        line-height: 1;
+        transform: translateY(-100%);
+    }
+    .caption {
+        font-size: 12px;
+        margin-top: 8px;
+        font-weight: 600;
+    }
+    .caption.old { color: #c0392b; }
+    .caption.new { color: #0a7ea4; }
+    .legend { font-size: 12px; color: #777; margin: 4px 0 0 0; }
+</style>
+</head>
+<body>
+
+<h1>DetectionLayer · quad-rendering reference</h1>
+<p class="intro">
+    The same tilted Vision-rectangle fixture rendered two ways. A rectangle
+    detection comes back as four oriented corner keypoints
+    (<code>topLeft → topRight → bottomRight → bottomLeft</code>), but the old
+    overlay drew only the axis-aligned <code>boundingBox</code> envelope — an
+    upright box that misrepresents a rotated quad. The new
+    <code>DetectionLayer.quadCorners(of:)</code> path connects the actual
+    corners. Coordinates apply the same Y-flip the converter does
+    (<code>y_screen = (1 − y_norm) · height</code>, Vision bottom-left origin →
+    screen top-left). Open in a browser; no build step.
+</p>
+
+<!--
+    Fixture (normalized, Vision bottom-left origin):
+      topLeft     (0.38, 0.82)
+      topRight    (0.60, 0.88)
+      bottomRight (0.66, 0.66)
+      bottomLeft  (0.44, 0.60)
+    Envelope boundingBox: x=0.38 y=0.60 w=0.28 h=0.28
+
+    Screen mapping for 360×240 (full-frame, videoRect origin 0,0):
+      x_screen = x_norm * 360
+      y_screen = (1 - y_norm) * 240
+      topLeft     -> (136.8,  43.2)
+      topRight    -> (216.0,  28.8)
+      bottomRight -> (237.6,  81.6)
+      bottomLeft  -> (158.4,  96.0)
+    Envelope rect (top-left origin): left=136.8 top=28.8 w=100.8 h=67.2
+      (top = (1 - 0.60 - 0.28) * 240 = 28.8)
+-->
+<section>
+    <h2>360 × 240 · full-frame · tilted rectangle (≈20°)</h2>
+    <div class="meta">container = videoRect = (0, 0, 360, 240)</div>
+    <div class="row">
+
+        <!-- (a) OLD: axis-aligned bbox outline. -->
+        <div>
+            <div class="container" style="width:360px;height:240px;">
+                <svg width="360" height="240">
+                    <rect class="bbox" x="136.8" y="28.8" width="100.8" height="67.2"/>
+                </svg>
+                <!-- Label anchored at bbox top-left, as the overlay does. -->
+                <span class="label" style="left:136.8px;top:28.8px;">tilted 88%</span>
+            </div>
+            <div class="caption old">bbox (old, misrepresents)</div>
+            <p class="legend">Upright dashed box = axis-aligned envelope. The
+                rectangle isn't actually upright.</p>
+        </div>
+
+        <!-- (b) NEW: quad connecting the four corners. -->
+        <div>
+            <div class="container" style="width:360px;height:240px;">
+                <svg width="360" height="240">
+                    <polygon class="quad"
+                        points="136.8,43.2 216,28.8 237.6,81.6 158.4,96"/>
+                    <circle class="corner" cx="136.8" cy="43.2" r="2.5"/>
+                    <circle class="corner" cx="216"   cy="28.8" r="2.5"/>
+                    <circle class="corner" cx="237.6" cy="81.6" r="2.5"/>
+                    <circle class="corner" cx="158.4" cy="96"   r="2.5"/>
+                </svg>
+                <!-- Label still anchored to bbox top-left (placement unchanged). -->
+                <span class="label" style="left:136.8px;top:28.8px;">tilted 88%</span>
+            </div>
+            <div class="caption new">quad (new, honest)</div>
+            <p class="legend">Outline follows the real detected corners
+                (TL→TR→BR→BL). Label anchor is unchanged — still the bbox
+                top-left.</p>
+        </div>
+
+    </div>
+</section>
+
+<!--
+    Second size to confirm the shape scales linearly. 720×480 (2x).
+      topLeft     -> (273.6,  86.4)
+      topRight    -> (432.0,  57.6)
+      bottomRight -> (475.2, 163.2)
+      bottomLeft  -> (316.8, 192.0)
+    Envelope rect: left=273.6 top=57.6 w=201.6 h=134.4
+-->
+<section>
+    <h2>720 × 480 · full-frame · same fixture, 2×</h2>
+    <div class="meta">container = videoRect = (0, 0, 720, 480)</div>
+    <div class="row">
+        <div>
+            <div class="container" style="width:720px;height:480px;">
+                <svg width="720" height="480">
+                    <rect class="bbox" x="273.6" y="57.6" width="201.6" height="134.4"/>
+                </svg>
+                <span class="label" style="left:273.6px;top:57.6px;">tilted 88%</span>
+            </div>
+            <div class="caption old">bbox (old, misrepresents)</div>
+        </div>
+        <div>
+            <div class="container" style="width:720px;height:480px;">
+                <svg width="720" height="480">
+                    <polygon class="quad"
+                        points="273.6,86.4 432,57.6 475.2,163.2 316.8,192"/>
+                    <circle class="corner" cx="273.6" cy="86.4"  r="3"/>
+                    <circle class="corner" cx="432"   cy="57.6"  r="3"/>
+                    <circle class="corner" cx="475.2" cy="163.2" r="3"/>
+                    <circle class="corner" cx="316.8" cy="192"   r="3"/>
+                </svg>
+                <span class="label" style="left:273.6px;top:57.6px;">tilted 88%</span>
+            </div>
+            <div class="caption new">quad (new, honest)</div>
+        </div>
+    </div>
+</section>
+
+<p style="color:#777;font-size:12px;max-width:760px;margin-top:32px;">
+    Why this exists: per CLAUDE.md's "favorite pattern", visual artifacts get
+    caught at the artifact level. If the quad here looks wrong, the quad the
+    SwiftUI <code>Canvas</code> draws via <code>quadCorners(of:)</code> will
+    look the same wrong. The point of the side-by-side is that the
+    spatial-honesty win is obvious at a glance — the dashed upright box clearly
+    does not describe a rotated rectangle.
+</p>
+
+</body>
+</html>

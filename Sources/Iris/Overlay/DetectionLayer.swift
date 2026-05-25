@@ -150,6 +150,25 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
 
     // MARK: - Drawing
 
+    /// The four oriented corners of a detected quadrilateral, in
+    /// `topLeft → topRight → bottomRight → bottomLeft` order, in normalized
+    /// (Vision bottom-left origin) coordinates — if the detection carries all
+    /// four documented corner keypoints. Vision rectangle detections populate
+    /// these (the documented corner-name invariant in `VisionRectanglesDetector`);
+    /// box-only detections (no keypoints, or non-corner keypoints) return `nil`,
+    /// and the caller falls back to the axis-aligned bounding box.
+    static func quadCorners(of detection: Detection) -> [CGPoint]? {
+        guard let keypoints = detection.keypoints else { return nil }
+        let cornerNames = ["topLeft", "topRight", "bottomRight", "bottomLeft"]
+        var corners: [CGPoint] = []
+        corners.reserveCapacity(4)
+        for name in cornerNames {
+            guard let kp = keypoints.first(where: { $0.name == name }) else { return nil }
+            corners.append(kp.position)
+        }
+        return corners
+    }
+
     /// Stroked-box + label render. Stroke and label colors / font / text
     /// come from `style`; the box geometry comes from the injected
     /// `converter`.
@@ -162,9 +181,20 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
     ) {
         let rect = converter.viewRect(forNormalized: detection.boundingBox, in: videoRect)
 
-        // Box outline.
+        // Outline: the real detected quad when the detection carries oriented
+        // corner keypoints (capability-honest — draw the geometry that actually
+        // came back), else the axis-aligned bounding box.
+        let outline: Path
+        if let corners = quadCorners(of: detection) {
+            var path = Path()
+            path.addLines(corners.map { converter.viewPoint(forNormalized: $0, in: videoRect) })
+            path.closeSubpath()
+            outline = path
+        } else {
+            outline = Path(rect)
+        }
         gc.stroke(
-            Path(rect),
+            outline,
             with: .color(style.color(for: detection.label)),
             lineWidth: style.strokeWidth
         )
@@ -236,6 +266,25 @@ private func previewStore() -> ResultStore {
             boundingBox: CGRect(x: 0.10, y: 0.05, width: 0.18, height: 0.18),
             label: "",
             confidence: 0.50,
+            sourceModelID: "preview"
+        ),
+        // Tilted rectangle (~20°): corner keypoints do not line up with the
+        // axis-aligned envelope, so the quad outline is visibly different
+        // from the bounding box. boundingBox is the envelope of the corners.
+        Detection(
+            boundingBox: CGRect(x: 0.38, y: 0.60, width: 0.28, height: 0.28),
+            label: "tilted",
+            confidence: 0.88,
+            keypoints: [
+                Detection.Keypoint(
+                    name: "topLeft", position: CGPoint(x: 0.38, y: 0.82), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "topRight", position: CGPoint(x: 0.60, y: 0.88), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "bottomRight", position: CGPoint(x: 0.66, y: 0.66), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "bottomLeft", position: CGPoint(x: 0.44, y: 0.60), confidence: 1.0),
+            ],
             sourceModelID: "preview"
         ),
     ]

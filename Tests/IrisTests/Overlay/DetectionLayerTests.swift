@@ -165,6 +165,73 @@ struct DetectionLayerTests {
         let host = HostView { layer }
         #expect(type(of: host.body) != Never.self)
     }
+
+    // MARK: - quadCorners
+
+    @Test
+    func quadCornersReturnsCornersInDocumentedOrder() {
+        // A detection carrying the four documented corner keypoints yields
+        // their positions in topLeft → topRight → bottomRight → bottomLeft
+        // order — the order the outline path connects them.
+        let tl = CGPoint(x: 0.38, y: 0.82)
+        let tr = CGPoint(x: 0.60, y: 0.88)
+        let br = CGPoint(x: 0.66, y: 0.66)
+        let bl = CGPoint(x: 0.44, y: 0.60)
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.38, y: 0.60, width: 0.28, height: 0.28),
+            label: "tilted",
+            confidence: 0.88,
+            keypoints: [
+                // Deliberately out of corner order to prove the helper
+                // resolves by name, not array position.
+                Detection.Keypoint(name: "bottomRight", position: br, confidence: 1.0),
+                Detection.Keypoint(name: "topLeft", position: tl, confidence: 1.0),
+                Detection.Keypoint(name: "bottomLeft", position: bl, confidence: 1.0),
+                Detection.Keypoint(name: "topRight", position: tr, confidence: 1.0),
+            ],
+            sourceModelID: "detection-layer-tests"
+        )
+
+        let corners = DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection)
+        #expect(corners == [tl, tr, br, bl])
+    }
+
+    @Test
+    func quadCornersReturnsNilForBoxOnlyDetection() {
+        // Box-only detection (keypoints nil) → no quad; caller falls back to
+        // the axis-aligned bounding box.
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4),
+            label: "box",
+            confidence: 0.9,
+            sourceModelID: "detection-layer-tests"
+        )
+
+        #expect(DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection) == nil)
+    }
+
+    @Test
+    func quadCornersReturnsNilWhenACornerNameIsMissing() {
+        // Keypoints present but missing one of the four corner names →
+        // not a quad; fall back to the box.
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.38, y: 0.60, width: 0.28, height: 0.28),
+            label: "partial",
+            confidence: 0.88,
+            keypoints: [
+                Detection.Keypoint(
+                    name: "topLeft", position: .init(x: 0.38, y: 0.82), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "topRight", position: .init(x: 0.60, y: 0.88), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "bottomRight", position: .init(x: 0.66, y: 0.66), confidence: 1.0),
+                // bottomLeft missing.
+            ],
+            sourceModelID: "detection-layer-tests"
+        )
+
+        #expect(DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection) == nil)
+    }
 }
 
 // MARK: - Helpers
