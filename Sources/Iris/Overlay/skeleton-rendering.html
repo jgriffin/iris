@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Iris · DetectionLayer skeleton-rendering reference</title>
+<style>
+    :root {
+        /* OverlayStyle.default — keep in lockstep with OverlayStyle.swift. */
+        --stroke-color: rgb(51, 217, 255);   /* Color(red: 0.20, green: 0.85, blue: 1.0) */
+        --stroke-width: 1.5;
+        --label-text: #ffffff;
+        --label-bg: rgba(0, 0, 0, 0.60);
+        --label-font: 600 11px -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                      "Helvetica Neue", system-ui, sans-serif;
+        --label-padding: 3px;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        color: #222;
+        background: #f5f5f7;
+        margin: 0;
+        padding: 32px;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 20px; }
+    p.intro { margin: 0 0 24px 0; max-width: 760px; color: #555; }
+    p.intro code { background: #e8e8ed; padding: 0 4px; border-radius: 3px; }
+
+    .row { display: flex; gap: 32px; flex-wrap: wrap; }
+    section { margin-bottom: 28px; }
+    section h2 { font-size: 14px; margin: 0 0 8px 0; color: #333; }
+    section .meta { font-size: 12px; color: #777; margin-bottom: 8px; }
+
+    /* `.container` is the SwiftUI view bounds; here it equals videoRect
+       (full-frame, no letterbox) to keep the focus on the skeleton. */
+    .container {
+        position: relative;
+        background: linear-gradient(135deg, #2a2a35 0%, #1a1a22 100%);
+        overflow: visible;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    svg { position: absolute; left: 0; top: 0; overflow: visible; }
+    .edge  { stroke: var(--stroke-color); stroke-width: var(--stroke-width); }
+    .joint { fill: var(--stroke-color); }
+
+    .label {
+        position: absolute;
+        font: var(--label-font);
+        color: var(--label-text);
+        background: var(--label-bg);
+        padding: var(--label-padding) var(--label-padding);
+        white-space: nowrap;
+        line-height: 1;
+        transform: translateY(-100%);
+    }
+    .caption { font-size: 12px; margin-top: 8px; font-weight: 600; color: #0a7ea4; }
+    .legend { font-size: 12px; color: #777; margin: 4px 0 0 0; }
+</style>
+</head>
+<body>
+
+<h1>DetectionLayer · skeleton-rendering reference</h1>
+<p class="intro">
+    The synthetic body-pose fixture from <code>DetectionLayer.previewStore()</code>
+    rendered as the SwiftUI <code>Canvas</code> draws it: every
+    <code>Skeleton.humanBodyPose</code> edge whose both endpoints resolve to a
+    present joint is stroked, then each joint gets a filled dot. The skeleton
+    topology is carried on the <code>Detection</code> itself
+    (<code>detection.skeleton</code>) — the overlay holds no joint knowledge.
+    Coordinates apply the same Y-flip the converter does
+    (<code>y_screen = (1 − y_norm) · height</code>, Vision bottom-left origin →
+    screen top-left), so the head (high normalized y) is at the top. The label
+    anchors to the bounding-box top-left, exactly like the box/quad paths. Open
+    in a browser; no build step.
+</p>
+
+<!--
+    Joints (normalized, Vision bottom-left origin) match the Detection in
+    previewStore(): nose (0.14,0.92) … ankles at y=0.08. boundingBox envelope
+    x=0.06 y=0.06 w=0.16 h=0.86 → label anchor (top-left) at 360×240:
+      left = 0.06*360 = 21.6 ; top = (1 - 0.06 - 0.86)*240 = 19.2
+-->
+<section>
+    <h2>360 × 240 · full-frame · synthetic upright figure</h2>
+    <div class="meta">container = videoRect = (0, 0, 360, 240)</div>
+    <div class="row">
+        <div>
+            <div class="container" style="width:360px;height:240px;">
+                <svg width="360" height="240">
+      <line class="edge" x1="50.4" y1="19.2" x2="43.2" y2="16.8"/>
+      <line class="edge" x1="50.4" y1="19.2" x2="57.6" y2="16.8"/>
+      <line class="edge" x1="43.2" y1="16.8" x2="36.0" y2="19.2"/>
+      <line class="edge" x1="57.6" y1="16.8" x2="64.8" y2="19.2"/>
+      <line class="edge" x1="50.4" y1="33.6" x2="50.4" y2="19.2"/>
+      <line class="edge" x1="50.4" y1="33.6" x2="28.8" y2="38.4"/>
+      <line class="edge" x1="28.8" y1="38.4" x2="21.6" y2="67.2"/>
+      <line class="edge" x1="21.6" y1="67.2" x2="25.2" y2="96.0"/>
+      <line class="edge" x1="50.4" y1="33.6" x2="72.0" y2="38.4"/>
+      <line class="edge" x1="72.0" y1="38.4" x2="79.2" y2="67.2"/>
+      <line class="edge" x1="79.2" y1="67.2" x2="75.6" y2="96.0"/>
+      <line class="edge" x1="50.4" y1="33.6" x2="50.4" y2="100.8"/>
+      <line class="edge" x1="50.4" y1="100.8" x2="39.6" y2="105.6"/>
+      <line class="edge" x1="39.6" y1="105.6" x2="36.0" y2="163.2"/>
+      <line class="edge" x1="36.0" y1="163.2" x2="32.4" y2="220.8"/>
+      <line class="edge" x1="50.4" y1="100.8" x2="61.2" y2="105.6"/>
+      <line class="edge" x1="61.2" y1="105.6" x2="64.8" y2="163.2"/>
+      <line class="edge" x1="64.8" y1="163.2" x2="68.4" y2="220.8"/>
+      <circle class="joint" cx="50.4" cy="19.2" r="2.5"/>
+      <circle class="joint" cx="43.2" cy="16.8" r="2.5"/>
+      <circle class="joint" cx="57.6" cy="16.8" r="2.5"/>
+      <circle class="joint" cx="36.0" cy="19.2" r="2.5"/>
+      <circle class="joint" cx="64.8" cy="19.2" r="2.5"/>
+      <circle class="joint" cx="50.4" cy="33.6" r="2.5"/>
+      <circle class="joint" cx="28.8" cy="38.4" r="2.5"/>
+      <circle class="joint" cx="72.0" cy="38.4" r="2.5"/>
+      <circle class="joint" cx="21.6" cy="67.2" r="2.5"/>
+      <circle class="joint" cx="79.2" cy="67.2" r="2.5"/>
+      <circle class="joint" cx="25.2" cy="96.0" r="2.5"/>
+      <circle class="joint" cx="75.6" cy="96.0" r="2.5"/>
+      <circle class="joint" cx="50.4" cy="100.8" r="2.5"/>
+      <circle class="joint" cx="39.6" cy="105.6" r="2.5"/>
+      <circle class="joint" cx="61.2" cy="105.6" r="2.5"/>
+      <circle class="joint" cx="36.0" cy="163.2" r="2.5"/>
+      <circle class="joint" cx="64.8" cy="163.2" r="2.5"/>
+      <circle class="joint" cx="32.4" cy="220.8" r="2.5"/>
+      <circle class="joint" cx="68.4" cy="220.8" r="2.5"/>
+                </svg>
+                <span class="label" style="left:21.6px;top:19.2px;">person</span>
+            </div>
+            <div class="caption">skeleton (drawn from detection.skeleton)</div>
+            <p class="legend">Head joints at top (high normalized y), feet at
+                bottom. Edges follow <code>humanBodyPose</code> topology.</p>
+        </div>
+    </div>
+</section>
+
+<!--
+    720×480 (2×) — confirms the skeleton scales linearly.
+    label anchor: left = 0.06*720 = 43.2 ; top = (1-0.06-0.86)*480 = 38.4
+-->
+<section>
+    <h2>720 × 480 · full-frame · same fixture, 2×</h2>
+    <div class="meta">container = videoRect = (0, 0, 720, 480)</div>
+    <div class="row">
+        <div>
+            <div class="container" style="width:720px;height:480px;">
+                <svg width="720" height="480">
+      <line class="edge" x1="100.8" y1="38.4" x2="86.4" y2="33.6"/>
+      <line class="edge" x1="100.8" y1="38.4" x2="115.2" y2="33.6"/>
+      <line class="edge" x1="86.4" y1="33.6" x2="72.0" y2="38.4"/>
+      <line class="edge" x1="115.2" y1="33.6" x2="129.6" y2="38.4"/>
+      <line class="edge" x1="100.8" y1="67.2" x2="100.8" y2="38.4"/>
+      <line class="edge" x1="100.8" y1="67.2" x2="57.6" y2="76.8"/>
+      <line class="edge" x1="57.6" y1="76.8" x2="43.2" y2="134.4"/>
+      <line class="edge" x1="43.2" y1="134.4" x2="50.4" y2="192.0"/>
+      <line class="edge" x1="100.8" y1="67.2" x2="144.0" y2="76.8"/>
+      <line class="edge" x1="144.0" y1="76.8" x2="158.4" y2="134.4"/>
+      <line class="edge" x1="158.4" y1="134.4" x2="151.2" y2="192.0"/>
+      <line class="edge" x1="100.8" y1="67.2" x2="100.8" y2="201.6"/>
+      <line class="edge" x1="100.8" y1="201.6" x2="79.2" y2="211.2"/>
+      <line class="edge" x1="79.2" y1="211.2" x2="72.0" y2="326.4"/>
+      <line class="edge" x1="72.0" y1="326.4" x2="64.8" y2="441.6"/>
+      <line class="edge" x1="100.8" y1="201.6" x2="122.4" y2="211.2"/>
+      <line class="edge" x1="122.4" y1="211.2" x2="129.6" y2="326.4"/>
+      <line class="edge" x1="129.6" y1="326.4" x2="136.8" y2="441.6"/>
+      <circle class="joint" cx="100.8" cy="38.4" r="3"/>
+      <circle class="joint" cx="86.4" cy="33.6" r="3"/>
+      <circle class="joint" cx="115.2" cy="33.6" r="3"/>
+      <circle class="joint" cx="72.0" cy="38.4" r="3"/>
+      <circle class="joint" cx="129.6" cy="38.4" r="3"/>
+      <circle class="joint" cx="100.8" cy="67.2" r="3"/>
+      <circle class="joint" cx="57.6" cy="76.8" r="3"/>
+      <circle class="joint" cx="144.0" cy="76.8" r="3"/>
+      <circle class="joint" cx="43.2" cy="134.4" r="3"/>
+      <circle class="joint" cx="158.4" cy="134.4" r="3"/>
+      <circle class="joint" cx="50.4" cy="192.0" r="3"/>
+      <circle class="joint" cx="151.2" cy="192.0" r="3"/>
+      <circle class="joint" cx="100.8" cy="201.6" r="3"/>
+      <circle class="joint" cx="79.2" cy="211.2" r="3"/>
+      <circle class="joint" cx="122.4" cy="211.2" r="3"/>
+      <circle class="joint" cx="72.0" cy="326.4" r="3"/>
+      <circle class="joint" cx="129.6" cy="326.4" r="3"/>
+      <circle class="joint" cx="64.8" cy="441.6" r="3"/>
+      <circle class="joint" cx="136.8" cy="441.6" r="3"/>
+                </svg>
+                <span class="label" style="left:43.2px;top:38.4px;">person</span>
+            </div>
+            <div class="caption">skeleton, 2×</div>
+        </div>
+    </div>
+</section>
+
+<p style="color:#777;font-size:12px;max-width:760px;margin-top:32px;">
+    Why this exists: per CLAUDE.md's "favorite pattern", visual artifacts get
+    caught at the artifact level. If the skeleton here looks wrong, the
+    skeleton the SwiftUI <code>Canvas</code> draws via
+    <code>skeletonSegments(of:)</code> will look the same wrong. The skeleton
+    is a recognizable upright figure — head dots clustered at top, two arms,
+    two legs splayed to the feet.
+</p>
+
+</body>
+</html>

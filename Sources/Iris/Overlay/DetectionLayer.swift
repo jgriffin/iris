@@ -169,9 +169,47 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         return corners
     }
 
-    /// Stroked-box + label render. Stroke and label colors / font / text
-    /// come from `style`; the box geometry comes from the injected
+    /// The drawable line segments of a detection's skeleton, as NORMALIZED
+    /// (Vision bottom-left origin) endpoint pairs — one per `Skeleton.Edge`
+    /// whose *both* endpoints resolve to a present keypoint. Edges with a
+    /// missing endpoint are skipped (a partially-occluded pose still draws
+    /// the limbs it has).
+    ///
+    /// Returns `nil` when the detection carries no skeleton
+    /// (`detection.skeleton == nil`) or no keypoints — the caller then falls
+    /// back to the quad / box paths. The overlay holds NO joint knowledge:
+    /// the topology is read entirely off the detection's own `skeleton`.
+    ///
+    /// Pure function of the detection; pulled out so tests can exercise the
+    /// name-resolution and skip-missing-endpoint logic without rendering.
+    static func skeletonSegments(of detection: Detection) -> [(CGPoint, CGPoint)]? {
+        guard let skeleton = detection.skeleton else { return nil }
+        guard let keypoints = detection.keypoints, !keypoints.isEmpty else { return nil }
+
+        var positions: [String: CGPoint] = [:]
+        positions.reserveCapacity(keypoints.count)
+        for kp in keypoints {
+            positions[kp.name] = kp.position
+        }
+
+        var segments: [(CGPoint, CGPoint)] = []
+        segments.reserveCapacity(skeleton.edges.count)
+        for edge in skeleton.edges {
+            guard let from = positions[edge.from], let to = positions[edge.to] else { continue }
+            segments.append((from, to))
+        }
+        return segments
+    }
+
+    /// Stroked-skeleton / quad / box + label render. Stroke and label colors
+    /// / font / text come from `style`; geometry comes from the injected
     /// `converter`.
+    ///
+    /// Geometry dispatch order: **skeleton → quad → box.** A detection that
+    /// carries a `skeleton` (pose) is drawn as connected joints; one that
+    /// carries four oriented corners is drawn as a quad; everything else
+    /// falls back to the axis-aligned bounding box. The label anchor is
+    /// always the bounding-box top-left, regardless of which geometry drew.
     private static func draw(
         _ detection: Detection,
         into gc: inout GraphicsContext,
@@ -180,6 +218,34 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         style: OverlayStyle
     ) {
         let rect = converter.viewRect(forNormalized: detection.boundingBox, in: videoRect)
+        let strokeColor = style.color(for: detection.label)
+
+        if let segments = skeletonSegments(of: detection) {
+            // Skeleton: stroke each present edge, then dot each joint. Every
+            // point goes through the centralized converter — never re-derive
+            // the Y-flip here.
+            for (from, to) in segments {
+                var line = Path()
+                line.move(to: converter.viewPoint(forNormalized: from, in: videoRect))
+                line.addLine(to: converter.viewPoint(forNormalized: to, in: videoRect))
+                gc.stroke(line, with: .color(strokeColor), lineWidth: style.strokeWidth)
+            }
+            if let keypoints = detection.keypoints {
+                let dotRadius = max(style.strokeWidth * 1.5, 2.5)
+                for kp in keypoints {
+                    let center = converter.viewPoint(forNormalized: kp.position, in: videoRect)
+                    let dot = CGRect(
+                        x: center.x - dotRadius,
+                        y: center.y - dotRadius,
+                        width: dotRadius * 2,
+                        height: dotRadius * 2
+                    )
+                    gc.fill(Path(ellipseIn: dot), with: .color(strokeColor))
+                }
+            }
+            drawLabel(detection, into: &gc, anchorRect: rect, style: style)
+            return
+        }
 
         // Outline: the real detected quad when the detection carries oriented
         // corner keypoints (capability-honest — draw the geometry that actually
@@ -195,13 +261,26 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         }
         gc.stroke(
             outline,
-            with: .color(style.color(for: detection.label)),
+            with: .color(strokeColor),
             lineWidth: style.strokeWidth
         )
 
-        // Label, if the formatter produced a non-empty string. The default
-        // formatter returns `""` for empty-label detections, so that branch
-        // suppresses the backplate automatically.
+        drawLabel(detection, into: &gc, anchorRect: rect, style: style)
+    }
+
+    /// Draw the label backplate + text, anchored to the top-left of
+    /// `anchorRect` (the converted bounding box). Shared by every geometry
+    /// path so the label placement is identical whether a skeleton, quad, or
+    /// box drew the detection.
+    ///
+    /// If the formatter produced an empty string (the default formatter does
+    /// so for empty-label detections), nothing is drawn.
+    private static func drawLabel(
+        _ detection: Detection,
+        into gc: inout GraphicsContext,
+        anchorRect: CGRect,
+        style: OverlayStyle
+    ) {
         let labelString = style.labelFormat(detection)
         guard !labelString.isEmpty else { return }
 
@@ -218,8 +297,8 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         let backplateWidth = textSize.width + padding * 2
         let backplateHeight = textSize.height + padding * 2
         let backplate = CGRect(
-            x: rect.minX,
-            y: rect.minY - backplateHeight,
+            x: anchorRect.minX,
+            y: anchorRect.minY - backplateHeight,
             width: backplateWidth,
             height: backplateHeight
         )
@@ -285,6 +364,57 @@ private func previewStore() -> ResultStore {
                 Detection.Keypoint(
                     name: "bottomLeft", position: CGPoint(x: 0.44, y: 0.60), confidence: 1.0),
             ],
+            sourceModelID: "preview"
+        ),
+        // Body pose: a synthetic upright figure at hardcoded normalized
+        // positions (Vision bottom-left origin, so the head is at high y and
+        // the feet at low y). Names match `Skeleton.humanBodyPose` edges so
+        // the skeleton renders; boundingBox is the joint envelope.
+        Detection(
+            boundingBox: CGRect(x: 0.06, y: 0.06, width: 0.16, height: 0.86),
+            label: "person",
+            confidence: 0.82,
+            keypoints: [
+                Detection.Keypoint(
+                    name: "nose", position: CGPoint(x: 0.14, y: 0.92), confidence: 0.97),
+                Detection.Keypoint(
+                    name: "leftEye", position: CGPoint(x: 0.12, y: 0.93), confidence: 0.9),
+                Detection.Keypoint(
+                    name: "rightEye", position: CGPoint(x: 0.16, y: 0.93), confidence: 0.9),
+                Detection.Keypoint(
+                    name: "leftEar", position: CGPoint(x: 0.10, y: 0.92), confidence: 0.8),
+                Detection.Keypoint(
+                    name: "rightEar", position: CGPoint(x: 0.18, y: 0.92), confidence: 0.8),
+                Detection.Keypoint(
+                    name: "neck", position: CGPoint(x: 0.14, y: 0.86), confidence: 0.95),
+                Detection.Keypoint(
+                    name: "leftShoulder", position: CGPoint(x: 0.08, y: 0.84), confidence: 0.93),
+                Detection.Keypoint(
+                    name: "rightShoulder", position: CGPoint(x: 0.20, y: 0.84), confidence: 0.93),
+                Detection.Keypoint(
+                    name: "leftElbow", position: CGPoint(x: 0.06, y: 0.72), confidence: 0.85),
+                Detection.Keypoint(
+                    name: "rightElbow", position: CGPoint(x: 0.22, y: 0.72), confidence: 0.85),
+                Detection.Keypoint(
+                    name: "leftWrist", position: CGPoint(x: 0.07, y: 0.60), confidence: 0.8),
+                Detection.Keypoint(
+                    name: "rightWrist", position: CGPoint(x: 0.21, y: 0.60), confidence: 0.8),
+                Detection.Keypoint(
+                    name: "root", position: CGPoint(x: 0.14, y: 0.58), confidence: 0.9),
+                Detection.Keypoint(
+                    name: "leftHip", position: CGPoint(x: 0.11, y: 0.56), confidence: 0.88),
+                Detection.Keypoint(
+                    name: "rightHip", position: CGPoint(x: 0.17, y: 0.56), confidence: 0.88),
+                Detection.Keypoint(
+                    name: "leftKnee", position: CGPoint(x: 0.10, y: 0.32), confidence: 0.82),
+                Detection.Keypoint(
+                    name: "rightKnee", position: CGPoint(x: 0.18, y: 0.32), confidence: 0.82),
+                Detection.Keypoint(
+                    name: "leftAnkle", position: CGPoint(x: 0.09, y: 0.08), confidence: 0.75),
+                Detection.Keypoint(
+                    name: "rightAnkle", position: CGPoint(x: 0.19, y: 0.08), confidence: 0.75),
+            ],
+            skeleton: .humanBodyPose,
             sourceModelID: "preview"
         ),
     ]

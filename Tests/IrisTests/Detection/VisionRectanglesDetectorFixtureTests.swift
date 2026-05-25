@@ -1,78 +1,14 @@
-import AVFoundation
 import CoreGraphics
-import CoreMedia
-import CoreVideo
 import Foundation
-import ImageIO
 import Testing
 
 @testable import Iris
 
-// MARK: - Fixture decoder
-
-/// Decode up to `maximumFrames` BGRA pixel buffers from a fixture clip and
-/// wrap each one in a `Frame`. Backed by `AVAssetReader` so the test stays
-/// hermetic — no `AVPlayer`, no display loop, no UI dependency. Available
-/// on both iOS and macOS (the only place `AVAssetReader` is unavailable is
-/// the Vision Pro simulator, which Iris doesn't target).
-///
-/// Decoded frames carry their natural presentation timestamps and a
-/// `.up` orientation tag. The clip is shot upright so no rotation metadata
-/// matters for the rectangles assertion.
-private func decodeFrames(
-    from url: URL,
-    maximumFrames: Int
-) async throws -> [Frame] {
-    let asset = AVURLAsset(url: url)
-    let tracks = try await asset.loadTracks(withMediaType: .video)
-    guard let track = tracks.first else {
-        Issue.record("Fixture has no video track: \(url.lastPathComponent)")
-        return []
-    }
-
-    let (naturalSize, _) = try await track.load(.naturalSize, .preferredTransform)
-
-    let reader = try AVAssetReader(asset: asset)
-    let outputSettings: [String: Any] = [
-        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-        kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [String: Any],
-    ]
-    let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings)
-    output.alwaysCopiesSampleData = false
-    guard reader.canAdd(output) else {
-        Issue.record("AVAssetReader rejected BGRA output settings")
-        return []
-    }
-    reader.add(output)
-
-    guard reader.startReading() else {
-        let message = reader.error?.localizedDescription ?? "unknown"
-        Issue.record("AVAssetReader failed to start: \(message)")
-        return []
-    }
-
-    var frames: [Frame] = []
-    frames.reserveCapacity(maximumFrames)
-
-    while frames.count < maximumFrames, let sample = output.copyNextSampleBuffer() {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-        let pts = CMSampleBufferGetPresentationTimeStamp(sample)
-        frames.append(
-            Frame(
-                pixelBuffer: pixelBuffer,
-                timestamp: pts,
-                orientation: .up,
-                source: .mock("fixture:\(url.lastPathComponent)"),
-                format: .bgra8,
-                dimensions: naturalSize
-            )
-        )
-    }
-
-    return frames
-}
-
 // MARK: - Tests
+//
+// The `decodeFrames` helper is shared via `Tests/IrisTests/Support/FixtureDecoding.swift`
+// (single source of truth for the AVAssetReader scaffolding, reused by the
+// body-pose fixture test).
 
 @Test
 func visionRectanglesDetectorFiresOnFixtureClip() async throws {

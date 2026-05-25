@@ -52,3 +52,23 @@ catching it — add the extension there before committing.
   provides a high-confidence rectangle target for `VisionRectanglesDetector`.
   The test pulls a handful of frames via `AVAssetReader` and asserts that
   detections fire on the majority of them.
+
+### `dancer-full-body.mp4`
+
+- **Source:** https://www.pexels.com/video/dancing-woman-6616343/
+- **Pexels video ID:** 6616343
+- **Author:** Yan Krukau
+- **License:** [Pexels License](https://www.pexels.com/license/) — free for
+  commercial and non-commercial use, no attribution required, no
+  redistribution as stock. Embedding in a Swift package's unit-test fixture
+  is within the license's intended use.
+- **Resolution:** 1280 x 720
+- **Duration:** ~24.8 s (619 frames @ 25 fps, H.264)
+- **File size:** 7.9 MB
+- **Used by:** `Tests/IrisTests/Detection/VisionBodyPoseDetectorFixtureTests.swift`
+  — a single dancer, full body head-to-feet, clearly lit against a plain
+  draped studio backdrop with no clutter or other people, and dynamic poses
+  that spread the limbs out — a high-detectability target for Apple Vision's
+  2D body-pose request. The test pulls a handful of frames via `AVAssetReader`
+  and asserts that a body pose with a reasonable joint count is detected on
+  the majority of them.

@@ -232,6 +232,102 @@ struct DetectionLayerTests {
 
         #expect(DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection) == nil)
     }
+
+    // MARK: - skeletonSegments
+
+    @Test
+    func skeletonSegmentsResolvesEdgesByName() {
+        // A small synthetic skeleton: three named joints, two edges.
+        let neck = CGPoint(x: 0.5, y: 0.8)
+        let nose = CGPoint(x: 0.5, y: 0.9)
+        let leftShoulder = CGPoint(x: 0.4, y: 0.78)
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.4, y: 0.78, width: 0.1, height: 0.12),
+            label: "person",
+            confidence: 0.9,
+            keypoints: [
+                // Out of order to prove name-resolution, not array order.
+                Detection.Keypoint(name: "leftShoulder", position: leftShoulder, confidence: 0.9),
+                Detection.Keypoint(name: "nose", position: nose, confidence: 0.9),
+                Detection.Keypoint(name: "neck", position: neck, confidence: 0.9),
+            ],
+            skeleton: Skeleton(edges: [
+                Skeleton.Edge(from: "neck", to: "nose"),
+                Skeleton.Edge(from: "neck", to: "leftShoulder"),
+            ]),
+            sourceModelID: "detection-layer-tests"
+        )
+
+        let segments = DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection)
+        let unwrapped = try? #require(segments)
+        #expect(unwrapped?.count == 2)
+        #expect(unwrapped?[0].0 == neck)
+        #expect(unwrapped?[0].1 == nose)
+        #expect(unwrapped?[1].0 == neck)
+        #expect(unwrapped?[1].1 == leftShoulder)
+    }
+
+    @Test
+    func skeletonSegmentsSkipsEdgeWithMissingEndpoint() {
+        // The "nose" joint is absent, so the neck–nose edge is skipped while
+        // the neck–leftShoulder edge (both present) survives.
+        let neck = CGPoint(x: 0.5, y: 0.8)
+        let leftShoulder = CGPoint(x: 0.4, y: 0.78)
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.4, y: 0.78, width: 0.1, height: 0.02),
+            label: "person",
+            confidence: 0.9,
+            keypoints: [
+                Detection.Keypoint(name: "neck", position: neck, confidence: 0.9),
+                Detection.Keypoint(name: "leftShoulder", position: leftShoulder, confidence: 0.9),
+            ],
+            skeleton: Skeleton(edges: [
+                Skeleton.Edge(from: "neck", to: "nose"),  // nose missing → skipped
+                Skeleton.Edge(from: "neck", to: "leftShoulder"),
+            ]),
+            sourceModelID: "detection-layer-tests"
+        )
+
+        let segments = DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection)
+        let unwrapped = try? #require(segments)
+        #expect(unwrapped?.count == 1)
+        #expect(unwrapped?[0].0 == neck)
+        #expect(unwrapped?[0].1 == leftShoulder)
+    }
+
+    @Test
+    func skeletonSegmentsReturnsNilForBoxOnlyDetection() {
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4),
+            label: "box",
+            confidence: 0.9,
+            sourceModelID: "detection-layer-tests"
+        )
+        #expect(DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection) == nil)
+    }
+
+    @Test
+    func skeletonSegmentsReturnsNilForQuadDetection() {
+        // A quad (corner keypoints, no skeleton) is not a skeleton — the
+        // helper returns nil so the caller falls through to the quad path.
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.38, y: 0.60, width: 0.28, height: 0.28),
+            label: "tilted",
+            confidence: 0.88,
+            keypoints: [
+                Detection.Keypoint(
+                    name: "topLeft", position: .init(x: 0.38, y: 0.82), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "topRight", position: .init(x: 0.60, y: 0.88), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "bottomRight", position: .init(x: 0.66, y: 0.66), confidence: 1.0),
+                Detection.Keypoint(
+                    name: "bottomLeft", position: .init(x: 0.44, y: 0.60), confidence: 1.0),
+            ],
+            sourceModelID: "detection-layer-tests"
+        )
+        #expect(DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection) == nil)
+    }
 }
 
 // MARK: - Helpers

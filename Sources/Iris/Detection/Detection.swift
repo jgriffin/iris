@@ -53,12 +53,20 @@ public struct Detection: Sendable, Hashable {
     /// producing `Detector`'s `modelIdentifier`.
     public let sourceModelID: String
 
+    /// Skeleton edge topology for keypoint detections (pose) — the named
+    /// connections the overlay strokes between `keypoints`. `nil` for
+    /// box / quad detections, which carry no skeleton. Self-describing:
+    /// the detector stamps the topology, so the overlay draws whatever
+    /// edges a detection carries without holding any joint knowledge.
+    public let skeleton: Skeleton?
+
     public init(
         boundingBox: CGRect,
         label: String,
         confidence: Float,
         keypoints: [Keypoint]? = nil,
         mask: Mask? = nil,
+        skeleton: Skeleton? = nil,
         sourceModelID: String
     ) {
         self.boundingBox = boundingBox
@@ -66,6 +74,7 @@ public struct Detection: Sendable, Hashable {
         self.confidence = confidence
         self.keypoints = keypoints
         self.mask = mask
+        self.skeleton = skeleton
         self.sourceModelID = sourceModelID
     }
 }
