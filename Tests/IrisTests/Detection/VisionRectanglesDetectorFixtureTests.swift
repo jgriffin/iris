@@ -47,11 +47,22 @@ func visionRectanglesDetectorFiresOnFixtureClip() async throws {
     // Vision serializes its own work and parallel dispatch buys nothing
     // for a 10-frame smoke. Sequential keeps the failure mode legible.
     var framesWithDetection = 0
+    var sampleDetection: Detection?
     for frame in frames {
         let detections = try await detector.detect(in: frame)
         let strong = detections.filter { $0.confidence >= 0.5 }
         if !strong.isEmpty { framesWithDetection += 1 }
+        sampleDetection = sampleDetection ?? detections.first
     }
+
+    // Capability-honest readout: every rectangle detection carries its true
+    // aspect ratio (computed in pixel space from the corner keypoints),
+    // formatted as "<ratio>:1". This is the meaningful number the overlay
+    // shows instead of a fabricated confidence percentage.
+    let detection = try #require(sampleDetection, "No rectangle detection captured")
+    let readout = try #require(detection.readout, "Rectangle carried no readout")
+    #expect(readout.label == "aspect")
+    #expect(readout.text.hasSuffix(":1"))
 
     // Threshold: at least 5 of 10 frames yield a rectangle with
     // confidence >= 0.5. Empirically the clip hits much higher than

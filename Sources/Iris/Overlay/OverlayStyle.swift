@@ -37,10 +37,10 @@ public struct OverlayStyle: Sendable {
     public var strokeColor: @Sendable (String) -> Color
 
     /// Formats the label string drawn above each detection's box. Receives
-    /// the whole `Detection` so the closure can compose label + confidence
-    /// (the default) or do something richer (e.g., a model-aware key).
-    /// Returning an empty string suppresses the label backplate entirely
-    /// for that detection.
+    /// the whole `Detection` so the closure can compose label + the
+    /// detector's honest `readout` (the default) or do something richer
+    /// (e.g., a model-aware key). Returning an empty string suppresses the
+    /// label backplate entirely for that detection.
     public var labelFormat: @Sendable (Detection) -> String
 
     /// Foreground color of the label text. White on the default backplate.
@@ -59,11 +59,19 @@ public struct OverlayStyle: Sendable {
             Color(red: 0.20, green: 0.85, blue: 1.0)
         },
         labelFormat: @Sendable @escaping (Detection) -> String = { detection in
-            let pct = Int((detection.confidence * 100).rounded())
-            if detection.label.isEmpty {
-                return ""
+            // Capability-honest default: surface the detector's own
+            // meaningful number (`readout`), NEVER a fabricated confidence
+            // percentage. A detector with real probabilistic confidence
+            // would expose it as a `Readout` (e.g. `Readout(label: "conf",
+            // text: "94%")`); that channel now flows through here unchanged.
+            if let readout = detection.readout {
+                return detection.label.isEmpty
+                    ? readout.text
+                    : "\(detection.label) · \(readout.text)"
             }
-            return "\(detection.label) \(pct)%"
+            // No readout: just the label (empty label → "" so the draw pass
+            // suppresses the backplate, as before).
+            return detection.label
         },
         labelTextColor: Color = .white,
         labelBackgroundColor: Color = .black.opacity(0.6),

@@ -259,11 +259,22 @@ public struct VisionRectanglesDetector: TunableDetector {
                 ),
             ]
 
+            // Capability-honest readout: the rectangle's TRUE aspect ratio
+            // in PIXEL space. The corner keypoints are normalized [0,1] on
+            // each axis independently, so a non-square frame stretches them;
+            // un-normalize by `frame.dimensions` before measuring edges so
+            // the ratio reflects the physical shape, not the normalized one.
+            let readout = Self.aspectRatioReadout(
+                corners: keypoints.map(\.position),
+                frameSize: frame.dimensions
+            )
+
             return Detection(
                 boundingBox: bbox,
                 label: settings.label,
                 confidence: observation.confidence,
                 keypoints: keypoints,
+                readout: readout,
                 sourceModelID: modelIdentifier
             )
         }
@@ -531,6 +542,7 @@ public struct VisionRectanglesDetector: TunableDetector {
                     confidence: d.confidence,
                     keypoints: d.keypoints,
                     mask: d.mask,
+                    readout: d.readout,
                     sourceModelID: d.sourceModelID
                 )
             }
@@ -579,6 +591,47 @@ public struct VisionRectanglesDetector: TunableDetector {
 
             return true
         }
+    }
+
+    // MARK: - Aspect-ratio readout
+
+    /// Build the capability-honest aspect-ratio `Readout` for a rectangle
+    /// from its four corner keypoints, measured in PIXEL space.
+    ///
+    /// Corners arrive in normalized `[0, 1]` coordinates that are scaled
+    /// per-axis, so a 16:9 frame stretches the horizontal axis relative to
+    /// the vertical. Multiplying each corner by `frameSize` recovers the
+    /// physical edge lengths, so the ratio describes the rectangle's true
+    /// shape rather than its normalized-space distortion.
+    ///
+    /// `width` is the top edge length (`topLeft → topRight`); `height` is the
+    /// left edge length (`topLeft → bottomLeft`); `aspect = width / height`,
+    /// formatted as `"<ratio>:1"` to two decimals (e.g. `"1.42:1"`). Returns
+    /// `nil` when the four corners aren't present or `height` is zero (a
+    /// degenerate edge) — the caller then omits the readout rather than
+    /// fabricate one.
+    static func aspectRatioReadout(
+        corners: [CGPoint],
+        frameSize: CGSize
+    ) -> Readout? {
+        guard corners.count == 4 else { return nil }
+        let topLeft = corners[0]
+        let topRight = corners[1]
+        let bottomLeft = corners[3]
+
+        func pixelDistance(_ a: CGPoint, _ b: CGPoint) -> Double {
+            let dx = Double(a.x - b.x) * Double(frameSize.width)
+            let dy = Double(a.y - b.y) * Double(frameSize.height)
+            return (dx * dx + dy * dy).squareRoot()
+        }
+
+        let width = pixelDistance(topLeft, topRight)
+        let height = pixelDistance(topLeft, bottomLeft)
+        guard height > 0 else { return nil }
+
+        let aspect = width / height
+        let text = String(format: "%.2f:1", aspect)
+        return Readout(label: "aspect", text: text)
     }
 
     // MARK: - Quadrature corner-angle filter

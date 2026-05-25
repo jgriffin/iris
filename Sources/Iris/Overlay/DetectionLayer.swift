@@ -315,9 +315,12 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
 
 /// Synthetic fixture used by the `#Preview` cases below — a tight set of
 /// detections covering the visual edge cases that matter for spot-checks:
-/// centered easy box, edge-clipped box, low-confidence box (exercises the
-/// label format with %), and an empty-label box (the default `labelFormat`
-/// suppresses the backplate for that one).
+/// centered box, edge-clipped box, a third generic box, and an empty-label
+/// box (the default `labelFormat` suppresses the backplate for that one).
+/// The generic boxes carry no `readout`, so the honest default label shows
+/// just their label — no fabricated confidence percentage. The tilted
+/// rectangle and the pose carry their detector's real readout (aspect ratio,
+/// joint count), which the default formatter appends after the label.
 @MainActor
 private func previewStore() -> ResultStore {
     let store = ResultStore()
@@ -364,6 +367,7 @@ private func previewStore() -> ResultStore {
                 Detection.Keypoint(
                     name: "bottomLeft", position: CGPoint(x: 0.44, y: 0.60), confidence: 1.0),
             ],
+            readout: Readout(label: "aspect", text: "1.30:1"),
             sourceModelID: "preview"
         ),
         // Body pose: a synthetic upright figure at hardcoded normalized
@@ -415,6 +419,7 @@ private func previewStore() -> ResultStore {
                     name: "rightAnkle", position: CGPoint(x: 0.19, y: 0.08), confidence: 0.75),
             ],
             skeleton: .humanBodyPose,
+            readout: Readout(label: "joints", text: "19 joints"),
             sourceModelID: "preview"
         ),
     ]

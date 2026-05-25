@@ -60,6 +60,15 @@ public struct Detection: Sendable, Hashable {
     /// edges a detection carries without holding any joint knowledge.
     public let skeleton: Skeleton?
 
+    /// Capability-honest numeric readout the producing detector stamps for
+    /// display — the meaningful number for THAT detector (a rectangle's
+    /// aspect ratio, a pose's joint count), never a fabricated probability.
+    /// Self-describing, exactly like `skeleton`: the detector computes the
+    /// metric, and the overlay's default label formatter surfaces it
+    /// generically without knowing which detector produced it. `nil` for
+    /// detectors that have no meaningful scalar to report.
+    public let readout: Readout?
+
     public init(
         boundingBox: CGRect,
         label: String,
@@ -67,6 +76,7 @@ public struct Detection: Sendable, Hashable {
         keypoints: [Keypoint]? = nil,
         mask: Mask? = nil,
         skeleton: Skeleton? = nil,
+        readout: Readout? = nil,
         sourceModelID: String
     ) {
         self.boundingBox = boundingBox
@@ -75,6 +85,7 @@ public struct Detection: Sendable, Hashable {
         self.keypoints = keypoints
         self.mask = mask
         self.skeleton = skeleton
+        self.readout = readout
         self.sourceModelID = sourceModelID
     }
 }

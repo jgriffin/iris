@@ -24,7 +24,38 @@ struct OverlayStyleTests {
     }
 
     @Test
-    func labelFormatComposesLabelAndConfidence() {
+    func labelFormatComposesLabelAndReadout() {
+        let style = OverlayStyle.default
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4),
+            label: "rectangle",
+            confidence: 1.0,
+            readout: Readout(label: "aspect", text: "1.42:1"),
+            sourceModelID: "overlay-style-tests"
+        )
+        let formatted = style.labelFormat(detection)
+        // Honest default: label + " · " + the detector's readout text.
+        #expect(formatted == "rectangle · 1.42:1")
+        // NEVER a fabricated confidence percentage.
+        #expect(!formatted.contains("%"))
+    }
+
+    @Test
+    func labelFormatShowsReadoutAloneForEmptyLabel() {
+        let style = OverlayStyle.default
+        let detection = Detection(
+            boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4),
+            label: "",
+            confidence: 1.0,
+            readout: Readout(label: "joints", text: "19 joints"),
+            sourceModelID: "overlay-style-tests"
+        )
+        // Empty label + readout → just the readout text (no leading separator).
+        #expect(style.labelFormat(detection) == "19 joints")
+    }
+
+    @Test
+    func labelFormatShowsLabelOnlyWithoutReadout() {
         let style = OverlayStyle.default
         let detection = Detection(
             boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4),
@@ -33,9 +64,10 @@ struct OverlayStyleTests {
             sourceModelID: "overlay-style-tests"
         )
         let formatted = style.labelFormat(detection)
-        #expect(formatted.contains("face"))
-        // Confidence is rendered as an integer percentage.
-        #expect(formatted.contains("87"))
+        // No readout → just the label, and never a percentage.
+        #expect(formatted == "face")
+        #expect(!formatted.contains("%"))
+        #expect(!formatted.contains("87"))
     }
 
     @Test
@@ -47,8 +79,8 @@ struct OverlayStyleTests {
             confidence: 0.5,
             sourceModelID: "overlay-style-tests"
         )
-        // Empty-label detections come back as `""` so `DetectionLayer`'s
-        // draw pass skips the label backplate for them.
+        // Empty-label, no-readout detections come back as `""` so
+        // `DetectionLayer`'s draw pass skips the label backplate for them.
         #expect(style.labelFormat(detection).isEmpty)
     }
 

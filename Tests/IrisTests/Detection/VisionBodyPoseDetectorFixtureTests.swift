@@ -51,4 +51,12 @@ func visionBodyPoseDetectorFiresOnDancerClip() async throws {
     let detection = try #require(sampleDetection, "No pose detection captured")
     #expect(detection.skeleton == .humanBodyPose)
     #expect(detection.label == "person")
+
+    // Capability-honest readout: the joint count, the meaningful number for
+    // a pose (per-joint confidence makes a single probability meaningless).
+    // Its text must reflect the keypoint count actually located.
+    let readout = try #require(detection.readout, "Pose carried no readout")
+    #expect(readout.label == "joints")
+    let jointCount = detection.keypoints?.count ?? 0
+    #expect(readout.text == "\(jointCount) joints")
 }

@@ -165,12 +165,18 @@ public struct VisionBodyPoseDetector: TunableDetector {
                 ? 0
                 : keypoints.reduce(Float(0)) { $0 + $1.confidence } / Float(keypoints.count)
 
+            // Capability-honest readout: the joint count. A pose has no
+            // single probability worth showing (confidence is per-joint),
+            // so the meaningful scalar is how many joints were located.
+            let readout = Readout(label: "joints", text: "\(keypoints.count) joints")
+
             return Detection(
                 boundingBox: bbox,
                 label: VisionBodyPoseSettings.label,
                 confidence: meanConfidence,
                 keypoints: keypoints,
                 skeleton: .humanBodyPose,
+                readout: readout,
                 sourceModelID: modelIdentifier
             )
         }
