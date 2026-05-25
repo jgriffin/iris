@@ -5,6 +5,12 @@
      link to the exploration that justifies it. Leave a blank line between entries.
      The linked RECOMMENDATIONS.md carries the deep case — don't restate it here. -->
 
+### 2026-05-24 — Detector capability model (M5)
+
+Built-in Vision detectors differ along axes a flat `[Detection]` can't express, so each detector declares a **capability descriptor** — the single source of truth for tuning UI, overlay rendering, and the raw-data inspector. Axes: **(1) geometry kind** (a *set*: box / quad / keypoints / contour / mask / heatmap / labelOnly / scalar); **(2) confidence semantics** — `probabilistic` / `perElement` / `none` / `derivedScalar(label:)`, never a bare `confidence: Float` that fabricates certainty; **(3) tunable-knob set** (reuses `SettingSchema`); **(4) introspectable field set**. Renderability (P3) and inspectability (P4) are two *projections* of the same descriptor, so they can't drift. `derivedScalar(label:)` is how geometric detectors surface a labeled quality ratio (rectangle quadrature deviation / aspect) without it masquerading as confidence. Proven on rectangles (confidence `none`) + 2D human body pose (confidence `perElement`); requires `SettingKind.string` + `.enum` additions for text/symbology knobs.
+
+→ [`explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md`](../explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md)
+
 ### 2026-05-22 — Best-effort temporal match in `ResultStore.lookup` via timestamp-keyed cache
 
 `ResultStore` is a `[CMTime: TimestampedDetections]` dictionary keyed on *quantized* asset-time buckets (default: one 30fps frame); `lookup(at:)` is nearest-neighbor within `min(2 × quantization, stale:)`. `DetectorPipeline.detect(in:cache:)` consults the cache via a `DetectionCache` protocol (in `Sources/Iris/Detection/`) before dispatching detectors — re-visiting an already-detected timestamp returns the cached detections without re-running inference. `PlaybackSource` uses `.bufferingNewest(3)` (not `(1)`) so seek-emitted and frame-step frames survive detector congestion; the original 2026-05-20 "Runtime frame pipeline" `.bufferingNewest(1)` contract is preserved for `CaptureSession`. No eviction policy in v1 — revisit when M5's dataset workflows want long-form footage handling.
