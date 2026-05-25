@@ -366,7 +366,6 @@ struct ContentView: View {
             minimumAspectRatio: 0.3,
             maximumAspectRatio: 1.0,
             minimumSize: 0.1,
-            minimumConfidence: 0.7,
             label: "rect"
         )
         let pipeline = DetectorPipeline(initialDetector)

@@ -67,15 +67,13 @@ public struct VisionRectanglesDetector: TunableDetector {
     /// Vision's default.
     public var maximumObservations: Int { settings.maximumObservations }
 
-    /// How far each corner is allowed to deviate from 90° (in degrees).
-    /// Mirrors `DetectRectanglesRequest.quadratureToleranceDegrees`.
-    /// Defaults to Vision's own default of `30.0`.
+    /// How far each corner is allowed to deviate from 90° (in degrees)
+    /// for a rectangle to be kept. A **post-hoc corner-angle filter**
+    /// (M5) — see `quadratureAnglePredicate(toleranceDegrees:)`. Vision
+    /// itself is queried at a fixed permissive tolerance
+    /// (`requestQuadratureToleranceDegrees`); this value filters the
+    /// candidates in Swift. Defaults to `30.0`.
     public var quadratureToleranceDegrees: Float { settings.quadratureToleranceDegrees }
-
-    /// Minimum confidence for a rectangle to be returned. Mirrors
-    /// `DetectRectanglesRequest.minimumConfidence`. Defaults to `0.0` so the
-    /// adapter is permissive by default; callers tune via init.
-    public var minimumConfidence: Float { settings.minimumConfidence }
 
     /// Label applied to every emitted `Detection`. Public so callers can
     /// override (e.g. `"document"` for a doc-scanner use case) without
@@ -150,16 +148,19 @@ public struct VisionRectanglesDetector: TunableDetector {
         self.settings = settings
     }
 
-    /// Backwards-compatible convenience init that builds a
-    /// `VisionRectanglesSettings` from raw arguments. Existing call
-    /// sites (and tests) continue to work unchanged.
+    /// Convenience init that builds a `VisionRectanglesSettings` from raw
+    /// arguments.
+    ///
+    /// **M5: no `minimumConfidence` parameter.** Vision rectangles carry
+    /// no probabilistic confidence, so the knob it tuned did nothing —
+    /// removed along with the schema knob and the
+    /// `request.minimumConfidence` forwarding.
     public init(
         minimumAspectRatio: Float = 0.5,
         maximumAspectRatio: Float = 0.5,
         minimumSize: Float = 0.2,
         maximumObservations: Int = 0,
         quadratureToleranceDegrees: Float = 30.0,
-        minimumConfidence: Float = 0.0,
         label: String = "rectangle"
     ) {
         self.init(
@@ -169,11 +170,29 @@ public struct VisionRectanglesDetector: TunableDetector {
                 minimumSize: minimumSize,
                 maximumObservations: maximumObservations,
                 quadratureToleranceDegrees: quadratureToleranceDegrees,
-                minimumConfidence: minimumConfidence,
                 label: label
             )
         )
     }
+
+    // MARK: - Request constants
+
+    /// The quadrature tolerance Vision's `DetectRectanglesRequest` is
+    /// asked for — fixed and *permissive* so Vision returns the full
+    /// candidate set, which the tunable `quadratureToleranceDegrees`
+    /// filter then narrows in Swift. `45.0` is the maximum Vision
+    /// accepts (a 45° corner deviation is the loosest "still rectangular"
+    /// it will admit); asking at the ceiling means the post-hoc filter
+    /// never has to fight a candidate Vision already discarded.
+    ///
+    /// **Why a fixed request param, not the tunable value.** Forwarding
+    /// the tunable to the request made *loosening* the tolerance a
+    /// detector-tier cache-dump (Vision had to re-run to surface
+    /// shapes it previously rejected), and *tightening* a filter-tier
+    /// no-op. Pinning the request permissive makes the knob symmetric:
+    /// both directions just re-run the corner-angle predicate over the
+    /// cached corners. See `quadratureToleranceDegrees` on the settings.
+    public static let requestQuadratureToleranceDegrees: Float = 45.0
 
     // MARK: - Detector
 
@@ -192,15 +211,19 @@ public struct VisionRectanglesDetector: TunableDetector {
         request.maximumAspectRatio = settings.maximumAspectRatio
         request.minimumSize = settings.minimumSize
         request.maximumObservations = settings.maximumObservations
-        request.quadratureToleranceDegrees = settings.quadratureToleranceDegrees
-        request.minimumConfidence = settings.minimumConfidence
+        // Fixed permissive request tolerance — Vision returns the full
+        // candidate set; the tunable `quadratureToleranceDegrees` then
+        // filters by corner angle in Swift (M5). `minimumConfidence` is
+        // *not* forwarded — `RectangleObservation.confidence` is a
+        // constant 1.0, so it gated nothing meaningful.
+        request.quadratureToleranceDegrees = Self.requestQuadratureToleranceDegrees
 
         let observations = try await request.perform(
             on: frame.pixelBuffer,
             orientation: frame.orientation
         )
 
-        return observations.map { observation in
+        let detections = observations.map { observation in
             // `boundingBox` on RectangleObservation is the axis-aligned
             // hull of the four corners in Vision-native normalized
             // (bottom-left origin) coordinates. We preserve that
@@ -244,25 +267,37 @@ public struct VisionRectanglesDetector: TunableDetector {
                 sourceModelID: modelIdentifier
             )
         }
+
+        // Apply the same settings-projection the filter-tier path uses,
+        // so a fresh inference and a cached-then-filtered result agree
+        // exactly (aspect / size / quadrature-angle / max-observations).
+        // This is what makes `quadratureToleranceDegrees` symmetric: the
+        // corner-angle predicate runs here on fresh output *and* in
+        // `transform(for:)` on cached output, from one definition.
+        return Self.transform(for: settings)(detections)
     }
 
     // MARK: - TunableDetector
 
     /// Per-knob × direction tier classifier.
     ///
-    /// Verdict table (Vision uses every knob below as a *model
-    /// parameter* — the request is built fresh per call from
-    /// `settings`, so widening any acceptance window means the model
-    /// would emit shapes it previously suppressed; the cache can't
-    /// recover those without re-inference):
+    /// `minimumAspectRatio` / `maximumAspectRatio` / `minimumSize` /
+    /// `maximumObservations` are still forwarded to
+    /// `DetectRectanglesRequest` as real Vision parameters — widening any
+    /// of their acceptance windows means Vision would emit shapes it
+    /// previously suppressed, which the cache can't recover without
+    /// re-inference (detector-tier). `quadratureToleranceDegrees` is
+    /// **not** a request parameter anymore (M5): Vision is queried at a
+    /// fixed permissive tolerance, so the knob is a pure post-hoc
+    /// corner-angle filter — symmetric and filter-tier in both
+    /// directions.
     ///
     ///   | Knob                          | Raise        | Lower        |
     ///   | ----------------------------- | ------------ | ------------ |
-    ///   | `minimumConfidence`           | `.filter`    | `.detector`  |
     ///   | `minimumAspectRatio`          | `.filter`    | `.detector`  |
     ///   | `maximumAspectRatio`          | `.detector`  | `.filter`    |
     ///   | `minimumSize`                 | `.filter`    | `.detector`  |
-    ///   | `quadratureToleranceDegrees`  | `.detector`  | `.filter`    |
+    ///   | `quadratureToleranceDegrees`  | `.filter`    | `.filter`    |
     ///   | `maximumObservations`         | (see below)  | (see below)  |
     ///   | `label`                       | `.filter` (always — relabel pass) |
     ///
@@ -291,14 +326,6 @@ public struct VisionRectanglesDetector: TunableDetector {
         let newSettings = projectedSettings(applying: change)
 
         switch change.key {
-        case "minimumConfidence":
-            // Vision uses this as a model parameter (see `detect(in:)`
-            // — `request.minimumConfidence = settings.minimumConfidence`).
-            // Raising hides detections we already have → `.filter`.
-            // Lowering needs detections the model never emitted →
-            // detector-tier rebuild.
-            return classifyFloatRaiseFilterLowerDetector(change, newSettings: newSettings)
-
         case "minimumAspectRatio":
             // Lower bound of an acceptance window. Raising narrows
             // (filter); lowering widens (detector).
@@ -315,9 +342,13 @@ public struct VisionRectanglesDetector: TunableDetector {
             return classifyFloatRaiseFilterLowerDetector(change, newSettings: newSettings)
 
         case "quadratureToleranceDegrees":
-            // Upper bound on angular skew. Raising widens (detector);
-            // lowering narrows (filter).
-            return classifyFloatRaiseDetectorLowerFilter(change, newSettings: newSettings)
+            // M5: a pure post-hoc corner-angle filter, not a Vision
+            // request parameter. Vision is queried at a fixed permissive
+            // tolerance, so the full candidate set is always cached;
+            // tightening *or* loosening the knob just re-runs the angle
+            // predicate over those cached corners. Filter-tier in both
+            // directions — symmetric and instant.
+            return .filter(transform: Self.transform(for: newSettings))
 
         case "maximumObservations":
             return classifyMaximumObservations(change, newSettings: newSettings)
@@ -434,10 +465,9 @@ public struct VisionRectanglesDetector: TunableDetector {
         case ("minimumSize", .float(let v)): next.minimumSize = v
         case ("maximumObservations", .int(let v)): next.maximumObservations = v
         case ("quadratureToleranceDegrees", .float(let v)): next.quadratureToleranceDegrees = v
-        case ("minimumConfidence", .float(let v)): next.minimumConfidence = v
         default:
-            // `label` (no SettingKind.string variant yet) and unknown
-            // keys land here. The classifier arms above route `label`
+            // `label` (not surfaced via the schema) and unknown keys
+            // land here. The classifier arms above route `label`
             // to `.filter` (no rebuild) and unknown keys to the
             // worst-case `.detector` arm where we rebuild with the
             // unchanged settings.
@@ -456,7 +486,6 @@ public struct VisionRectanglesDetector: TunableDetector {
     /// line and pins the predicate semantics in one place for tests.
     ///
     /// **What's covered.**
-    /// - `minimumConfidence` — drop detections below the new floor.
     /// - `minimumAspectRatio` / `maximumAspectRatio` — drop detections
     ///   whose short/long axis ratio falls outside the new window.
     ///   Normalized boxes; ratio computed as `min(w,h)/max(w,h)` so it
@@ -467,6 +496,14 @@ public struct VisionRectanglesDetector: TunableDetector {
     ///   we only have normalized boxes ([0,1] on both axes), where the
     ///   shortest image dimension is 1.0 in normalized terms, so the
     ///   `min(w,h)` comparison reduces to the same predicate.
+    /// - `quadratureToleranceDegrees` (M5) — drop detections any of
+    ///   whose four corner angles deviate from 90° by more than the
+    ///   tolerance, computed from the corner keypoints
+    ///   (`topLeft`…`bottomLeft`) Vision returns. See
+    ///   `quadratureAnglePredicate(toleranceDegrees:)`. Detections
+    ///   lacking the four keypoints are kept (the filter can't judge a
+    ///   shape it can't measure — e.g. a non-Vision detection routed
+    ///   through the same transform).
     /// - `maximumObservations` — truncate to the new cap (0 =
     ///   unlimited). Pre-sorts by confidence descending so the cap
     ///   keeps the most-confident detections regardless of the cached
@@ -475,16 +512,9 @@ public struct VisionRectanglesDetector: TunableDetector {
     ///   current `settings.label`. `Detection.label` is `let`, so the
     ///   rewrite reconstructs the value.
     ///
-    /// **What's *not* covered yet.** `quadratureToleranceDegrees` —
-    /// the cache holds axis-aligned bounding boxes plus four corner
-    /// keypoints; computing the actual corner-angle deviation from
-    /// keypoints is non-trivial enough that getting it subtly wrong
-    /// would be worse than skipping it for now. The classifier's
-    /// `.detector`-on-raise arm still triggers a full re-inference
-    /// when the user widens the tolerance; the `.filter`-on-lower
-    /// arm passes the surviving boxes through unchanged. Re-smoke
-    /// after this lands; tighten the predicate if it matters in
-    /// practice. (TODO M4 polish.)
+    /// Confidence is deliberately **not** filtered: Vision rectangles
+    /// have no probabilistic confidence (`capabilities.confidence ==
+    /// .none`), so there is no honest floor to apply (M5).
     public static func transform(
         for settings: VisionRectanglesSettings
     ) -> @Sendable ([Detection]) -> [Detection] {
@@ -521,13 +551,13 @@ public struct VisionRectanglesDetector: TunableDetector {
     static func predicate(
         for settings: VisionRectanglesSettings
     ) -> @Sendable (Detection) -> Bool {
-        let minConfidence = settings.minimumConfidence
         let minAR = settings.minimumAspectRatio
         let maxAR = settings.maximumAspectRatio
         let minSize = settings.minimumSize
+        let quadPredicate = quadratureAnglePredicate(
+            toleranceDegrees: settings.quadratureToleranceDegrees
+        )
         return { detection in
-            guard detection.confidence >= minConfidence else { return false }
-
             let w = abs(detection.boundingBox.width)
             let h = abs(detection.boundingBox.height)
             guard w > 0, h > 0 else { return false }
@@ -544,8 +574,101 @@ public struct VisionRectanglesDetector: TunableDetector {
             // in normalized [0,1]² that's just `min(w,h)`.
             guard Float(shortSide) >= minSize else { return false }
 
+            // Quadrature: reject shapes whose corners are too skewed.
+            guard quadPredicate(detection) else { return false }
+
             return true
         }
+    }
+
+    // MARK: - Quadrature corner-angle filter
+
+    /// A per-`Detection` predicate that keeps a rectangle only if all
+    /// four of its corner angles are within `toleranceDegrees` of 90°.
+    ///
+    /// **Why keypoints, not the bounding box.** The axis-aligned
+    /// `boundingBox` is always a perfect rectangle — it carries no skew
+    /// information. The *oriented* quadrilateral lives in the four corner
+    /// keypoints (`topLeft`, `topRight`, `bottomRight`, `bottomLeft`, in
+    /// that documented order), which Vision returns and `detect(in:)`
+    /// preserves. The interior angle at each corner is the angle between
+    /// the two edges meeting there; a deviation from 90° measures how far
+    /// the shape departs from a true rectangle.
+    ///
+    /// **Detections without four keypoints pass through.** A detection
+    /// that doesn't carry the four corners (a non-Vision detection routed
+    /// through the same transform, or a malformed one) can't be measured,
+    /// so the filter abstains rather than dropping it — narrowing only
+    /// what it can actually judge.
+    ///
+    /// Pure function of the corner geometry; pulled out so tests can
+    /// exercise the angle math directly with synthetic keypoints, without
+    /// invoking Vision.
+    static func quadratureAnglePredicate(
+        toleranceDegrees: Float
+    ) -> @Sendable (Detection) -> Bool {
+        let tolerance = Double(toleranceDegrees)
+        return { detection in
+            guard let kps = detection.keypoints, kps.count == 4 else {
+                // Not a measurable quad — abstain (keep it).
+                return true
+            }
+            let corners = kps.map(\.position)
+            let maxDeviation = maximumCornerAngleDeviation(corners: corners)
+            // A degenerate quad (zero-length edge) yields `nil` — treat
+            // as "can't judge", keep it, consistent with the abstain rule.
+            guard let maxDeviation else { return true }
+            return maxDeviation <= tolerance
+        }
+    }
+
+    /// Maximum deviation (in degrees) of any of the four interior corner
+    /// angles from 90°, for a quadrilateral given as four points in
+    /// cyclic order. Returns `nil` if any edge is degenerate (zero
+    /// length), where an angle is undefined.
+    ///
+    /// For corner `i`, the interior angle is the angle between the edge to
+    /// the previous corner (`i-1`) and the edge to the next corner
+    /// (`i+1`), taken cyclically over the four points.
+    static func maximumCornerAngleDeviation(corners: [CGPoint]) -> Double? {
+        guard corners.count == 4 else { return nil }
+        var maxDeviation = 0.0
+        for i in 0..<4 {
+            let prev = corners[(i + 3) % 4]  // i - 1 (mod 4)
+            let curr = corners[i]
+            let next = corners[(i + 1) % 4]
+            guard let angle = interiorAngleDegrees(prev: prev, vertex: curr, next: next) else {
+                return nil
+            }
+            maxDeviation = max(maxDeviation, abs(angle - 90.0))
+        }
+        return maxDeviation
+    }
+
+    /// Interior angle (in degrees, 0…180) at `vertex`, between the rays
+    /// `vertex → prev` and `vertex → next`. `nil` if either ray is
+    /// degenerate (zero length). Uses `atan2` on the cross/dot of the two
+    /// edge vectors, which is numerically stable across the full range
+    /// and avoids `acos` domain blow-ups near 0°/180°.
+    static func interiorAngleDegrees(
+        prev: CGPoint,
+        vertex: CGPoint,
+        next: CGPoint
+    ) -> Double? {
+        let ax = Double(prev.x - vertex.x)
+        let ay = Double(prev.y - vertex.y)
+        let bx = Double(next.x - vertex.x)
+        let by = Double(next.y - vertex.y)
+
+        let magA = (ax * ax + ay * ay).squareRoot()
+        let magB = (bx * bx + by * by).squareRoot()
+        guard magA > 0, magB > 0 else { return nil }
+
+        let dot = ax * bx + ay * by
+        let cross = ax * by - ay * bx
+        // atan2(|cross|, dot) gives the unsigned angle in [0, π].
+        let radians = atan2(abs(cross), dot)
+        return radians * 180.0 / Double.pi
     }
 
     /// Convenience: the transform built from this instance's current

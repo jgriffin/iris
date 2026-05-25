@@ -17,15 +17,15 @@ func visionRectanglesSchemaEnumeratesEveryKnownKnob() {
     let keys = Set(schema.knobs.map(\.key))
 
     // Every Vision knob currently surfaced through the schema. `label`
-    // is intentionally excluded — `SettingKind` has no string variant
-    // yet (see `VisionRectanglesSettings.schema` doc comment).
+    // is intentionally excluded (no UI surfaces it). `minimumConfidence`
+    // is gone — M5 deleted it (Vision rectangles have no probabilistic
+    // confidence).
     let expected: Set<String> = [
         "minimumAspectRatio",
         "maximumAspectRatio",
         "minimumSize",
         "maximumObservations",
         "quadratureToleranceDegrees",
-        "minimumConfidence",
     ]
 
     #expect(keys == expected, "Schema knobs drifted from settings: \(keys) vs \(expected)")
@@ -73,12 +73,6 @@ func visionRectanglesSchemaDefaultsMatchSettingsDefaults() {
                 continue
             }
             #expect(d == defaults.quadratureToleranceDegrees)
-        case "minimumConfidence":
-            guard case .float(_, _, let d) = knob.kind else {
-                Issue.record("minimumConfidence should be .float")
-                continue
-            }
-            #expect(d == defaults.minimumConfidence)
         default:
             Issue.record("Unexpected knob key: \(knob.key)")
         }
@@ -86,17 +80,26 @@ func visionRectanglesSchemaDefaultsMatchSettingsDefaults() {
 }
 
 @Test
-func visionRectanglesSchemaTiersDefaultToWorstCaseDetector() {
-    // Per `plans/features/M4.md`: the schema's static tier is the
-    // *worst-case* — the channel must assume detector-tier when it
-    // can't ask the detector. Every Vision knob that touches the
-    // model parameter set should be `.detector` in the schema; the
-    // per-transition classifier may downgrade to `.filter` later.
+func visionRectanglesSchemaTiersAreWorstCasePerKnob() {
+    // The schema's static tier is the *worst-case* — the channel must
+    // assume it when it can't ask the detector. The four Vision
+    // *request*-parameter knobs are `.detector` (widening them needs
+    // re-inference). `quadratureToleranceDegrees` is the exception:
+    // M5 made it a pure post-hoc corner-angle filter (Vision is queried
+    // at a fixed permissive tolerance), so its worst case is `.filter`
+    // — it never needs re-inference in either direction.
+    let expectedTiers: [String: ChangeTier] = [
+        "minimumAspectRatio": .detector,
+        "maximumAspectRatio": .detector,
+        "minimumSize": .detector,
+        "maximumObservations": .detector,
+        "quadratureToleranceDegrees": .filter,
+    ]
     let schema = VisionRectanglesSettings.schema
     for knob in schema.knobs {
         #expect(
-            knob.tier == .detector,
-            "Knob \(knob.key) should default to .detector (worst-case); got \(knob.tier)"
+            knob.tier == expectedTiers[knob.key],
+            "Knob \(knob.key) tier \(knob.tier) != expected \(String(describing: expectedTiers[knob.key]))"
         )
     }
 }
@@ -113,7 +116,6 @@ func defaultSettingsMatchPreM4DetectorDefaults() {
     #expect(s.minimumSize == 0.2)
     #expect(s.maximumObservations == 0)
     #expect(s.quadratureToleranceDegrees == 30.0)
-    #expect(s.minimumConfidence == 0.0)
     #expect(s.label == "rectangle")
 }
 

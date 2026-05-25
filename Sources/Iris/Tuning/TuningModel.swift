@@ -290,9 +290,9 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
             // current detector in place — the cache invalidation
             // still runs, so the next inference produces fresh
             // entries; the *settings*-as-source-of-truth shape
-            // means the detector's `settings.minimumConfidence`
-            // computed forward isn't picked up until rebuild, but
-            // safer than ignoring the tier verdict entirely.
+            // means the detector's settings computed forward aren't
+            // picked up until rebuild, but safer than ignoring the
+            // tier verdict entirely.
             // Detector-tier rebuild implicitly "starts fresh" — the
             // newly-built detector hasn't yielded any transform
             // context yet, so the prior projection (which was
@@ -340,7 +340,7 @@ public final class TuningModel<Detector: TunableDetector>: TuningRouter {
     /// `update(_:to:)` instead of mutating `settings` directly.
     ///
     /// **Why a helper, not a direct `Bindable`-style projection.** SwiftUI's
-    /// `$model.settings.minimumConfidence` would write to the property
+    /// `$model.settings.minimumAspectRatio` would write to the property
     /// in place, *bypassing* the tier classifier — which means a
     /// `.detector`-tier change would silently leave the cache stale.
     /// Forcing writes through `update(_:to:)` keeps the tier verdict +

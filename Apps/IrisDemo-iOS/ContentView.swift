@@ -98,13 +98,13 @@ struct CaptureContentView: View {
             session = new
 
             // Vision default `maximumAspectRatio` of 0.5 only accepts narrow
-            // rects (Phase 3 footgun). 1.0 accepts squares too;
-            // `minimumConfidence: 0.5` filters out the noisy long-tail.
+            // rects (Phase 3 footgun). 1.0 accepts squares too. (M5 removed
+            // the `minimumConfidence` knob — Vision rectangles carry no
+            // probabilistic confidence, so it filtered nothing.)
             let detector = VisionRectanglesDetector(
                 minimumAspectRatio: 0.3,
                 maximumAspectRatio: 1.0,
                 minimumSize: 0.1,
-                minimumConfidence: 0.7,
                 label: "rect"
             )
 
@@ -501,7 +501,6 @@ struct PlaybackContentView: View {
             minimumAspectRatio: 0.3,
             maximumAspectRatio: 1.0,
             minimumSize: 0.1,
-            minimumConfidence: 0.7,
             label: "rect"
         )
         let pipeline = DetectorPipeline(initialDetector)

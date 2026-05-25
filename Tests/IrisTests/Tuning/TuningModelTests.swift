@@ -15,6 +15,11 @@ import Testing
 // Detector instance is a real `VisionRectanglesDetector` — its
 // classifier table is the load-bearing piece exercised end-to-end
 // here (the per-tier matrix is in `VisionRectanglesClassifierTests`).
+//
+// M5 deleted the `minimumConfidence` knob (Vision rectangles have no
+// probabilistic confidence). These tests now drive `minimumAspectRatio`
+// (filter on raise / detector on lower) and `quadratureToleranceDegrees`
+// (the M5 post-hoc corner-angle filter, filter-tier both ways).
 
 // MARK: - update mutates settings
 
@@ -22,27 +27,27 @@ import Testing
 @MainActor
 func updateMutatesSettingsViaKeyPath() {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.2)
     )
     let model = TuningModel(detector: detector)
 
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.minimumAspectRatio, to: 0.6)
 
-    #expect(model.settings.minimumConfidence == 0.6)
+    #expect(model.settings.minimumAspectRatio == 0.6)
 }
 
 @Test
 @MainActor
 func updateEmitsLastChangeWithKeyAndPayload() throws {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.2)
     )
     let model = TuningModel(detector: detector)
 
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.minimumAspectRatio, to: 0.6)
 
     let change = try #require(model.lastChange)
-    #expect(change.key == "minimumConfidence")
+    #expect(change.key == "minimumAspectRatio")
     #expect(change.oldValue == .float(0.2))
     #expect(change.newValue == .float(0.6))
 }
@@ -51,12 +56,12 @@ func updateEmitsLastChangeWithKeyAndPayload() throws {
 @MainActor
 func updatePublishesApplyTierFromClassifier() {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.2)
     )
     let model = TuningModel(detector: detector)
 
-    // Raising minimumConfidence is filter-tier per the classifier table.
-    model.update(\.minimumConfidence, to: 0.6)
+    // Raising minimumAspectRatio narrows the window → filter-tier.
+    model.update(\.minimumAspectRatio, to: 0.6)
     #expect(model.lastApplyTier == .filter)
 }
 
@@ -64,23 +69,21 @@ func updatePublishesApplyTierFromClassifier() {
 @MainActor
 func updateDetectorTierSwapsDetector() throws {
     let initial = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.6)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.6)
     )
     let model = TuningModel(detector: initial)
     let priorRef = model.detector
 
-    // Lowering minimumConfidence is detector-tier — the classifier
-    // returns a rebuilt detector and the model swaps the reference.
-    model.update(\.minimumConfidence, to: 0.2)
+    // Lowering minimumAspectRatio widens the window → detector-tier; the
+    // classifier returns a rebuilt detector and the model swaps the ref.
+    model.update(\.minimumAspectRatio, to: 0.2)
 
     #expect(model.lastApplyTier == .detector)
-    // The reference itself changed (struct-copy semantics — the new
-    // value is a distinct instance with the post-change settings).
     let swapped = try #require(model.detector)
-    #expect(swapped.settings.minimumConfidence == 0.2)
+    #expect(swapped.settings.minimumAspectRatio == 0.2)
     // priorRef's settings still reflect the pre-change snapshot —
     // detectors are immutable post-construction.
-    #expect(priorRef?.settings.minimumConfidence == 0.6)
+    #expect(priorRef?.settings.minimumAspectRatio == 0.6)
 }
 
 // MARK: - No-op short-circuit
@@ -89,16 +92,16 @@ func updateDetectorTierSwapsDetector() throws {
 @MainActor
 func updateWithIdenticalValueIsNoOp() {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.4)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.4)
     )
     let model = TuningModel(detector: detector)
 
     // First update establishes a baseline `lastChange`.
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.minimumAspectRatio, to: 0.6)
     let baseline = model.lastChange
 
     // Identical write should not re-publish.
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.minimumAspectRatio, to: 0.6)
     #expect(model.lastChange?.newValue == baseline?.newValue)
     #expect(model.lastChange?.oldValue == baseline?.oldValue)
 }
@@ -124,18 +127,17 @@ func transformSlotIsAssignableAndReadable() {
 @Test
 @MainActor
 func filterTierUpdatePopulatesTransform() {
-    // The M4 fix: every filter-tier `update` installs the
-    // detector-supplied projection into `model.transform` so the
-    // overlay / pipeline pick up the new settings without the
-    // consumer having to wire a per-knob predicate.
+    // Every filter-tier `update` installs the detector-supplied
+    // projection into `model.transform` so the overlay / pipeline pick
+    // up the new settings without the consumer wiring a per-knob
+    // predicate. Quadrature is filter-tier in both directions (M5).
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(quadratureToleranceDegrees: 30.0)
     )
     let model = TuningModel(detector: detector)
     #expect(model.transform == nil)
 
-    // Raising minimumConfidence is filter-tier per the classifier.
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.quadratureToleranceDegrees, to: 10.0)
 
     #expect(model.lastApplyTier == .filter)
     #expect(model.transform != nil)
@@ -144,54 +146,54 @@ func filterTierUpdatePopulatesTransform() {
 @Test
 @MainActor
 func filterTierTransformReflectsCurrentSettings() throws {
-    // The installed transform should behave like the post-change
-    // settings — a detection that no longer passes the new floor
-    // should be dropped on the next overlay tick.
+    // The installed transform behaves like the post-change settings — a
+    // skewed quad that no longer passes the tightened quadrature
+    // tolerance is dropped on the next overlay tick.
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(
+            minimumAspectRatio: 0.0,
+            maximumAspectRatio: 1.0,
+            minimumSize: 0.0,
+            quadratureToleranceDegrees: 30.0
+        )
     )
     let model = TuningModel(detector: detector)
-    model.update(\.minimumConfidence, to: 0.6)
+    model.update(\.quadratureToleranceDegrees, to: 3.0)
 
-    // 2:1 box → short/long = 0.5 → passes the default aspect-ratio
-    // window [0.5, 0.5] and the default minimumSize (0.2). Leaves
-    // confidence as the only knob in play.
-    let lowConf = Detection(
-        boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.2),
-        label: "rectangle",
-        confidence: 0.4,
-        sourceModelID: "vision.rectangles"
-    )
-    let hiConf = Detection(
-        boundingBox: CGRect(x: 0.4, y: 0.4, width: 0.4, height: 0.2),
-        label: "rectangle",
-        confidence: 0.9,
-        sourceModelID: "vision.rectangles"
-    )
+    // A near-perfect square (all corners 90°) survives; a sheared quad
+    // (corners well off 90°) is dropped.
+    let square = makeRect(corners: [
+        CGPoint(x: 0.2, y: 0.8), CGPoint(x: 0.8, y: 0.8),
+        CGPoint(x: 0.8, y: 0.2), CGPoint(x: 0.2, y: 0.2),
+    ])
+    let skewed = makeRect(corners: [
+        CGPoint(x: 0.4, y: 0.8), CGPoint(x: 1.0, y: 0.8),
+        CGPoint(x: 0.8, y: 0.2), CGPoint(x: 0.2, y: 0.2),
+    ])
 
     let installed = try #require(model.transform)
-    let projected = installed([lowConf, hiConf])
-    #expect(projected.map(\.confidence) == [0.9])
+    let projected = installed([square, skewed])
+    #expect(projected.count == 1)
+    #expect(projected.first == square)
 }
 
 @Test
 @MainActor
 func detectorTierUpdateClearsTransform() {
     // Detector-tier rebuild implicitly "starts fresh" — the rebuilt
-    // detector hasn't yielded any transform context yet, so the
-    // prior projection (derived from pre-rebuild settings) is
-    // cleared.
+    // detector hasn't yielded any transform context yet, so the prior
+    // projection (derived from pre-rebuild settings) is cleared.
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.6)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.6)
     )
     let model = TuningModel(detector: detector)
 
-    // First, install a transform via a filter-tier change.
-    model.update(\.minimumConfidence, to: 0.8)
+    // First, install a transform via a filter-tier change (raise = filter).
+    model.update(\.minimumAspectRatio, to: 0.8)
     #expect(model.transform != nil)
 
-    // Then a detector-tier change should clear it.
-    model.update(\.minimumConfidence, to: 0.1)
+    // Then a detector-tier change (lower = detector) clears it.
+    model.update(\.minimumAspectRatio, to: 0.1)
     #expect(model.lastApplyTier == .detector)
     #expect(model.transform == nil)
 }
@@ -202,7 +204,7 @@ func detectorTierUpdateClearsTransform() {
 @MainActor
 func currentDetectorErasesToAnyDetector() {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.3)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.3)
     )
     let model = TuningModel(detector: detector)
 
@@ -217,7 +219,7 @@ func currentDetectorErasesToAnyDetector() {
 @MainActor
 func settingsOnlyInitOmitsDetector() {
     let model = TuningModel<VisionRectanglesDetector>(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.3)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.3)
     )
 
     #expect(model.detector == nil)
@@ -225,7 +227,32 @@ func settingsOnlyInitOmitsDetector() {
 
     // Updating still mutates settings — there's just no classifier to
     // dispatch through, so `lastApplyTier` stays nil.
-    model.update(\.minimumConfidence, to: 0.7)
-    #expect(model.settings.minimumConfidence == 0.7)
+    model.update(\.minimumAspectRatio, to: 0.7)
+    #expect(model.settings.minimumAspectRatio == 0.7)
     #expect(model.lastApplyTier == nil)
+}
+
+// MARK: - Helpers
+
+/// Build a rectangle `Detection` with `corners` as keypoints in
+/// `topLeft, topRight, bottomRight, bottomLeft` order and a bounding box
+/// equal to their axis-aligned hull.
+private func makeRect(corners: [CGPoint]) -> Detection {
+    let xs = corners.map(\.x)
+    let ys = corners.map(\.y)
+    let minX = xs.min() ?? 0
+    let maxX = xs.max() ?? 0
+    let minY = ys.min() ?? 0
+    let maxY = ys.max() ?? 0
+    let names = ["topLeft", "topRight", "bottomRight", "bottomLeft"]
+    let kps = zip(names, corners).map {
+        Detection.Keypoint(name: $0.0, position: $0.1, confidence: 1.0)
+    }
+    return Detection(
+        boundingBox: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY),
+        label: "rectangle",
+        confidence: 1.0,
+        keypoints: kps,
+        sourceModelID: "vision.rectangles"
+    )
 }

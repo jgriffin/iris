@@ -268,9 +268,9 @@ public enum ApplyResult: Sendable {
     /// **Why the detector carries the transform.** The projection from
     /// settings to "which cached detections should still be visible"
     /// is detector-family specific — only the conformer knows which
-    /// knobs map to which predicates (e.g. Vision's
-    /// `minimumConfidence` is a confidence floor; another detector
-    /// might project the same knob differently). Returning the
+    /// knobs map to which predicates (e.g. Vision rectangles project
+    /// `quadratureToleranceDegrees` to a corner-angle filter; another
+    /// detector might project a confidence floor). Returning the
     /// transform here lets `TuningModel` install it directly into the
     /// pipeline / overlay filter slot, so filter-tier slider changes
     /// take effect on the next frame / draw without the consumer

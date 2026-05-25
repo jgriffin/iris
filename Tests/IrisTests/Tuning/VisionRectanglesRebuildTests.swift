@@ -9,14 +9,14 @@ import Testing
 // `settings` reflect the post-change value. Pins the Phase 1
 // `TODO M4 Phase 2:` placeholder replacements as locked behavior.
 
-// MARK: - minimumConfidence (lower-bound → .detector on lower)
+// MARK: - minimumAspectRatio (lower-bound → .detector on lower)
 
 @Test
-func minimumConfidenceLowerReturnsRebuiltDetectorWithNewSettings() throws {
+func minimumAspectRatioLowerReturnsRebuiltDetectorWithNewSettings() throws {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.6)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.6)
     )
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.6, to: 0.2)
+    let change = SettingChange.float(key: "minimumAspectRatio", from: 0.6, to: 0.2)
 
     let result = detector.apply(change)
     guard case .detector(let rebuilt) = result else {
@@ -24,9 +24,9 @@ func minimumConfidenceLowerReturnsRebuiltDetectorWithNewSettings() throws {
         return
     }
     let cast = try #require(rebuilt as? VisionRectanglesDetector)
-    #expect(cast.settings.minimumConfidence == 0.2)
+    #expect(cast.settings.minimumAspectRatio == 0.2)
     // Other knobs preserved from the original.
-    #expect(cast.settings.minimumAspectRatio == detector.settings.minimumAspectRatio)
+    #expect(cast.settings.minimumSize == detector.settings.minimumSize)
     #expect(cast.settings.label == detector.settings.label)
 }
 
@@ -48,10 +48,14 @@ func maximumAspectRatioRaiseReturnsRebuiltDetectorWithNewSettings() throws {
     #expect(cast.settings.maximumAspectRatio == 0.9)
 }
 
-// MARK: - quadratureToleranceDegrees (upper-bound → .detector on raise)
+// MARK: - quadratureToleranceDegrees (M5: filter-tier — NOT a rebuild)
 
 @Test
-func quadratureToleranceRaiseReturnsRebuiltDetectorWithNewSettings() throws {
+func quadratureToleranceRaiseDoesNotProduceRebuiltDetector() {
+    // M5: `quadratureToleranceDegrees` became a pure post-hoc filter, so
+    // even *raising* it (previously a detector-tier cache-dump) is now
+    // filter-tier with no rebuilt detector. This is the core asymmetry
+    // M5 fixes.
     let detector = VisionRectanglesDetector(
         settings: VisionRectanglesSettings(quadratureToleranceDegrees: 20.0)
     )
@@ -62,12 +66,10 @@ func quadratureToleranceRaiseReturnsRebuiltDetectorWithNewSettings() throws {
     )
 
     let result = detector.apply(change)
-    guard case .detector(let rebuilt) = result else {
-        Issue.record("Expected .detector verdict, got \(result)")
-        return
+    if case .detector = result {
+        Issue.record("Quadrature raise must not rebuild the detector: \(result)")
     }
-    let cast = try #require(rebuilt as? VisionRectanglesDetector)
-    #expect(cast.settings.quadratureToleranceDegrees == 40.0)
+    #expect(result.tier == .filter)
 }
 
 // MARK: - minimumSize (lower-bound → .detector on lower)
@@ -127,11 +129,11 @@ func maximumObservationsToUnlimitedReturnsRebuiltDetectorWithNewSettings() throw
 // MARK: - Filter arms do not produce a rebuilt detector
 
 @Test
-func minimumConfidenceRaiseDoesNotProduceRebuiltDetector() {
+func minimumAspectRatioRaiseDoesNotProduceRebuiltDetector() {
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(minimumAspectRatio: 0.2)
     )
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.2, to: 0.6)
+    let change = SettingChange.float(key: "minimumAspectRatio", from: 0.2, to: 0.6)
 
     let result = detector.apply(change)
     if case .detector = result {

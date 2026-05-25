@@ -18,7 +18,7 @@ import SwiftUI
 ///
 /// **Binding routing.** Every primitive is constructed via the
 /// model's `binding(_:)` helper. This is load-bearing — writes
-/// through `Binding($model.settings.minimumConfidence)` would
+/// through `Binding($model.settings.minimumAspectRatio)` would
 /// bypass the tier classifier and silently leave the cache stale on
 /// `.detector`-tier changes. The helper routes every write through
 /// `TuningModel.update(_:to:)`, which runs the classifier and
@@ -26,11 +26,12 @@ import SwiftUI
 ///
 /// **Int / Float adaptation.** `maximumObservations` is an `Int`
 /// knob; SwiftUI's `Stepper` binds to `Int` directly, so no
-/// adapter is needed. The other six knobs are `Float`. The
-/// `label` property is intentionally *not* surfaced — the schema
-/// omits it (no `.string` `SettingKind` variant yet), and a
-/// tuning UI for a cosmetic detector label adds little smoke-test
-/// value. Re-introduce when `SettingKind.string` lands.
+/// adapter is needed. The other knobs are `Float`. The `label`
+/// property is intentionally *not* surfaced — the schema omits it
+/// and a tuning UI for a cosmetic detector label adds little
+/// smoke-test value. There is no confidence slider: Vision
+/// rectangles have no probabilistic confidence (M5), so the knob
+/// was deleted.
 @MainActor
 public struct VisionRectanglesTuningView: View {
 
@@ -46,15 +47,11 @@ public struct VisionRectanglesTuningView: View {
 
     public var body: some View {
         Form {
-            Section("Confidence") {
-                TuningSlider(
-                    label: "Minimum confidence",
-                    value: model.binding(\.minimumConfidence),
-                    range: 0...1,
-                    step: 0.01
-                )
-            }
-
+            // No "Confidence" section: Vision rectangles carry no
+            // probabilistic confidence (`capabilities.confidence ==
+            // .none`), so there is no honest slider to show — the knob
+            // M5 deleted. (Wave 2 derives this section's presence/absence
+            // from the capability descriptor generically.)
             Section("Geometry") {
                 TuningSlider(
                     label: "Minimum aspect ratio",
@@ -126,8 +123,7 @@ public struct VisionRectanglesTuningView: View {
                     maximumAspectRatio: 1.0,
                     minimumSize: 0.05,
                     maximumObservations: 20,
-                    quadratureToleranceDegrees: 35.0,
-                    minimumConfidence: 0.7
+                    quadratureToleranceDegrees: 35.0
                 )
             )
         )

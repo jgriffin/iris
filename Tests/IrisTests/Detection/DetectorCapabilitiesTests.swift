@@ -68,10 +68,13 @@ func rectanglesTunableKnobsReuseTheSettingsSchema() {
     #expect(descriptorKeys == schemaKeys)
 }
 
-// NOTE: `rectanglesTunableKnobsExcludeConfidence` (asserting
-// `minimumConfidence` is gone from the knob set) lands with the
-// rectangles rework commit, where the schema edit that removes the
-// knob makes it true. Adding it here would fail until that lands.
+@Test
+func rectanglesTunableKnobsExcludeConfidence() {
+    // M5's deletion: `minimumConfidence` is the knob the milestone
+    // exists to remove. It must not appear in the capability knob set.
+    let keys = rectangles.capabilities.tunableKnobs.knobs.map(\.key)
+    #expect(!keys.contains("minimumConfidence"))
+}
 
 // MARK: - Introspectable fields
 

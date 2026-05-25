@@ -18,39 +18,6 @@ import Testing
 
 private let baseline = VisionRectanglesDetector()
 
-// MARK: - minimumConfidence
-
-@Test
-func minimumConfidenceRaiseIsFilter() {
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.2, to: 0.6)
-    #expect(baseline.apply(change).tier == .filter)
-}
-
-@Test
-func minimumConfidenceLowerIsDetector() {
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.6, to: 0.2)
-    #expect(baseline.apply(change).tier == .detector)
-}
-
-@Test
-func minimumConfidenceNoOpIsView() {
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.4, to: 0.4)
-    #expect(baseline.apply(change).tier == .view)
-}
-
-@Test
-func minimumConfidenceTypeIncompatibleFallsBackToDetector() {
-    // Caller mis-built the change payload (e.g. passed an int into a
-    // float knob). Worst-case fallback per `plans/features/M4.md`:
-    // assume detector-tier so we never silently miss a re-inference.
-    let change = SettingChange(
-        key: "minimumConfidence",
-        oldValue: .int(0),
-        newValue: .int(1)
-    )
-    #expect(baseline.apply(change).tier == .detector)
-}
-
 // MARK: - minimumAspectRatio (lower-bound)
 
 @Test
@@ -131,14 +98,18 @@ func minimumSizeNoOpIsView() {
     #expect(baseline.apply(change).tier == .view)
 }
 
-// MARK: - quadratureToleranceDegrees (upper-bound — inverted)
+// MARK: - quadratureToleranceDegrees (M5: pure post-hoc filter, symmetric)
 
 @Test
-func quadratureToleranceDegreesRaiseIsDetector() {
+func quadratureToleranceDegreesRaiseIsFilter() {
+    // M5: a post-hoc corner-angle filter, not a Vision request param.
+    // Vision is queried permissive, so loosening just re-runs the angle
+    // predicate over the already-cached corners — filter-tier, no
+    // re-inference (the asymmetry M5 fixes: this used to be detector).
     let change = SettingChange.float(
         key: "quadratureToleranceDegrees", from: 15.0, to: 30.0
     )
-    #expect(baseline.apply(change).tier == .detector)
+    #expect(baseline.apply(change).tier == .filter)
 }
 
 @Test
@@ -286,16 +257,18 @@ private func tierRank(_ tier: ChangeTier) -> Int {
 // MARK: - Filter-tier transform behavior
 
 @Test
-func filterTierVerdictCarriesProjectionMatchingNewSettings() throws {
-    // M4 fix: every `.filter` verdict carries a transform that
-    // projects the detector's *post-change* settings onto a cached
-    // `[Detection]`. Construct a detection that just barely passes
-    // the old floor (0.4) and fails the new one (0.6); the
-    // transform must drop it.
+func filterTierVerdictCarriesQuadratureProjectionMatchingNewSettings() throws {
+    // M5: every `.filter` verdict carries a transform that projects the
+    // detector's *post-change* settings onto a cached `[Detection]`. For
+    // the quadrature knob, that means re-running the corner-angle filter
+    // at the new tolerance. Tighten 30° → 5°: a square passes; a 70°/110°
+    // skewed quad (20° corner deviation) is now dropped.
     let detector = VisionRectanglesDetector(
-        settings: VisionRectanglesSettings(minimumConfidence: 0.2)
+        settings: VisionRectanglesSettings(quadratureToleranceDegrees: 30.0)
     )
-    let change = SettingChange.float(key: "minimumConfidence", from: 0.2, to: 0.6)
+    let change = SettingChange.float(
+        key: "quadratureToleranceDegrees", from: 30.0, to: 5.0
+    )
 
     let result = detector.apply(change)
     guard case .filter(let transform) = result else {
@@ -303,25 +276,59 @@ func filterTierVerdictCarriesProjectionMatchingNewSettings() throws {
         return
     }
 
-    // Use a 2:1 box (short/long = 0.5) so it passes the default
-    // aspect-ratio window [0.5, 0.5] and the default minimumSize
-    // (0.2) — leaving confidence as the only knob in play for this
-    // test.
-    let lowConf = Detection(
-        boundingBox: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.2),
-        label: "rectangle",
-        confidence: 0.4,
-        sourceModelID: "vision.rectangles"
+    // A unit square, corners TL,TR,BR,BL (axes irrelevant to the angle
+    // math; all corners 90°). Aspect ratio 1.0 fails the default narrow
+    // [0.5,0.5] window, so widen this detector's window via the keypoint
+    // shape but keep the box square. To isolate the quadrature filter,
+    // build boxes that pass aspect/size: use a 2:1 box but supply corner
+    // keypoints describing the actual quad skew.
+    let square = makeRectDetection(
+        corners: [
+            CGPoint(x: 0.1, y: 0.3),  // TL
+            CGPoint(x: 0.5, y: 0.3),  // TR
+            CGPoint(x: 0.5, y: 0.1),  // BR
+            CGPoint(x: 0.1, y: 0.1),  // BL
+        ]
     )
-    let hiConf = Detection(
-        boundingBox: CGRect(x: 0.4, y: 0.4, width: 0.4, height: 0.2),
-        label: "rectangle",
-        confidence: 0.9,
-        sourceModelID: "vision.rectangles"
+    // Skew the bottom edge so the two bottom corners deviate ~20° from 90°.
+    let skewed = makeRectDetection(
+        corners: [
+            CGPoint(x: 0.1, y: 0.3),  // TL
+            CGPoint(x: 0.5, y: 0.3),  // TR
+            CGPoint(x: 0.5, y: 0.1),  // BR
+            CGPoint(x: 0.18, y: 0.1),  // BL shifted right, bottom edge slants
+        ]
     )
 
-    let projected = transform([lowConf, hiConf])
-    #expect(projected.map(\.confidence) == [0.9])
+    let projected = transform([square, skewed])
+    // Square survives the tight 5° tolerance; the skewed quad is dropped.
+    #expect(projected.count == 1)
+    #expect(projected.first == square)
+}
+
+/// Build a rectangle `Detection` whose bounding box is the axis-aligned
+/// hull of `corners` (so it passes the default aspect/size window when
+/// the corners describe a ~2:1 box) and whose keypoints carry the corners
+/// in `topLeft, topRight, bottomRight, bottomLeft` order. Confidence is a
+/// constant 1.0 — the honest Vision-rectangles value (M5).
+private func makeRectDetection(corners: [CGPoint]) -> Detection {
+    let xs = corners.map(\.x)
+    let ys = corners.map(\.y)
+    let minX = xs.min() ?? 0
+    let maxX = xs.max() ?? 0
+    let minY = ys.min() ?? 0
+    let maxY = ys.max() ?? 0
+    let names = ["topLeft", "topRight", "bottomRight", "bottomLeft"]
+    let kps = zip(names, corners).map {
+        Detection.Keypoint(name: $0.0, position: $0.1, confidence: 1.0)
+    }
+    return Detection(
+        boundingBox: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY),
+        label: "rectangle",
+        confidence: 1.0,
+        keypoints: kps,
+        sourceModelID: "vision.rectangles"
+    )
 }
 
 @Test
