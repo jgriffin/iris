@@ -2,7 +2,7 @@
 
 _A guided walk through the layers, the contracts that hold them together, and
 the wiring you should actually look at. Pointers are `path:line` — clickable in
-most editors. Snapshot: 2026-05-24 (M1–M4 done, M5 in flight)._
+most editors. Snapshot: 2026-05-25 (M1–M5 complete, through M5·P6)._
 
 > This is a **map for reading**, not a spec. For *why* things are the way they
 > are, see [`plans/DECISIONS.md`](../plans/DECISIONS.md); for *what's next*, see
@@ -156,7 +156,7 @@ flowchart LR
     end
     PIPE -->|"[Detection]"| STORE[("ResultStore\n@MainActor @Observable")]
     STORE -->|"lookup(at: displayTime)"| OVL["DetectionLayer\nCanvas @ 60Hz"]
-    CONV["NormalizedGeometryConverting\n(Preview / Player)"] --> OVL
+    CONV["NormalizedGeometryConverting\n(VideoGeometry / PreviewLayer)"] --> OVL
     TUNE["TuningModel\n(TuningRouter)"] -.->|"transform + detector swap"| PIPE
     TUNE -.->|"transform at draw time"| OVL
     classDef seam fill:#1f6feb22,stroke:#1f6feb;
@@ -209,13 +209,16 @@ ticks**.
 - type decl, `Source` + `@unchecked Sendable` (NSLock-guarded, *not* `@MainActor`,
   to avoid per-frame main hops) [`PlaybackSource.swift:72`](../Sources/Iris/Playback/PlaybackSource.swift)
 - stream uses `.bufferingNewest(3)` (vs capture's `1`) to preserve seek-emitted +
-  step frames [`PlaybackSource.swift:127`](../Sources/Iris/Playback/PlaybackSource.swift)
+  step frames [`PlaybackSource.swift:141`](../Sources/Iris/Playback/PlaybackSource.swift)
 - **`tick()`** — the per-frame pull: `copyPixelBuffer(forItemTime:)`, a
   monotonicity guard that drops already-emitted timestamps, then
-  `continuation.yield(frame)` [`PlaybackSource.swift:421`](../Sources/Iris/Playback/PlaybackSource.swift)
+  `continuation.yield(frame)`. A `.dropped` yield result bumps a cumulative
+  drop counter (the honest denominator §6's metrics read) [`PlaybackSource.swift:451`](../Sources/Iris/Playback/PlaybackSource.swift)
 - **`seek(to:)`** — frame-accurate (`.zero` tolerances), *does not change state*
   (paused stays paused), resets the monotonicity guard, emits one frame at the new
-  position [`PlaybackSource.swift:290`](../Sources/Iris/Playback/PlaybackSource.swift)
+  position. The paused re-emit reaches the live detect loop — a paused seek both
+  re-renders *and* yields a fresh detection (the M5·P5 catch-up guarantee, pinned
+  by `PlaybackSourcePausedCatchUpTests`) [`PlaybackSource.swift:320`](../Sources/Iris/Playback/PlaybackSource.swift)
 
 **What drives ticks** — `PlaybackTickDriver` protocol [`PlaybackTickDriver.swift:23`](../Sources/Iris/Playback/PlaybackTickDriver.swift), three implementations:
 
@@ -232,12 +235,12 @@ ticks**.
 - `PlaybackController` — `@MainActor @Observable`, conforms to `ScrubberModel`;
   a **sibling** to `PlaybackSource` (not a replacement) so the source stays off
   the main actor. Periodic time observer + KVO drive the observable state
-  [`PlaybackController.swift:39`](../Sources/Iris/Playback/PlaybackController.swift)
+  [`PlaybackController.swift:41`](../Sources/Iris/Playback/PlaybackController.swift)
 - `Scrubber<Model: ScrubberModel>` — generic SwiftUI slider; the track binding
   converts seconds ↔ `CMTime` and calls `model.seek(to:)` [`Scrubber.swift:28`](../Sources/Iris/Playback/Scrubber.swift)
 - `PlaybackView` — public entry; `AVPlayerLayer`-backed view (iOS `UIView` /
   macOS `NSView`), installs the `DisplayLinkTickDriver`, hands out the layer via
-  `onPlayerLayerReady` [`PlaybackView.swift:46`](../Sources/Iris/Playback/PlaybackView.swift)
+  `onPlayerLayerReady` [`PlaybackView.swift:50`](../Sources/Iris/Playback/PlaybackView.swift)
 
 **Seek → frame sequence** (the trickiest wiring):
 
@@ -298,9 +301,9 @@ Internals worth seeing:
 - `withThrowingTaskGroup` fan-out, **results re-ordered to input order** for
   deterministic output (matters for overlay flicker & sidecar diffs) [`:156`](../Sources/Iris/Detection/DetectorPipeline.swift)
 - tuning routing: if `tuning.currentDetector` is set, run *that* instead of the
-  array (hot-swap) [`:122`](../Sources/Iris/Detection/DetectorPipeline.swift)
+  array (hot-swap) [`:151`](../Sources/Iris/Detection/DetectorPipeline.swift)
 - output transform applied **after** cache hit *or* fresh inference, so filter
-  changes show through cached frames [`:142`](../Sources/Iris/Detection/DetectorPipeline.swift)
+  changes show through cached frames [`:145`](../Sources/Iris/Detection/DetectorPipeline.swift)
 - write-through caches **unfiltered** output [`:176`](../Sources/Iris/Detection/DetectorPipeline.swift)
 
 ### Caching
@@ -320,7 +323,7 @@ public struct DetectorCapabilities: Sendable, Hashable {
     public let geometryKinds: Set<GeometryKind>       // .box .quad .keypoints .mask …  [:86]
     public let confidence: ConfidenceSemantics        // the spine — see below           [:126]
     public let tunableKnobs: SettingSchema            // reuses the settings schema
-    public let introspectableFields: [IntrospectableField] // read by overlay (P3) + inspector (P4) [:181]
+    public let introspectableFields: [IntrospectableField] // read by overlay + DetectionInspector [:181]
 }
 ```
 
@@ -329,69 +332,127 @@ distinguishes a real probability from Vision's constant `1.0`:
 `.probabilistic` / `.perElement` / `.none` / `.derivedScalar(label:)`. This one
 type drives both what the overlay draws and what tuning UI appears (§8).
 
-### `VisionRectanglesDetector` — the worked example (biggest file, 681 lines)
+> **Self-describing detections.** As of M5, the inspector (§7) and overlay read
+> a detection's own fields — `skeleton`, `keypoints`, `readout` — not the
+> producing detector's capabilities. `Detection` now carries a `Skeleton`
+> (edge topology) and a `Readout` (the honest label-text the default formatter
+> appends, e.g. an aspect ratio or joint count) so the geometry it carries is
+> drawable and labelable without back-channeling to the detector. Locked in
+> DECISIONS ("Self-describing detections", 2026-05-25).
+
+### `VisionRectanglesDetector` — the worked example (biggest file, ~734 lines)
 
 [`Vision/VisionRectanglesDetector.swift:38`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift) — a stateless `struct` conforming to `TunableDetector`.
 
 - **Vision call site** — native `async` value-type API, no Obj-C bridge:
-  `DetectRectanglesRequest().perform(on:orientation:)` [`:208`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
+  `DetectRectanglesRequest().perform(on:orientation:)` [`:221`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
 - **quad mapping** — Vision's four corners → `Detection.keypoints` in the
   documented order `topLeft, topRight, bottomRight, bottomLeft` (downstream relies
   on this order) [`:235`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
-- declares `.box + .quad` geometry, `.none` confidence [`:115`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
+- declares `.quad + .box` geometry, `.none` confidence [`:117`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
 - **M5 quadrature rework** — Vision is queried at a *fixed permissive 45°*
   [`:195`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift); the
   tunable tolerance is a **pure post-hoc Swift filter** computed from corner
   angles, so the knob is symmetric (tighten/loosen both filter-tier, instant).
-  Predicate [`:607`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift), angle math via `atan2(|cross|,dot)` [`:653`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
-- `apply(_:)` (the tier classifier) [`:309`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift), `transform(for:)` (the filter projection, reused on fresh + cached) [`:518`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
+  Predicate [`:563`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift), angle math via `atan2(|cross|,dot)` [`:723`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
+- `apply(_:)` (the tier classifier) [`:320`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift), `transform(for:)` (the filter projection, reused on fresh + cached) [`:529`](../Sources/Iris/Detection/Vision/VisionRectanglesDetector.swift)
 
 - `MockDetector` — returns a fixed `[Detection]`; the detection-side twin of
   `MockSource` [`MockDetector.swift:9`](../Sources/Iris/Detection/MockDetector.swift)
 
-> **Newer than this snapshot:** as of `main @ 44827a1`, M5·P3/P4 have landed a
-> **body-pose detector** (a second concrete `Detector` — the pluggability seam
-> paying off), a **capability-honest skeleton overlay**, capability-honest
-> **numeric readouts** instead of fake percentages, and a **detection inspector
-> panel** (P4). These extend §6/§7 and aren't yet detailed here — see the
-> "second detector" note in §11.
+### `VisionBodyPoseDetector` — the second concrete detector (the seam paying off)
+
+[`Vision/VisionBodyPoseDetector.swift:39`](../Sources/Iris/Detection/Vision/VisionBodyPoseDetector.swift) — the second `TunableDetector`, added in M5·P3/P4. It exercises the pluggability seam with a non-rectangles model: no new pipeline, no new overlay path, it slots in by conforming.
+
+- declares `.keypoints` geometry + **`.perElement` confidence** — the honest
+  signal lives on each joint, not on the detection [`:73`/`:74`](../Sources/Iris/Detection/Vision/VisionBodyPoseDetector.swift)
+- `detect(in:)` maps Vision joints → `Detection.keypoints` and stamps the
+  canonical `Skeleton.humanBodyPose` topology so the overlay can stroke limbs
+  without joint knowledge [`:124`](../Sources/Iris/Detection/Vision/VisionBodyPoseDetector.swift); the topology constant [`:347`](../Sources/Iris/Detection/Vision/VisionBodyPoseDetector.swift)
+- **`minimumJointConfidence`** — the body-pose analogue of the quadrature filter:
+  a filter-tier per-joint threshold (default 0.3) that drops sub-threshold joints
+  and recomputes the envelope/mean/readout from survivors, so the slider retunes
+  instantly off cache with no re-inference [`apply(_:):204`](../Sources/Iris/Detection/Vision/VisionBodyPoseDetector.swift)
+
+`Skeleton` (edge topology) [`Skeleton.swift:6`](../Sources/Iris/Detection/Skeleton.swift) and `Readout` (the honest label-text fragment) [`Readout.swift:5`](../Sources/Iris/Detection/Readout.swift) are the two `Detection` fields that make a pose self-describing — see the callout above.
+
+### `DetectionMetrics` — the honest pipeline gauge
+
+[`DetectionMetrics.swift:35`](../Sources/Iris/Detection/DetectionMetrics.swift) — `@MainActor @Observable`. Iris sheds frames under load (best-effort, locked in DECISIONS), which makes strain invisible by construction; this instrument *measures* it without changing pipeline behavior.
+
+- `recordInference(seconds:)` — the single per-frame call site; feeds a rolling
+  window for `averageInferenceMillis` + `effectiveDetectionsPerSecond` [`:107`](../Sources/Iris/Detection/DetectionMetrics.swift)
+- **honest drop counting** — `setDropped(_:)` mirrors the source's cumulative
+  `.dropped`-yield counter rather than guessing; `dropRate` is derived, not
+  primary [`:133`/`:81`](../Sources/Iris/Detection/DetectionMetrics.swift)
+- `compactSummary` — the one-line HUD pill (`312 done · 0 drop · 28 ms`); raw
+  counts lead, the % is demoted [`:164`](../Sources/Iris/Detection/DetectionMetrics.swift)
+- `DetectionMetricsView` — the full-pane readout (Frames / Inference / Throughput),
+  raw `emitted · processed · dropped` leading, drop-% trailing small [`DetectionMetricsView.swift:19`](../Sources/Iris/Detection/DetectionMetricsView.swift)
 
 ---
 
 ## 7. Overlay layer — coordinate conversion + drawing
 
 The one invariant this layer owns: **normalized → view-space conversion happens
-once, behind a protocol.** No call site does the math itself.
+once, behind a protocol.** No call site does the math itself. As of M5·P6 there
+is a single authority for that math — `VideoGeometry` — and the protocol no
+longer threads an on-screen video rect through each call.
 
 ### The conversion seam
 
-`NormalizedGeometryConverting` [`NormalizedGeometryConverting.swift:31`](../Sources/Iris/Overlay/NormalizedGeometryConverting.swift):
+`NormalizedGeometryConverting` [`NormalizedGeometryConverting.swift:35`](../Sources/Iris/Overlay/NormalizedGeometryConverting.swift):
 
 ```swift
 public protocol NormalizedGeometryConverting: Sendable {
-    func viewRect(forNormalized rect: CGRect, in videoRect: CGRect) -> CGRect
-    func viewPoint(forNormalized point: CGPoint, in videoRect: CGRect) -> CGPoint
+    func viewRect(forNormalized rect: CGRect) -> CGRect
+    func viewPoint(forNormalized point: CGPoint) -> CGPoint
 }
 ```
+
+Note the absence of a `videoRect:` parameter — box geometry is resolved
+*before* a converter is built (each backend owns its own display box), so
+callers never thread an on-screen rect through each conversion call.
+
+**`VideoGeometry` is the single coordinate-mapping authority**
+[`VideoGeometry.swift:44`](../Sources/Iris/Overlay/VideoGeometry.swift) — a pure
+`Sendable` value type: `contentSize` + `containerSize` + `contentMode` →
+`displayRect` + Y-flip. It is the one place upright-normalized detection
+coordinates ("truth") are placed into the on-screen video box (aspect-fit
+letterbox/pillarbox or aspect-fill crop, centered) with the Y-flip applied.
+
+- `displayRect` — the aspect-fit/-fill placement math; the centered box the
+  content occupies [`:81`](../Sources/Iris/Overlay/VideoGeometry.swift)
+- `transform` — the single "place + Y-flip" affine matrix (`y = minY + (1 - u.y)·h`);
+  `viewRect`/`viewPoint` both go through it [`:115`](../Sources/Iris/Overlay/VideoGeometry.swift)
+
+**There is deliberately no rotation or mirroring here.** By the time anything
+reaches the overlay, frames and detections are already **upright** — capture
+rotates the buffer on the `AVCaptureConnection` and stamps `.up`, Vision is
+handed `frame.orientation`, the player displays upright. Orientation/mirroring
+are *source* concerns; re-applying them in the overlay would double-apply work
+done upstream. Locked in DECISIONS ("VideoGeometry = single coordinate-mapping
+authority; orientation/mirroring upstream", 2026-05-25). The earlier
+two-converter story — `PlayerLayerConverter` doing aspect-fit math independently,
+with the Y-flip living in its static helper — is **gone**: that type was retired
+and its math folded into `VideoGeometry`.
 
 Two backends, picked by source:
 
 | Converter | Used for | How | Pointer |
 | --- | --- | --- | --- |
-| `PreviewLayerConverter` | live capture (iOS) | delegates to AVF `layerRectConverted(fromMetadataOutputRect:)` — AVF handles letterbox + front-cam mirroring | [`PreviewLayerConverter.swift:33`](../Sources/Iris/Overlay/PreviewLayerConverter.swift) |
-| `PlayerLayerConverter` | playback | explicit aspect-fit math (AVPlayerLayer has no helper) | [`PlayerLayerConverter.swift:32`](../Sources/Iris/Overlay/PlayerLayerConverter.swift) |
-
-The Y-flip lives in `PlayerLayerConverter`'s static math: `1 - y - h` for rects,
-`1 - y` for points [`PlayerLayerConverter.swift:67`/`:79`](../Sources/Iris/Overlay/PlayerLayerConverter.swift).
+| `VideoGeometry` | playback (iOS + macOS) | the authority above: derives its own `displayRect` from `containerSize` + `contentSize`, applies the Y-flip — no AVF layer needed | [`VideoGeometry.swift:44`](../Sources/Iris/Overlay/VideoGeometry.swift) |
+| `PreviewLayerConverter` | live capture (iOS) | delegates to AVF `layerRectConverted(fromMetadataOutputRect:)` — AVF owns the live layer's `videoGravity` letterbox math + front-cam mirroring; ignores any externally-supplied size | [`PreviewLayerConverter.swift:33`](../Sources/Iris/Overlay/PreviewLayerConverter.swift) |
 
 ### The drawing view
 
-`DetectionLayer<Converter>` [`DetectionLayer.swift:39`](../Sources/Iris/Overlay/DetectionLayer.swift) — a `Canvas` inside a 60Hz `TimelineView(.animation)`, decoupled from detector cadence:
+`DetectionLayer` [`DetectionLayer.swift:41`](../Sources/Iris/Overlay/DetectionLayer.swift) — a `Canvas` inside a 60Hz `TimelineView(.animation)`, decoupled from detector cadence. It is **no longer generic over a converter type**: it takes a size-keyed `makeConverter: (CGSize) -> any NormalizedGeometryConverting` and wraps its body in a `GeometryReader` — the ONE place the SwiftUI container size is measured. Playback callers return a `VideoGeometry` built against `proxy.size`; capture callers ignore the size and return a `PreviewLayerConverter`.
 
-- body: `displayTimeSource()` → `store.lookup(at:)` → optional tuning transform →
-  draw each [`:110`](../Sources/Iris/Overlay/DetectionLayer.swift)
-- `draw(_:)` dispatch — if the detection carries the four named corners, stroke
-  the **real quad**; else the axis-aligned bbox [`:175`](../Sources/Iris/Overlay/DetectionLayer.swift), corner extraction [`:160`](../Sources/Iris/Overlay/DetectionLayer.swift)
+- body: `GeometryReader` → `makeConverter(proxy.size)` → `displayTimeSource()` →
+  `store.lookup(at:)` → optional tuning transform → draw each [`:110`](../Sources/Iris/Overlay/DetectionLayer.swift)
+- `draw(_:)` geometry dispatch — **skeleton → quad → box**: a detection carrying
+  a `skeleton` strokes connected joints; one carrying the four named corners
+  strokes the **real quad**; everything else is the axis-aligned bbox [`:214`](../Sources/Iris/Overlay/DetectionLayer.swift). Corner extraction [`quadCorners:161`](../Sources/Iris/Overlay/DetectionLayer.swift), skeleton edges [`skeletonSegments:186`](../Sources/Iris/Overlay/DetectionLayer.swift) — every point routed through the converter, never a re-derived Y-flip
 - `.drawingGroup()` (Metal) + `.allowsHitTesting(false)` (gestures pass through)
 
 `OverlayStyle` — per-label color, stroke width, label formatter (closures, all
@@ -399,20 +460,43 @@ The Y-flip lives in `PlayerLayerConverter`'s static math: `1 - y - h` for rects,
 
 ### `ResultStore` — the cache the overlay reads
 
-[`ResultStore.swift:30`](../Sources/Iris/Overlay/ResultStore.swift) — `@MainActor @Observable`, conforms to `DetectionCache`. Timestamps are quantized into buckets (default one 30fps frame).
+[`ResultStore.swift:32`](../Sources/Iris/Overlay/ResultStore.swift) — `@MainActor @Observable`, conforms to `DetectionCache`. Timestamps are quantized into buckets (default one 30fps frame).
 
 - **`lookup(at:stale:)`** — best-effort **nearest-neighbor** within a window of
   `min(2×quantization, staleness)`; returns `[]` if the detector has stalled.
   *No latency compensation* — overlays trail the subject by detection latency (a
   locked decision) [`:89`](../Sources/Iris/Overlay/ResultStore.swift)
-- live vs playback staleness thresholds (500ms vs 2s) are fields [`:30`](../Sources/Iris/Overlay/ResultStore.swift)
+- live vs playback staleness thresholds (500ms vs 2s) are fields [`:44`/`:50`](../Sources/Iris/Overlay/ResultStore.swift)
+
+### `DetectionInspector` — the render/cache bisector
+
+[`DetectionInspector.swift:32`](../Sources/Iris/Overlay/DetectionInspector.swift) — `@MainActor`, the data-truth complement to the spatial overlay (M5·P5). It reads the **same** `ResultStore.lookup(at:stale:)` the overlay reads, with an identical call shape (same `displayTimeSource()` + `stalenessThreshold`), so the two always see the same input — which makes it a bisector: inspector lists but canvas is blank → render bug; both empty → detector/cache bug.
+
+- **self-describing** — every line is derived from the `Detection`'s own fields
+  (`skeleton`/`keypoints`/`readout`/`boundingBox`/`confidence`), never the
+  producing detector's capabilities. The `introspectableFields` schema (§6) is
+  the structured source of truth this view renders against.
+- honest confidence — with keypoints it shows the per-joint min/mean/max spread
+  and labels the flat `detection.confidence` as a *mean*, not a probability
+  [`confidenceDetail:182`](../Sources/Iris/Overlay/DetectionInspector.swift)
+- a **Raw** toggle dumps every field literally; 30Hz `TimelineView` (half the
+  overlay's 60Hz — it's a text panel) [`:64`](../Sources/Iris/Overlay/DetectionInspector.swift)
 
 ### Visual previews (the "favorite pattern")
 
 - [`Overlay/box-rendering.html`](../Sources/Iris/Overlay/box-rendering.html) — bbox rendering across letterbox/pillarbox scenes; demonstrates the Y-flip.
 - [`Overlay/quad-rendering.html`](../Sources/Iris/Overlay/quad-rendering.html) — old bbox vs new corner-quad rendering on a tilted rectangle.
+- [`Overlay/skeleton-rendering.html`](../Sources/Iris/Overlay/skeleton-rendering.html) — body-pose skeleton rendering (joints + edges) across scenes.
 
-Open with `open Sources/Iris/Overlay/quad-rendering.html` — no build, no app.
+For the `VideoGeometry` math specifically, the SwiftUI `#Preview` gallery in
+[`VideoGeometryPreviews.swift`](../Sources/Iris/Overlay/VideoGeometryPreviews.swift)
+is the live oracle: it draws a ground-truth source card with SwiftUI's own
+layout, then overlays probes routed *through* `VideoGeometry` — misalignment is
+glaring if the placement/Y-flip math is wrong. (This gallery is what surfaced
+the earlier rotation-in-geometry mistake as the wrong layer — an architecture
+catch caught at the artifact level.)
+
+Open the HTML with `open Sources/Iris/Overlay/skeleton-rendering.html` — no build, no app.
 
 ---
 
@@ -425,7 +509,8 @@ on the Tuning folder. That's what `TuningRouter` is for.
 
 `TuningRouter` — the minimal `Sendable` protocol both layers accept as
 `any TuningRouter` [`TuningModel.swift:30`](../Sources/Iris/Tuning/TuningModel.swift). Referenced from
-`DetectorPipeline.swift:120` and `DetectionLayer.swift:88`; `TuningModel`
+`DetectorPipeline.swift:130` (reads `currentDetector` + `transform`) and
+`DetectionLayer.swift:115` (reads `transform` at draw time); `TuningModel`
 conforms.
 
 ### Settings model (generic, schema-driven)
@@ -454,9 +539,9 @@ tuning feel instant where it can be:
 | `.detector(rebuilt:)` | new detector instance + cache invalidation | re-inference required |
 
 `TuningModel<Detector>` — `@MainActor @Observable`, conforms to `TuningRouter`
-[`TuningModel.swift:110`](../Sources/Iris/Tuning/TuningModel.swift). The dispatch that routes a change to a tier (and invalidates
-cache / wakes paused playback on the `.detector` tier) [`:272`](../Sources/Iris/Tuning/TuningModel.swift); typed write
-surface [`:232`](../Sources/Iris/Tuning/TuningModel.swift); string-keyed write surface for the derived UI [`:392`](../Sources/Iris/Tuning/TuningModel.swift).
+[`TuningModel.swift:120`](../Sources/Iris/Tuning/TuningModel.swift). The dispatch that routes a change to a tier (and invalidates
+cache / wakes paused playback on the `.detector` tier) [`:282`](../Sources/Iris/Tuning/TuningModel.swift); typed write
+surface [`:242`](../Sources/Iris/Tuning/TuningModel.swift); string-keyed write surface for the derived UI [`:402`](../Sources/Iris/Tuning/TuningModel.swift).
 
 ### Capability-derived UI (the M5·P2 payoff)
 
@@ -508,8 +593,9 @@ Tests mirror `Sources/` and use **real fixtures** (sample clips, in
 | the quadrature filter math | `Tests/IrisTests/Detection/VisionRectanglesQuadratureFilterTests.swift` |
 | detector rebuild on `.detector` tier | `Tests/IrisTests/Tuning/VisionRectanglesRebuildTests.swift` |
 | seek → frame delivery | `Tests/IrisTests/Playback/PlaybackSourceSeekDeliveryTests.swift` |
+| paused seek re-emits a fresh detection | `Tests/IrisTests/Playback/PlaybackSourcePausedCatchUpTests.swift` |
 | nearest-neighbor lookup | `Tests/IrisTests/Overlay/ResultStoreTests.swift` |
-| converter math | `Tests/IrisTests/Overlay/PlayerLayerConverterTests.swift` |
+| coordinate-mapping math (aspect-fit/-fill + Y-flip) | `Tests/IrisTests/Overlay/VideoGeometryTests.swift` |
 | Vision against a real clip | `Tests/IrisTests/Detection/VisionRectanglesDetectorFixtureTests.swift` |
 
 Run: `swift test` (note: macOS gets everything except the iOS-only `Capture/`
@@ -522,26 +608,31 @@ smoke tests, which are platform-gated).
 1. **The spine** — `Frame.swift`, `Source.swift`, `Detector.swift`, `Detection.swift`. ~120 lines total; everything else assumes them.
 2. **One Source** — skim `PlaybackSource.swift` (`tick()` + `seek()`). It's the macOS path and the most self-contained.
 3. **The pipeline** — `DetectorPipeline.swift`. See the three `detect` overloads + the TaskGroup.
-4. **The overlay invariant** — `NormalizedGeometryConverting.swift` then `DetectionLayer.draw()`.
+4. **The overlay invariant** — `NormalizedGeometryConverting.swift`, then `VideoGeometry.swift` (the single coordinate-mapping authority), then `DetectionLayer.draw()`.
 5. **The M5 idea** — `DetectorCapabilities.swift`, then `CapabilityTuningProjection.controls(for:)`, then `VisionRectanglesDetector.apply()`. This is the current frontier and the most interesting design.
 
 ---
 
 ## 11. Snapshot caveat
 
-This tour was written against the tree at **2026-05-24**; this branch
-(`codebase-tour`) was cut from `main @ 44827a1`, which is **past** that snapshot.
-The spine (§2), the pipeline shape (§3), capture (§4), playback (§5), and the
-coordinate-conversion invariant (§7) are unchanged. What has moved on since:
+This tour covers the tree at **2026-05-25**, `main @ 433f4bf` — **M1–M5
+complete, through M5·P6**. The second detector, skeleton overlay, honest
+readouts, detection inspector, and runtime metrics are all *present* and are
+described in the body (§6/§7), not deferred here. The headline since the
+original 2026-05-24 draft:
 
-- **M5·P3** — a **body-pose detector** (the second concrete `Detector`, which
-  finally exercises the pluggability seam with a non-rectangles model) and a
-  **capability-honest skeleton overlay**; capability-honest **numeric readouts**
-  replacing fake confidence percentages.
-- **M5·P4** — a **detection inspector** panel (raw per-detection fields, driven
-  by `DetectorCapabilities.introspectableFields`) and the detector picker moved
-  into the tuning pane.
+- **M5·P3/P4** — `VisionBodyPoseDetector` (the second concrete detector, §6), a
+  capability-honest skeleton overlay (§7), and honest readouts replacing fake
+  confidence percentages; the detector picker moved into the tuning pane.
+- **M5·P5** — the `DetectionInspector` render/cache bisector (§7) and richer
+  `DetectionMetrics` with honest drop counting (§6).
+- **M5·P6** — `VideoGeometry` consolidated coordinate mapping into a **single
+  authority** (§7); `PlayerLayerConverter` was retired and `DetectionLayer` is
+  no longer generic over a converter. This is the section most rewritten from
+  the original draft.
 
-Folding the body-pose detector + skeleton overlay + inspector into §6/§7 is the
-natural next edit to this doc. Line numbers drift as code changes; the symbol
-name in each row will still find the target if a number is off by a few.
+What sits just past this snapshot (see [`plans/STATUS.md`](../plans/STATUS.md)):
+**source-orientation correctness** — `PlaybackSource` honoring `preferredTransform`
+for portrait clips, and capture front-camera mirroring — both pencilled in, not
+yet built. Line numbers drift as code changes; the symbol name in each pointer
+will still find the target if a number is off by a few.
