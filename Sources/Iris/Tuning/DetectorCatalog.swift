@@ -61,6 +61,71 @@ extension DetectorCatalogEntry {
             )
         }
     }
+
+    /// Build an entry for a **plain `Detector`** that has no runtime-tunable
+    /// knobs (M6·P2's path-A `CoreMLDetector`, where thresholds are baked at
+    /// export time).
+    ///
+    /// **Why a second overload, not the `TunableDetector` one.** The
+    /// `make<D: TunableDetector>` seam routes everything through a
+    /// `TuningModel`, which requires a `Settings` type and a per-knob
+    /// classifier. A non-tunable detector has neither, and forcing a fake
+    /// empty `TunableDetector` conformance would be a lie about the detector's
+    /// capabilities. This overload wires a minimal ``PassthroughRouter``
+    /// instead: it carries the detector for the pipeline to run, exposes no
+    /// output transform, and pairs with an empty settings view. The detector
+    /// still surfaces honest `DetectorCapabilities` for the inspector — it
+    /// just has no tuning UI.
+    public static func make(
+        id: String,
+        displayName: String,
+        detector: @escaping @MainActor () -> any Detector
+    ) -> DetectorCatalogEntry {
+        DetectorCatalogEntry(id: id, displayName: displayName) { _ in
+            ActiveDetectorSession(
+                router: PassthroughRouter(detector: detector()),
+                settingsView: AnyView(EmptyView())
+            )
+        }
+    }
+}
+
+// MARK: - PassthroughRouter
+
+/// Minimal `TuningRouter` for a non-tunable `Detector`.
+///
+/// `DetectorPipeline` consults a `TuningRouter` only for two things: the
+/// `currentDetector` to run (used in place of the pipeline's own array) and an
+/// optional output `transform`. A detector with no runtime knobs needs neither
+/// hot-swap nor a filter pass, so this router just holds the detector and
+/// returns `nil`/no-op for the rest. It lets a plain `Detector` register as a
+/// catalog entry without a `TuningModel` (which would require a `Settings`
+/// type the detector doesn't have).
+///
+/// **Concurrency.** `@MainActor final class` matching `TuningModel`'s shape —
+/// the only other `TuningRouter` conformer — so the pipeline reads it via the
+/// same `MainActor.run` hop.
+@MainActor
+public final class PassthroughRouter: TuningRouter {
+
+    private let detector: any Detector
+
+    /// The detector the pipeline should run. Never `nil` for a passthrough
+    /// router — that's its whole job.
+    public var currentDetector: (any Detector)? { detector }
+
+    /// No output transform: a non-tunable detector has no filter-tier knobs,
+    /// so the pipeline returns its detections unchanged.
+    public var transform: (@Sendable ([Detection]) -> [Detection])? { nil }
+
+    /// Never fires — there are no detector-tier knob changes to react to.
+    /// `var` to satisfy the protocol's settable requirement; setting it is a
+    /// no-op in effect because nothing ever invokes it.
+    public var onDetectorTierChange: (@Sendable @MainActor () -> Void)?
+
+    public init(detector: any Detector) {
+        self.detector = detector
+    }
 }
 
 // MARK: - DetectorCatalog

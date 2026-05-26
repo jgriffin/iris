@@ -209,7 +209,13 @@ struct PlaybackContentView: View {
     /// names a concrete detector or tuning view in the playback path — it
     /// goes through the catalog. Rectangles is the default so pre-M5
     /// behavior is preserved until the user picks Body Pose.
-    private let catalog = DetectorCatalog.builtInVision
+    // M6·P2: the demo catalog adds the converted Core ML YOLOv12n detector
+    // (bundled `.mlpackage`, located in `Bundle.main`) after the built-in
+    // Vision detectors. Computed so the bundle lookup stays cheap (it only
+    // checks the resource exists; the model is compiled lazily inside the
+    // entry's session factory). The YOLO entry is omitted if the resource is
+    // missing — the picker still works with the Vision detectors.
+    private var catalog: DetectorCatalog { DemoCatalog.detectors }
     @State private var selectedDetectorID: String = "vision.rectangles"
     @State private var session: ActiveDetectorSession?
 

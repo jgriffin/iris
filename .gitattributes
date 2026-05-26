@@ -3,3 +3,7 @@ Tests/IrisTests/Fixtures/*.mp4            filter=lfs diff=lfs merge=lfs -text
 Tests/IrisTests/Fixtures/*.mlmodel        filter=lfs diff=lfs merge=lfs -text
 Tests/IrisTests/Fixtures/*.mlpackage/**   filter=lfs diff=lfs merge=lfs -text
 Tests/IrisTests/Fixtures/*.png            filter=lfs diff=lfs merge=lfs -text
+
+# M6·P2: Core ML model bundled into the demo app targets (iOS + macOS).
+# Same `.mlpackage` binary inner files as the test fixture — track via LFS.
+Apps/Shared/*.mlpackage/**                filter=lfs diff=lfs merge=lfs -text

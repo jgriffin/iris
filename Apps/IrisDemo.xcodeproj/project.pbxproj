@@ -15,6 +15,10 @@
 		AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */; };
 		B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
 		BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
+		898B5D39DDC9DDD7B43C218F /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */; };
+		DFE7EB47103AA9ECF21E20F2 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */; };
+		363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
+		6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
 /* End PBXBuildFile section */
@@ -26,6 +30,8 @@
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5FE11DED63C51AD082CD66F7 /* iris */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iris; path = ..; sourceTree = SOURCE_ROOT; };
 		8486F9C7159F774FB48A6C3B /* RecentVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentVideos.swift; sourceTree = "<group>"; };
+		C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
+		C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = yolo12n.mlpackage; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
 		D03976040AAEAF22317D9BE0 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
@@ -75,6 +81,8 @@
 			isa = PBXGroup;
 			children = (
 				8486F9C7159F774FB48A6C3B /* RecentVideos.swift */,
+				C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */,
+				C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -153,6 +161,7 @@
 			buildConfigurationList = 8958D5CA9C4E28A7F285D550 /* Build configuration list for PBXNativeTarget "IrisDemo-macOS" */;
 			buildPhases = (
 				0C9B97C882B423BAA036FDC2 /* Sources */,
+				B87F8AA4F2EB025225C7E2B4 /* Resources */,
 				4666C62F121707C7690ED7C8 /* Frameworks */,
 			);
 			buildRules = (
@@ -233,6 +242,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */,
+				363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B87F8AA4F2EB025225C7E2B4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,6 +264,7 @@
 				80FFD62CD539847D349D137F /* ContentView.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
 				B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */,
+				DFE7EB47103AA9ECF21E20F2 /* DemoCatalog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,6 +276,7 @@
 				2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,
 				BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */,
+				898B5D39DDC9DDD7B43C218F /* DemoCatalog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
