@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **M5 — Honest detectors** (P1–P6 ✅ · the macOS overlay-render BLOCKER is resolved — `VideoGeometry` now owns coordinate mapping in pure SwiftUI space)
-👉 Next: source-orientation correctness — `PlaybackSource` `preferredTransform` (portrait) + capture front-mirror; or define M6/M7. → [`STATUS.md`](./STATUS.md)
+🌱 **M6 — Custom models + captioning** (P1 ✅ Core ML conversion pipeline · P2 📋 ← here · P3–P4 📋)
+👉 Next: start M6·P2 — `CoreMLDetector` + `VisionObjectDecoder`, prove YOLOv12 (path A) end-to-end in a demo. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -405,3 +405,17 @@
 - Library `swift test` 207 green; both demo targets (`IrisDemo-macOS`, `IrisDemo-iOS`) compile.
 - 🗓 **Deferred → QUESTIONS.md:** (1) playback `preferredTransform` → upright detections for portrait clips; (2) capture front-camera `isVideoMirrored` (locked decision unimplemented); (3) pre-existing `DetectionInspector` Swift 6 warning in both demos.
 - 👉 **Next:** source-orientation correctness — `PlaybackSource` `preferredTransform` (portrait) + capture front-mirror; or define M6/M7.
+
+---
+
+## 2026-05-25 — M6·P1 — Core ML conversion pipeline
+
+- Did: **Defined M6 — Custom models + captioning** and wrote [`features/M6.md`](./features/M6.md) (P1 ✅ conversion pipeline · P2 📋 `CoreMLDetector` + `VisionObjectDecoder` YOLOv12 path A · P3 📋 `YOLOEnd2EndDecoder` + model-swap catalog/loading · P4 📋 captioning, stretch). Design spine: one `CoreMLDetector` with a pluggable `OutputDecoder` seam — `VisionObjectDecoder` (path A default), `YOLOEnd2EndDecoder` (path B), `DETRSetPredictionDecoder` (RF-DETR, later/additive). Everything downstream (`Detector`/`TunableDetector`, `DetectorCapabilities`, the M5·P4 `DetectorCatalog`/`ActiveDetectorSession`, overlay, inspector, cache) is reused; Core ML models register as catalog entries like the built-in Vision ones.
+- Did: **Verified the PyTorch→Core ML toolchain empirically** (ultralytics 8.4.54, coremltools 9.0, Apple M1 Max) — not doc-only. Wrote the reusable [`tools/model-export/RUNBOOK.md`](../tools/model-export/RUNBOOK.md) (durable procedure for converting *any* external detector + per-model recipes + "adding the next model" checklist) and a working `inspect_model.py` (mandatory artifact-verify step, coremltools-9 API: `skip_model_load`, `userDefined`, `coordinatesOutputFeatureName`). Tooling is `uv`-managed, CLI-first, Python, **outside the Swift package** (never a SwiftPM dep); blessed default is a pinned-ephemeral `uv run --with …` one-liner (`--python 3.12` + `numpy<=2.3.5` pins are load-bearing), with a persistent `.venv` as the repeat-export option.
+- Did: **Converted `yolo11n` / `yolo12n` / `yolo26n` to `.mlpackage`** and restructured artifacts under [`data/models/`](../data/models/) (`weights/` for `.pt`, `coreml/` for `.mlpackage`; both gitignored + regenerable, `README.md` tracked).
+- Did: Landed the **DECISIONS** entry (2026-05-25 — start with YOLOv12 Path A, pluggable `OutputDecoder` seam) and the **RF-DETR backlog** item in [`QUESTIONS.md`](./QUESTIONS.md) (off the M6 critical path). Recorded the **empirical-over-docs** lesson to memory.
+- 💡 Learned: **the YOLO Path A vs Path B finding.** **YOLOv12** (and classic Detect models) with `nms=True` is true **Path A** — Apple `NonMaximumSuppression` pipeline, `coordinates`+`confidence` outputs, 80 COCO labels in the NMS stage → Vision auto-decodes, **zero Swift decode**. **YOLO26 is Path B, not A** — ultralytics *forces* `nms=False` on end2end models (warns *"'nms=True' is not available for end2end models"*), so it always exports as a raw `[1,300,6]` tensor needing a **trivial** decoder (threshold + scale ≤300 rows, **NO NMS** — the one-to-one head self-dedupes; labels in `userDefined` `names`).
+- 💡 Learned: `yolo download` is a **phantom command** (it errors) — `yolo export`/`yolo predict` auto-download `*.pt` on first use; the CLI `yolo export … format=coreml` is the *same code path* as `YOLO(…).export(format='coreml')`. And the **empirical re-run corrected doc-only conclusions**: the original doc-only pass predicted YOLO26 → Path A and framed RF-DETR as "ONNX→coremltools"; the actual export proved YOLO26 → Path B and RF-DETR's real route is a direct PyTorch→Core ML patched fork (FP32-only). Always verify the decode path against the artifact (`inspect_model.py`) before writing Swift.
+- 🗓 Deferred: **RF-DETR Core ML spike** — off the M6 critical path. No native Core ML export (`rfdetr.export()` does ONNX/TFLite only; Roboflow won't add Core ML, issue #318 closed); proven OSS route is a direct PyTorch→Core ML patched fork ([`landchenxuan/rf-detr-to-coreml`](https://github.com/landchenxuan/rf-detr-to-coreml) on [`timnielen/rf-detr`](https://github.com/timnielen/rf-detr)), FP32-only, still path B needing a `DETRSetPredictionDecoder`. Captured in [`QUESTIONS.md`](./QUESTIONS.md); spike in isolation once the YOLO path proves the seam.
+- 🗓 Captured (open): **runtime-tunable Core ML thresholds** — Path A bakes IoU/conf at export, so runtime tuning forces Path B or a re-export. Landed in [`QUESTIONS.md`](./QUESTIONS.md) + [`features/M6.md`](./features/M6.md); settle before/during P2.
+- 👉 Next: start **M6·P2** — build `CoreMLDetector` + the `OutputDecoder` protocol + `VisionObjectDecoder`, wire the converted YOLOv12n through it, and prove it end-to-end in a demo player (boxes + COCO labels, zero Swift decode), with a fixture-based test. Confirm the iOS/macOS 26 auto-decode observation type against the installed SDK.

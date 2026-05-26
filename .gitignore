@@ -47,6 +47,18 @@ Apps/**/Local.xcconfig
 # Core ML compiled models (committed sources only)
 *.mlmodelc/
 
+# Model-export tooling outputs (tools/model-export/ — see its RUNBOOK.md).
+# Tracked here: RUNBOOK.md, scripts, pyproject/lock. Ignored: the venv, plus
+# any downloaded weights / converted .mlpackages that ultralytics drops in the
+# CWD (the canonical home is data/models/ — these two lines are a safety net).
+tools/model-export/.venv/
+tools/model-export/*.pt
+tools/model-export/*.mlpackage
+
+# Model artifacts (data/models/ — regenerable; the README is tracked).
+data/models/weights/
+data/models/coreml/
+
 # Datasets and captured frames (project-specific outputs)
 datasets/
 captures/

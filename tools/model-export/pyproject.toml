@@ -1,0 +1,11 @@
+[project]
+name = "model-export"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "coremltools>=9.0",
+    "numpy>=1.14.5,<=2.3.5",
+    "ultralytics>=8.4.54",
+]
