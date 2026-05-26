@@ -1,6 +1,7 @@
 import CoreGraphics
 import CoreML
 import Vision
+import os
 
 /// `Detector` conformer that runs a converted Core ML model through Vision's
 /// `CoreMLRequest`, decoding its output via a pluggable ``OutputDecoder``.
@@ -144,12 +145,40 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
 
     // MARK: - Detector
 
-    /// No-op. `CoreMLRequest` doesn't expose an explicit prewarm hook, and the
-    /// model is already compiled + container-wrapped at construction. Callers
-    /// that care about first-frame latency should run `detect(in:)` against a
-    /// representative frame at warm-up time (mirrors the Vision detectors).
+    /// Run one throwaway inference against a synthetic black buffer so Core ML
+    /// compiles + loads its compute path before the first real frame.
+    ///
+    /// **Why this is real, unlike the Vision built-ins.** The Vision
+    /// rectangle/body-pose detectors left `prewarm()` a no-op — their requests
+    /// are cheap to spin up and carry no model-load cost. A converted Core ML
+    /// model is different: the *first* `CoreMLRequest.perform` pays a genuine
+    /// one-time cost — Core ML loads the compiled program onto the Neural
+    /// Engine / GPU and allocates its scratch buffers. Without a warm-up that
+    /// stall lands on frame one of live playback, a visible hitch. Running one
+    /// pass here against a discardable buffer moves that cost to launch.
+    ///
+    /// **Best-effort.** A warm-up that fails (buffer alloc refused, an
+    /// inference error) must never crash or propagate — the detector is
+    /// contractually required to handle the first real `detect(in:)` correctly
+    /// without a prewarm. Any failure is logged and swallowed.
     public func prewarm() async {
-        // intentionally empty
+        guard let buffer = CoreMLModelLoading.makeWarmupPixelBuffer() else {
+            coreMLDetectorLogger.debug("prewarm skipped: could not allocate warm-up buffer")
+            return
+        }
+        do {
+            var request = CoreMLRequest(model: container)
+            request.cropAndScaleAction = .scaleToFit
+            // Run the request only; discard the observations. We're warming the
+            // compute path, not decoding — the synthetic black frame carries no
+            // real objects, and a path-B decoder's inverse-letterbox math is
+            // irrelevant here. `.up` because the buffer has no orientation.
+            _ = try await request.perform(on: buffer, orientation: .up)
+        } catch {
+            coreMLDetectorLogger.debug(
+                "prewarm inference failed (best-effort, ignored): \(String(describing: error), privacy: .public)"
+            )
+        }
     }
 
     public func detect(in frame: Frame) async throws -> [Detection] {
@@ -172,3 +201,8 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
         )
     }
 }
+
+/// File-level logger for the Core ML detector. A file-scope constant rather
+/// than a `static` on `CoreMLDetector` because the detector is generic over
+/// its `Decoder`, and Swift forbids stored statics on generic types.
+private let coreMLDetectorLogger = Logger(subsystem: "iris.detection", category: "coreml")

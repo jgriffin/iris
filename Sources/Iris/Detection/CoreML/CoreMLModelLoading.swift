@@ -1,4 +1,5 @@
 import CoreML
+import CoreVideo
 import Foundation
 
 /// Runtime loading helpers for Core ML models shipped as `.mlpackage`.
@@ -75,5 +76,40 @@ public enum CoreMLModelLoading {
         let configuration = MLModelConfiguration()
         configuration.computeUnits = computeUnits
         return try MLModel(contentsOf: compiledURL, configuration: configuration)
+    }
+
+    /// Build a synthetic, all-black IOSurface-backed BGRA `CVPixelBuffer` for
+    /// warm-up inference.
+    ///
+    /// Used by ``CoreMLDetector/prewarm()`` to run one throwaway pass so Core
+    /// ML compiles + loads its compute path (Neural Engine program, scratch
+    /// buffers) *before* the first real frame, rather than paying that cost on
+    /// frame one. The contents don't matter — a black buffer is fine, since
+    /// `CoreMLDetector`'s `.scaleToFit` letterbox sizes whatever it's handed to
+    /// the model's fixed input. 640×640 matches the YOLO family's input so the
+    /// scale is a no-op, but the value is incidental: Vision reads the real
+    /// input size from the model, so any reasonable size warms the same path.
+    ///
+    /// `internal` — a warm-up implementation detail, not part of the public
+    /// loading surface. Returns `nil` if the OS refuses the allocation (the
+    /// caller treats prewarm as best-effort and simply skips it).
+    static func makeWarmupPixelBuffer(
+        width: Int = 640,
+        height: Int = 640
+    ) -> CVPixelBuffer? {
+        let attrs: [CFString: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary
+        ]
+        var buffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attrs as CFDictionary,
+            &buffer
+        )
+        guard status == kCVReturnSuccess else { return nil }
+        return buffer
     }
 }

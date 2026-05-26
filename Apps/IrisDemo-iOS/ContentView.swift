@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import Iris
 import SwiftUI
+import UniformTypeIdentifiers
 import os
 
 /// Top-level shell for the iOS demo. Two tabs:
@@ -215,9 +216,21 @@ struct PlaybackContentView: View {
     // checks the resource exists; the model is compiled lazily inside the
     // entry's session factory). The YOLO entry is omitted if the resource is
     // missing — the picker still works with the Vision detectors.
-    private var catalog: DetectorCatalog { DemoCatalog.detectors }
+    // M6·P3: the catalog is now a function of `modelStore` (bundled warm-up
+    // cache + file-picked slot). The bundled YOLO entries appear when present;
+    // the file-picked `coreml.custom` slot is always listed (placeholder until
+    // the user supplies a model).
+    private var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
     @State private var selectedDetectorID: String = "vision.rectangles"
     @State private var session: ActiveDetectorSession?
+
+    /// M6·P3: holds the bundled-model warm-up cache + the file-picked detector.
+    /// `@Observable` so the picker re-renders when the custom slot loads.
+    @State private var modelStore = DemoModelStore()
+
+    /// M6·P3: presents the Core ML model document picker (`.mlpackage` /
+    /// `.mlmodel`).
+    @State private var showModelPicker = false
 
     /// Whether the tuning sheet is presented. Gear-icon toolbar button
     /// flips this on the Playback tab; the sheet hosts the active
@@ -264,6 +277,16 @@ struct PlaybackContentView: View {
             }
             .ignoresSafeArea()
         }
+        // M6·P3: Core ML model document picker. On pick, load + prewarm via the
+        // store, then re-select the custom entry so the existing swap flow runs
+        // the freshly-loaded detector.
+        .sheet(isPresented: $showModelPicker) {
+            DocumentPicker(contentTypes: Self.modelContentTypes) { url in
+                showModelPicker = false
+                loadPickedModel(at: url)
+            }
+            .ignoresSafeArea()
+        }
         .sheet(isPresented: $showTuning) {
             NavigationStack {
                 ScrollView {
@@ -284,12 +307,31 @@ struct PlaybackContentView: View {
                         sheetSection("Detector") {
                             Picker("Detector", selection: $selectedDetectorID) {
                                 ForEach(catalog.entries) { entry in
-                                    Text(entry.displayName).tag(entry.id)
+                                    detectorRow(for: entry).tag(entry.id)
                                 }
                             }
                             .pickerStyle(.menu)
                             .labelsHidden()
                             .accessibilityLabel("Active detector")
+
+                            // M6·P3: when the file-picked slot is selected and
+                            // not yet loaded, surface a "Load model…" button to
+                            // open the Core ML document picker.
+                            if selectedDetectorID == DemoCatalog.customEntryID,
+                                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+                            {
+                                Button {
+                                    showModelPicker = true
+                                } label: {
+                                    Label("Load model…", systemImage: "square.and.arrow.down")
+                                }
+                                .controlSize(.small)
+                            }
+                            if let modelError = modelStore.pickedModelError {
+                                Text(modelError)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
                         }
 
                         // The session's `settingsView` is itself a `Form`,
@@ -354,8 +396,18 @@ struct PlaybackContentView: View {
             if controller == nil {
                 loadFixture()
             }
+            // M6·P3: warm the bundled Core ML models off the main actor at
+            // launch so the first selection isn't a cold compile/load stall.
+            await modelStore.prewarmBundledModels()
         }
         .onChange(of: selectedDetectorID) {
+            // M6·P3: selecting the unloaded file-pick slot opens the model
+            // picker right away (in addition to the explicit button).
+            if selectedDetectorID == DemoCatalog.customEntryID,
+                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+            {
+                showModelPicker = true
+            }
             swapDetector()
         }
         .onDisappear {
@@ -796,6 +848,52 @@ struct PlaybackContentView: View {
             }
             if let priorScopedURL {
                 priorScopedURL.stopAccessingSecurityScopedResource()
+            }
+        }
+    }
+
+    // MARK: - M6·P3 model picking
+
+    /// Content types for the Core ML model document picker. `.mlpackage` is a
+    /// directory bundle (UTI derived from its extension; conforms to
+    /// `.package`); `.mlmodel` is a bare file. `.package` is appended as a
+    /// fallback so `.mlpackage` directories stay selectable if the extension
+    /// lookup returns nil on a given OS.
+    private static let modelContentTypes: [UTType] = {
+        var types: [UTType] = []
+        if let pkg = UTType(filenameExtension: "mlpackage") { types.append(pkg) }
+        if let model = UTType(filenameExtension: "mlmodel") { types.append(model) }
+        types.append(.package)
+        return types
+    }()
+
+    /// One picker row, annotated with availability. A `.modelNotReady` entry
+    /// (the unloaded file-pick slot) is dimmed; everything else shows its plain
+    /// display name (which for the custom slot already carries the loaded
+    /// model's basename — see `DemoCatalog.customDisplayName`).
+    @ViewBuilder
+    private func detectorRow(for entry: DetectorCatalogEntry) -> some View {
+        if modelStore.availability(forEntryID: entry.id) == .modelNotReady {
+            Text(entry.displayName).foregroundStyle(.secondary)
+        } else {
+            Text(entry.displayName)
+        }
+    }
+
+    /// Load a file-picked Path-A model, then re-select the custom entry so the
+    /// existing detector-swap flow runs the freshly-loaded detector. Acquires
+    /// the picked URL's security scope for the load, then releases it — the
+    /// compiled model is held in memory, so no ongoing scope is needed.
+    @MainActor
+    private func loadPickedModel(at url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        Task {
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            await modelStore.loadPickedModel(at: url)
+            if selectedDetectorID == DemoCatalog.customEntryID {
+                swapDetector()
+            } else {
+                selectedDetectorID = DemoCatalog.customEntryID
             }
         }
     }

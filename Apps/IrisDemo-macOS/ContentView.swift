@@ -44,6 +44,13 @@ struct ContentView: View {
     @State private var showFilePicker = false
     @State private var errorText: String?
 
+    /// M6·P3: holds the bundled-model warm-up cache + the file-picked detector.
+    /// `@Observable` so the picker re-renders when the custom slot loads.
+    @State private var modelStore = DemoModelStore()
+
+    /// M6·P3: presents the Core ML model importer (`.mlpackage` / `.mlmodel`).
+    @State private var showModelPicker = false
+
     /// Best-effort pipeline gauge. `@MainActor @Observable` — surfaced in
     /// the bottom bar (avg inference ms · effective det/s · drop %). Reset
     /// per video / detector swap.
@@ -85,7 +92,11 @@ struct ContentView: View {
     // checks the resource exists; the model is compiled lazily inside the
     // entry's session factory). The YOLO entry is omitted if the resource is
     // missing — the picker still works with the Vision detectors.
-    private var catalog: DetectorCatalog { DemoCatalog.detectors }
+    // M6·P3: the catalog is now a function of `modelStore` (bundled warm-up
+    // cache + file-picked slot). The bundled YOLO entries appear when present;
+    // the file-picked `coreml.custom` slot is always listed (placeholder until
+    // the user supplies a model).
+    private var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
     @State private var selectedDetectorID: String = "vision.rectangles"
     @State private var session: ActiveDetectorSession?
 
@@ -123,12 +134,31 @@ struct ContentView: View {
                     inspectorSection("Detector") {
                         Picker("Detector", selection: $selectedDetectorID) {
                             ForEach(catalog.entries) { entry in
-                                Text(entry.displayName).tag(entry.id)
+                                detectorRow(for: entry).tag(entry.id)
                             }
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
                         .accessibilityLabel("Active detector")
+
+                        // M6·P3: when the file-picked slot is selected and not
+                        // yet loaded, surface a "Load model…" button to open
+                        // the Core ML importer. Mirrors the video Open button.
+                        if selectedDetectorID == DemoCatalog.customEntryID,
+                            modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+                        {
+                            Button {
+                                showModelPicker = true
+                            } label: {
+                                Label("Load model…", systemImage: "square.and.arrow.down")
+                            }
+                            .controlSize(.small)
+                        }
+                        if let modelError = modelStore.pickedModelError {
+                            Text(modelError)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
                     }
 
                     // 2. Tuning — the session's capability-derived settings.
@@ -191,7 +221,20 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedDetectorID) {
+            // M6·P3: selecting the unloaded file-pick slot opens the model
+            // importer right away (in addition to the explicit button) so a
+            // first selection is a one-step "pick the model" gesture.
+            if selectedDetectorID == DemoCatalog.customEntryID,
+                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+            {
+                showModelPicker = true
+            }
             swapDetector()
+        }
+        // M6·P3: warm the bundled Core ML models off the main actor at launch
+        // so the first selection isn't a cold compile/load stall. Idempotent.
+        .task {
+            await modelStore.prewarmBundledModels()
         }
         .fileImporter(
             isPresented: $showFilePicker,
@@ -207,6 +250,25 @@ struct ContentView: View {
                     "file picker failed: \(error.localizedDescription, privacy: .public)"
                 )
                 errorText = "Could not open file: \(error.localizedDescription)"
+            }
+        }
+        // M6·P3: Core ML model importer. On pick, load + prewarm via the store,
+        // then re-select the custom entry so the existing swap flow runs the
+        // freshly-loaded detector.
+        .fileImporter(
+            isPresented: $showModelPicker,
+            allowedContentTypes: Self.modelContentTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                loadPickedModel(at: url)
+            case .failure(let error):
+                Logger.demo.error(
+                    "model picker failed: \(error.localizedDescription, privacy: .public)"
+                )
+                errorText = "Could not open model: \(error.localizedDescription)"
             }
         }
         // Tear down the active session when the view disappears so the
@@ -451,6 +513,52 @@ struct ContentView: View {
     private static let movieContentTypes: [UTType] = [
         .movie, .mpeg4Movie, .quickTimeMovie,
     ]
+
+    /// M6·P3: content types for the Core ML model importer. `.mlpackage` is a
+    /// directory bundle, so its UTI is derived from the extension (it conforms
+    /// to `.package`); `.mlmodel` is a bare file. Falling back to `.package`
+    /// keeps `.mlpackage` directories selectable if the extension lookup
+    /// returns nil on a given OS.
+    private static let modelContentTypes: [UTType] = {
+        var types: [UTType] = []
+        if let pkg = UTType(filenameExtension: "mlpackage") { types.append(pkg) }
+        if let model = UTType(filenameExtension: "mlmodel") { types.append(model) }
+        types.append(.package)
+        return types
+    }()
+
+    /// M6·P3: one picker row, annotated with availability. A `.modelNotReady`
+    /// entry (the unloaded file-pick slot) is dimmed; everything else shows
+    /// its plain display name. The display name itself already carries the
+    /// loaded model's basename for the custom slot (see
+    /// `DemoCatalog.customDisplayName`).
+    @ViewBuilder
+    private func detectorRow(for entry: DetectorCatalogEntry) -> some View {
+        if modelStore.availability(forEntryID: entry.id) == .modelNotReady {
+            Text(entry.displayName).foregroundStyle(.secondary)
+        } else {
+            Text(entry.displayName)
+        }
+    }
+
+    /// M6·P3: load a file-picked Path-A model, then re-select the custom entry
+    /// so the existing detector-swap flow runs the freshly-loaded detector.
+    /// Acquires the picked URL's security scope for the load, then releases it
+    /// — the compiled model is held in memory, so no ongoing scope is needed.
+    @MainActor
+    private func loadPickedModel(at url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        Task {
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            await modelStore.loadPickedModel(at: url)
+            // Re-select to trigger swapDetector even if already selected.
+            if selectedDetectorID == DemoCatalog.customEntryID {
+                swapDetector()
+            } else {
+                selectedDetectorID = DemoCatalog.customEntryID
+            }
+        }
+    }
 
     /// Swap the active source to an external (picker- or MRU-supplied) URL.
     ///
