@@ -24,36 +24,33 @@ import SwiftUI
 /// subject by detection latency. Apps that want zero-lag overlays predict
 /// ahead of `ResultStore.append`; Iris does not.
 ///
-/// **Required `converter:`.** The locked sketch defaulted to
-/// `PlayerLayerConverter()`; resolved at Phase 5 to drop the default. A
-/// converter without a backing AVF layer has no useful runtime behavior, and
-/// the call site is the natural place to be explicit (`PreviewLayerConverter`
-/// for camera, `PlayerLayerConverter` for playback). See the LOG entry for
-/// Phase 4 close and the `_Amendment 2026-05-22:_` note in the recommendation
-/// doc.
+/// **Required `makeConverter:`.** A size-keyed factory that builds the
+/// geometry converter for a given measured container size. The overlay wraps
+/// its body in a `GeometryReader` — the ONE place the SwiftUI container size
+/// is measured — and calls `makeConverter(proxy.size)` once per measured
+/// size. For playback, callers return
+/// `VideoGeometry(contentSize: presentationSize, containerSize: size, contentMode: .aspectFit)`;
+/// for capture, callers ignore the size and return a `PreviewLayerConverter`
+/// bound to the live `AVCaptureVideoPreviewLayer` (AVF owns capture
+/// geometry). See the LOG entry for the coordinate-mapping consolidation.
 ///
 /// **Styling via `OverlayStyle`** (Phase 6). Stroke width, per-class stroke
 /// color, label format, label text/background color, and label font are all
 /// configured via `style:`. The default `OverlayStyle()` reproduces the
 /// Phase 5 hardcoded visuals.
-public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
+public struct DetectionLayer: View {
 
     /// The result store the overlay reads at draw time. `@MainActor`-isolated
     /// internally; the SwiftUI `Canvas` body is also `@MainActor`, so the
     /// `lookup(at:)` call is direct (no actor hop).
     public let store: ResultStore
 
-    /// The geometry converter — `PreviewLayerConverter` for capture,
-    /// `PlayerLayerConverter` for playback. Required (no default); see the
-    /// type doc-comment for the Phase 5 resolution.
-    public let converter: Converter
-
-    /// The on-screen rect the video pixels occupy after aspect-fit
-    /// letterbox/pillarbox. For `PreviewLayerConverter` this is ignored
-    /// (AVF computes it internally); for `PlayerLayerConverter` callers
-    /// pass `AVPlayerLayer.videoRect` (M3 surfaces this reactively via
-    /// `PlaybackSession.videoRect: AsyncStream<CGRect>`).
-    public let videoRect: CGRect
+    /// Size-keyed factory for the geometry converter. Invoked once per
+    /// measured container size inside the overlay's `GeometryReader` —
+    /// `VideoGeometry` for playback (uses the size as its `containerSize`),
+    /// `PreviewLayerConverter` for capture (ignores the size; AVF owns the
+    /// geometry off the live layer).
+    public let makeConverter: @Sendable (CGSize) -> any NormalizedGeometryConverting
 
     /// Style knobs for stroke and label rendering. Defaults to the
     /// Phase-5-equivalent `OverlayStyle()`.
@@ -89,8 +86,7 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
 
     public init(
         store: ResultStore,
-        converter: Converter,
-        videoRect: CGRect,
+        makeConverter: @escaping @Sendable (CGSize) -> any NormalizedGeometryConverting,
         style: OverlayStyle = .default,
         stalenessThreshold: CMTime? = nil,
         tuning: (any TuningRouter)? = nil,
@@ -99,8 +95,7 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         }
     ) {
         self.store = store
-        self.converter = converter
-        self.videoRect = videoRect
+        self.makeConverter = makeConverter
         self.style = style
         self.stalenessThreshold = stalenessThreshold
         self.tuning = tuning
@@ -108,24 +103,30 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
-            let displayTime = displayTimeSource()
-            let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
-            let detections = Self.applyTransform(tuning?.transform, to: raw)
+        // The GeometryReader is the ONE place the SwiftUI container size is
+        // measured. Build the converter once per measured size, then drive
+        // the draw loop off it — `VideoGeometry` derives its own display box
+        // from that size; `PreviewLayerConverter` ignores it.
+        GeometryReader { proxy in
+            let converter = makeConverter(proxy.size)
+            TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
+                let displayTime = displayTimeSource()
+                let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
+                let detections = Self.applyTransform(tuning?.transform, to: raw)
 
-            Canvas { gc, _ in
-                for detection in detections {
-                    Self.draw(
-                        detection,
-                        into: &gc,
-                        converter: converter,
-                        videoRect: videoRect,
-                        style: style
-                    )
+                Canvas { gc, _ in
+                    for detection in detections {
+                        Self.draw(
+                            detection,
+                            into: &gc,
+                            converter: converter,
+                            style: style
+                        )
+                    }
                 }
+                .drawingGroup()
+                .allowsHitTesting(false)
             }
-            .drawingGroup()
-            .allowsHitTesting(false)
         }
     }
 
@@ -213,11 +214,10 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
     private static func draw(
         _ detection: Detection,
         into gc: inout GraphicsContext,
-        converter: Converter,
-        videoRect: CGRect,
+        converter: any NormalizedGeometryConverting,
         style: OverlayStyle
     ) {
-        let rect = converter.viewRect(forNormalized: detection.boundingBox, in: videoRect)
+        let rect = converter.viewRect(forNormalized: detection.boundingBox)
         let strokeColor = style.color(for: detection.label)
 
         if let segments = skeletonSegments(of: detection) {
@@ -226,14 +226,14 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
             // the Y-flip here.
             for (from, to) in segments {
                 var line = Path()
-                line.move(to: converter.viewPoint(forNormalized: from, in: videoRect))
-                line.addLine(to: converter.viewPoint(forNormalized: to, in: videoRect))
+                line.move(to: converter.viewPoint(forNormalized: from))
+                line.addLine(to: converter.viewPoint(forNormalized: to))
                 gc.stroke(line, with: .color(strokeColor), lineWidth: style.strokeWidth)
             }
             if let keypoints = detection.keypoints {
                 let dotRadius = max(style.strokeWidth * 1.5, 2.5)
                 for kp in keypoints {
-                    let center = converter.viewPoint(forNormalized: kp.position, in: videoRect)
+                    let center = converter.viewPoint(forNormalized: kp.position)
                     let dot = CGRect(
                         x: center.x - dotRadius,
                         y: center.y - dotRadius,
@@ -253,7 +253,7 @@ public struct DetectionLayer<Converter: NormalizedGeometryConverting>: View {
         let outline: Path
         if let corners = quadCorners(of: detection) {
             var path = Path()
-            path.addLines(corners.map { converter.viewPoint(forNormalized: $0, in: videoRect) })
+            path.addLines(corners.map { converter.viewPoint(forNormalized: $0) })
             path.closeSubpath()
             outline = path
         } else {
@@ -430,24 +430,29 @@ private func previewStore() -> ResultStore {
 #Preview("DetectionLayer · default style") {
     let store = previewStore()
     let frozen = CMTime(value: 100, timescale: 60)
-    let videoRect = CGRect(x: 0, y: 0, width: 360, height: 240)
+    let frame = CGSize(width: 360, height: 240)
 
     return ZStack {
         Color.black
         DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: videoRect,
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 360, height: 240),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             displayTimeSource: { frozen }
         )
     }
-    .frame(width: videoRect.width, height: videoRect.height)
+    .frame(width: frame.width, height: frame.height)
 }
 
 #Preview("DetectionLayer · custom style") {
     let store = previewStore()
     let frozen = CMTime(value: 100, timescale: 60)
-    let videoRect = CGRect(x: 0, y: 0, width: 360, height: 240)
+    let frame = CGSize(width: 360, height: 240)
 
     let style = OverlayStyle(
         strokeWidth: 2.5,
@@ -472,11 +477,16 @@ private func previewStore() -> ResultStore {
         Color.black
         DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: videoRect,
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 360, height: 240),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             style: style,
             displayTimeSource: { frozen }
         )
     }
-    .frame(width: videoRect.width, height: videoRect.height)
+    .frame(width: frame.width, height: frame.height)
 }

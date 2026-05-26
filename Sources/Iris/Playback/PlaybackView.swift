@@ -21,21 +21,25 @@ import AppKit
 /// state-change in the parent — source identity is stable for the playback
 /// session's lifetime, so equality on identity is safe.
 ///
-/// `videoGravity` is locked to `.resizeAspect` —
-/// [`PlayerLayerConverter`](../Overlay/PlayerLayerConverter.swift)'s
-/// aspect-fit math assumes this. The other gravity modes
-/// (`.resizeAspectFill`, `.resize`) would silently break the converter's
-/// view-space mapping; if a future use case wants fill, a parallel
-/// converter (or a math branch) is required first. Tracked in
+/// `videoGravity` is locked to `.resizeAspect` (centered aspect-fit) —
+/// [`VideoGeometry`](../Overlay/VideoGeometry.swift)'s `.aspectFit`
+/// `displayRect` math assumes this, so the overlay box lands exactly on the
+/// on-screen video. The other gravity modes (`.resizeAspectFill`,
+/// `.resize`) would silently break that mapping; if a future use case wants
+/// fill, pair it with `VideoGeometry`'s `.aspectFill` mode. Tracked in
 /// [`plans/features/M3.md`](../../../plans/features/M3.md) §Risks.
 ///
 /// **`onPlayerLayerReady`** fires on MainActor inside `makeUIView` /
 /// `makeNSView` and hands the consumer the `AVPlayerLayer` backing the
-/// view — the seam needed to construct a `PlayerLayerConverter` for
-/// `DetectionLayer`. Default is a no-op so callers without overlay
-/// concerns don't need it. Fires once per representable-create; SwiftUI
-/// may recreate the underlying view (e.g. structural identity changes),
-/// in which case the closure fires again with the new layer.
+/// view. Default is a no-op so callers without overlay concerns don't need
+/// it. Fires once per representable-create; SwiftUI may recreate the
+/// underlying view (e.g. structural identity changes), in which case the
+/// closure fires again with the new layer.
+///
+/// Note: the overlay no longer needs this layer — `DetectionLayer` keys its
+/// geometry off `PlaybackController.presentationSize` + a SwiftUI-measured
+/// container size via `VideoGeometry`. The callback remains for consumers
+/// that want the raw layer for other purposes.
 ///
 /// **Tick driver wiring.** On view-create, `PlaybackView` installs a
 /// `DisplayLinkTickDriver` bound to the host view via

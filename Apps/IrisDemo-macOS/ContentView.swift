@@ -1,4 +1,3 @@
-@preconcurrency import AVFoundation
 import Iris
 import SwiftUI
 import UniformTypeIdentifiers
@@ -32,20 +31,30 @@ import os
 /// `stopAccessingSecurityScopedResource()`. Mirrors the iOS demo's Phase 2
 /// pattern.
 ///
-/// `videoRect` for the `DetectionLayer` is read from `playerLayer.videoRect`
-/// every TimelineView tick — that's the on-screen rect the video occupies
-/// after `.resizeAspect` letterbox/pillarbox, which `PlayerLayerConverter`
-/// needs as input. `PlaybackSession.videoRect: AsyncStream<CGRect>` is the
-/// eventual reactive plumbing per M3.md §Phase 3; for the smoke demo, the
-/// per-tick read is simpler and equivalent.
+/// The `DetectionLayer`'s geometry is computed by `VideoGeometry` from the
+/// controller's `presentationSize` (the upright displayed video size) and
+/// the SwiftUI-measured container size — no `AVPlayerLayer.videoRect` read.
+/// Player + overlay share one `.resizeAspect` (centered aspect-fit) frame,
+/// so `VideoGeometry.displayRect` lands on the on-screen video; window
+/// resizes propagate through the overlay's `GeometryReader` automatically.
 struct ContentView: View {
     @State private var controller: PlaybackController?
     @State private var resultStore = ResultStore()
-    @State private var converter = PlayerLayerConverter()
-    @State private var playerLayer: AVPlayerLayer?
     @State private var detectionTask: Task<Void, Never>?
     @State private var showFilePicker = false
     @State private var errorText: String?
+
+    /// Best-effort pipeline gauge. `@MainActor @Observable` — surfaced in
+    /// the bottom bar (avg inference ms · effective det/s · drop %). Reset
+    /// per video / detector swap.
+    @State private var metrics = DetectionMetrics()
+
+    /// FIX 3 (macOS only): the sidebar row currently highlighted by the
+    /// `List(selection:)` binding. Arrow keys move this highlight WITHOUT
+    /// loading; a single mouse click loads via `.onTapGesture`; Enter
+    /// commits the highlighted row. Kept in sync with the active video so
+    /// the highlight tracks loads triggered from elsewhere.
+    @State private var highlightedURL: URL?
 
     /// The URL currently held under a security scope, if any. nil when no
     /// session is active. Every transition that mutates this must balance
@@ -88,47 +97,77 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 480)
         .inspector(isPresented: $showTuning) {
-            // M5·P4: live tuning inspector. M5·P4 follow-up: the detector
-            // picker now lives at the TOP of the inspector (above the
-            // settings), not in the toolbar — always visible. Below it,
-            // the active session's capability-derived `settingsView` (built
-            // by the catalog); an empty state shows when no session is
-            // loaded. The gear button stays toggleable so users learn where
-            // the panel — and the picker — live even on an empty workspace.
-            VStack(spacing: 0) {
-                // Always-visible detector picker at the top of the pane.
-                // Changing the selection rebuilds the active `session` and
-                // restarts the detection loop (see
-                // `.onChange(of: selectedDetectorID)`). `settingsView` is
-                // itself a `Form`, so the picker sits in its own header above
-                // it rather than nesting Forms.
-                HStack {
-                    Text("Detector")
-                        .font(.headline)
-                    Spacer()
-                    Picker("Detector", selection: $selectedDetectorID) {
-                        ForEach(catalog.entries) { entry in
-                            Text(entry.displayName).tag(entry.id)
+            // M5·P5: one scrolling pane, three regions separated by rules —
+            // the filter controls (Detector picker + Tuning) lead at the
+            // TOP; Live detections takes the generous middle (it's the
+            // focus); Metrics anchors the BOTTOM. `Divider()`s mark the
+            // region boundaries and the wider `spacing` keeps it from
+            // reading as jammed-together. The detector picker is always
+            // visible (even on an empty workspace); tuning is the active
+            // session's capability-derived `settingsView`; Live detections
+            // is the `DetectionInspector` reading the SAME
+            // `resultStore.lookup` the overlay reads, as a render/cache
+            // diagnostic; Metrics is the verbose `DetectionMetricsView`.
+            // The gear button stays toggleable.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    // 1. Detector — always-visible picker. Changing the
+                    //    selection rebuilds `session` + restarts the loop
+                    //    (see `.onChange(of: selectedDetectorID)`).
+                    inspectorSection("Detector") {
+                        Picker("Detector", selection: $selectedDetectorID) {
+                            ForEach(catalog.entries) { entry in
+                                Text(entry.displayName).tag(entry.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .accessibilityLabel("Active detector")
+                    }
+
+                    // 2. Tuning — the session's capability-derived settings.
+                    inspectorSection("Tuning") {
+                        if let session {
+                            session.settingsView
+                        } else {
+                            Text("Open a video to start tuning.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .accessibilityLabel("Active detector")
+
+                    Divider()
+
+                    // 3. Live detections — same lookup the overlay reads.
+                    //    The focus of the pane: given a generous `minHeight`
+                    //    so it reads as room to breathe, not a cramped row.
+                    inspectorSection("Live detections") {
+                        if let controller {
+                            DetectionInspector(
+                                store: resultStore,
+                                displayTimeSource: { [controller] in
+                                    controller.currentTime
+                                },
+                                stalenessThreshold: resultStore.playbackStalenessThreshold
+                            )
+                        } else {
+                            Text("Open a video to inspect detections.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(minHeight: 280, alignment: .top)
+
+                    Divider()
+
+                    // 4. Metrics — verbose, counts-lead gauge.
+                    inspectorSection("Metrics") {
+                        DetectionMetricsView(metrics: metrics)
+                    }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-
-                Divider()
-
-                if let session {
-                    session.settingsView
-                } else {
-                    ContentUnavailableView(
-                        "No session",
-                        systemImage: "slider.horizontal.3",
-                        description: Text("Open a video to start tuning.")
-                    )
-                }
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
         }
@@ -173,6 +212,22 @@ struct ContentView: View {
     }
 
     // MARK: - Sub-views
+
+    /// One labeled section in the stacked inspector pane: a headline title
+    /// over its content. Keeps the four sections (Detector / Tuning / Metrics
+    /// / Live detections) visually uniform without nesting Forms.
+    @ViewBuilder
+    private func inspectorSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     /// Sidebar: "Open Video…" button + recent picks list. Empty MRU state
     /// surfaces a hint pointing at the picker button — macOS demo has
@@ -221,21 +276,29 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else {
-                let selectionBinding = Binding<URL?>(
-                    get: { scopedURL },
-                    set: { newValue in
-                        if let url = newValue, url != scopedURL {
-                            swapToExternal(url: url)
-                        }
-                    }
-                )
-                List(selection: selectionBinding) {
+                // FIX 3: selection binds to `highlightedURL` — it ONLY
+                // moves the highlight (arrow keys + single-click both update
+                // it; no load side-effect in the setter). A single mouse
+                // click ALSO fires `.onTapGesture` on the row → loads;
+                // arrow keys move selection only (no gesture) → highlight
+                // without load. Enter commits the highlighted row.
+                List(selection: $highlightedURL) {
                     ForEach(recents, id: \.self) { url in
                         recentRow(url: url)
                             .tag(url)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                swapToExternal(url: url)
+                            }
                     }
                 }
                 .listStyle(.sidebar)
+                .onKeyPress(.return) {
+                    if let highlightedURL {
+                        swapToExternal(url: highlightedURL)
+                    }
+                    return .handled
+                }
             }
         }
     }
@@ -276,43 +339,55 @@ struct ContentView: View {
         }
     }
 
-    /// The `PlaybackView` + `DetectionLayer` stack. The overlay is conditional
-    /// on `playerLayer` because `PlayerLayerConverter` needs the AVF layer to
-    /// compute `videoRect` — the layer is wired in via `PlaybackView`'s
-    /// `onPlayerLayerReady` callback, which fires the first time the view
-    /// is built.
+    /// The `PlaybackView` + `DetectionLayer` stack. Player + overlay share
+    /// the SAME `ZStack` frame, and `PlaybackView` is locked to
+    /// `.resizeAspect` (centered aspect-fit). The overlay's own
+    /// `GeometryReader` measures that shared frame, so
+    /// `VideoGeometry(contentSize: presentationSize, containerSize: <that
+    /// frame>, .aspectFit).displayRect` lands exactly on the on-screen
+    /// video — no `AVPlayerLayer.videoRect` read. The overlay is gated on a
+    /// non-zero `presentationSize` (zero until the item is ready); window
+    /// resizes flow through the `GeometryReader` automatically.
     @ViewBuilder
     private func playbackArea(controller: PlaybackController) -> some View {
         ZStack {
-            PlaybackView(source: controller.source) { layer in
-                // `onPlayerLayerReady` fires inside `makeNSView`. Deferring
-                // the `@State` write one runloop tick avoids SwiftUI's
-                // "modifying state during view update" warning.
-                Task { @MainActor in
-                    self.converter = PlayerLayerConverter(playerLayer: layer)
-                    self.playerLayer = layer
-                }
-            }
+            PlaybackView(source: controller.source)
+                // Pin the representable's identity to the source's lifetime so
+                // sibling/parent re-evaluation can never re-make it (which would
+                // tear down the AVPlayerLayer + restart the tick driver mid-play).
+                .id(ObjectIdentifier(controller.source))
 
-            if let playerLayer {
-                // Outer TimelineView samples `playerLayer.videoRect` at the
-                // same ~60 Hz cadence as the overlay's own TimelineView, so
-                // window resizes / aspect changes propagate without manual
-                // KVO. The overlay still owns its draw-time tick internally.
-                TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
-                    DetectionLayer(
-                        store: resultStore,
-                        converter: converter,
-                        videoRect: playerLayer.videoRect,
-                        stalenessThreshold: resultStore.playbackStalenessThreshold,
-                        tuning: session?.router,
-                        displayTimeSource: { [controller] in
-                            controller.currentTime
-                        }
-                    )
-                    .allowsHitTesting(false)
+            // Always present. `presentationSize` is read INSIDE the closure,
+            // which runs at draw time in `DetectionLayer`'s own
+            // `GeometryReader` — NOT in this body. That keeps `presentationSize`
+            // (a KVO-driven `@Observable` AVF can re-publish on seeks/stalls)
+            // from re-evaluating the slot holding `PlaybackView`. Until the
+            // size is non-zero, `VideoGeometry.displayRect` is `.zero`, so the
+            // overlay self-suppresses — no conditional branch toggling next to
+            // the player.
+            DetectionLayer(
+                store: resultStore,
+                makeConverter: { [controller] size in
+                    // `makeConverter` runs at draw time inside DetectionLayer's
+                    // GeometryReader, which SwiftUI evaluates on MainActor — so
+                    // reading the MainActor-isolated controller is safe. Assert
+                    // it to satisfy the `@Sendable` signature without a hop.
+                    MainActor.assumeIsolated {
+                        VideoGeometry(
+                            contentSize: controller.presentationSize,
+                            containerSize: size,
+                            contentMode: .aspectFit
+                        )
+                    }
+                },
+                stalenessThreshold: resultStore.playbackStalenessThreshold,
+                tuning: session?.router,
+                displayTimeSource: { [controller] in
+                    // Same MainActor draw-time guarantee as `makeConverter`.
+                    MainActor.assumeIsolated { controller.currentTime }
                 }
-            }
+            )
+            .allowsHitTesting(false)
         }
     }
 
@@ -325,6 +400,13 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+                // Best-effort pipeline gauge: avg inference ms · effective
+                // detections/s · drop %. Placeholders until samples exist.
+                Text(metrics.compactSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
             Spacer()
             Button("Open Video…") { showFilePicker = true }
@@ -392,16 +474,27 @@ struct ContentView: View {
 
         // Register in MRU. `addOrPromote` is idempotent — tapping an
         // existing MRU row moves it to the front without duplicating.
-        recentVideos.addOrPromote(url)
+        // Wrap the model mutation in an animation transaction so the List
+        // row animates its move to the top (the ForEach is keyed by stable
+        // URL id, so SwiftUI can interpolate the reorder).
+        withAnimation(.snappy) {
+            recentVideos.addOrPromote(url)
+        }
+
+        // Per-session counters reset on a new video.
+        metrics.reset()
 
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
 
         self.scopedURL = url
+        self.highlightedURL = url
         self.activeLabel = url.lastPathComponent
         self.controller = newController
         self.errorText = nil
-        self.playerLayer = nil  // re-bound when PlaybackView attaches
+        // The overlay now keys off `controller.presentationSize` (an
+        // `@Observable` on the new controller) and the SwiftUI-measured
+        // frame — no `AVPlayerLayer` handle to thread across the swap.
 
         // M5·P4: build the active detector session from the catalog and
         // spin up the detection loop bound to its router. The demo holds
@@ -459,11 +552,28 @@ struct ContentView: View {
         let store = resultStore
         let pipeline = DetectorPipeline([])
         let source = controller.source
+        let metrics = self.metrics
         let task = Task { [router = newSession.router] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
+                    // Time the inference and feed the best-effort gauge.
+                    // `DetectionMetrics` is `@MainActor`, so record on the
+                    // main actor; the cumulative source drop counter is
+                    // bridged in alongside.
+                    let clock = ContinuousClock()
+                    let start = clock.now
                     _ = try await pipeline.detect(in: frame, cache: store, tuning: router)
+                    let elapsed = clock.now - start
+                    let seconds = Double(elapsed.components.seconds)
+                        + Double(elapsed.components.attoseconds) / 1e18
+                    let dropped = source.droppedFrameCount
+                    let emitted = source.emittedFrameCount
+                    await MainActor.run {
+                        metrics.recordInference(seconds: seconds)
+                        metrics.setDropped(dropped)
+                        metrics.setEmitted(emitted)
+                    }
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
@@ -485,6 +595,8 @@ struct ContentView: View {
     private func swapDetector() {
         guard let controller else { return }
         resultStore.invalidateAll()
+        // Per-session counters reset on a new detector.
+        metrics.reset()
         buildSessionAndStartDetection(on: controller)
         // Re-emit the visible frame so a paused player still re-runs
         // detection under the freshly-selected detector. Same primitive as
@@ -516,8 +628,8 @@ struct ContentView: View {
         session?.router.onDetectorTierChange = nil
 
         controller = nil
-        playerLayer = nil
         scopedURL = nil
+        highlightedURL = nil
         activeLabel = ""
         session = nil
         resultStore.clear()

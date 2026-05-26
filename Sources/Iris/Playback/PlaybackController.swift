@@ -53,6 +53,15 @@ public final class PlaybackController: ScrubberModel {
     /// so the UI ticks on the same edge.
     public private(set) var state: SourceState = .idle
 
+    /// The **upright displayed size** of the current video, in pixels —
+    /// `AVPlayerItem.presentationSize`, which already accounts for the
+    /// asset's `preferredTransform` (so a 1920×1080 landscape clip reports
+    /// `1920×1080`). `.zero` until the item reaches `.readyToPlay`; the
+    /// overlay path uses it as `VideoGeometry.contentSize` and skips drawing
+    /// while it is zero. (Portrait correctness of the *detector* is a later
+    /// pass; this is the box the player actually draws.)
+    public private(set) var presentationSize: CGSize = .zero
+
     // MARK: - Stored
 
     /// The wrapped source. Public so callers that also need the AVF-side
@@ -72,6 +81,8 @@ public final class PlaybackController: ScrubberModel {
     @ObservationIgnored private nonisolated(unsafe) var timeObserverToken: Any?
     @ObservationIgnored private nonisolated(unsafe) var durationObservation: NSKeyValueObservation?
     @ObservationIgnored private nonisolated(unsafe) var statusObservation: NSKeyValueObservation?
+    @ObservationIgnored private nonisolated(unsafe)
+        var presentationSizeObservation: NSKeyValueObservation?
     private let logger = Logger(subsystem: "iris.playback", category: "controller")
 
     // MARK: - Init
@@ -93,6 +104,7 @@ public final class PlaybackController: ScrubberModel {
         installTimeObserver()
         installDurationObservation()
         installStatusObservation()
+        installPresentationSizeObservation()
     }
 
     deinit {
@@ -105,6 +117,7 @@ public final class PlaybackController: ScrubberModel {
         }
         durationObservation?.invalidate()
         statusObservation?.invalidate()
+        presentationSizeObservation?.invalidate()
     }
 
     // MARK: - ScrubberModel actions
@@ -229,6 +242,24 @@ public final class PlaybackController: ScrubberModel {
             let sourceState = self.source.state
             Task { @MainActor [weak self] in
                 self?.state = sourceState
+            }
+        }
+    }
+
+    /// KVO on `AVPlayerItem.presentationSize` — the upright displayed size
+    /// of the video (post-`preferredTransform`). `.zero` until the asset is
+    /// ready; becomes valid once tracks load. The overlay's `VideoGeometry`
+    /// reads this as its `contentSize` and skips drawing while it's zero.
+    private func installPresentationSizeObservation() {
+        presentationSizeObservation = playerItem.observe(
+            \.presentationSize,
+            options: [.initial, .new]
+        ) { [weak self] item, _ in
+            let newSize = item.presentationSize
+            // KVO callbacks aren't `@MainActor`-isolated even when delivered
+            // on `.main`; hop explicitly, mirroring the duration observer.
+            Task { @MainActor [weak self] in
+                self?.presentationSize = newSize
             }
         }
     }

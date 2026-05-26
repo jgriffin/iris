@@ -17,7 +17,7 @@ import os
 /// The tab structure exists to prove the playback subsystem is *not*
 /// macOS-only — per the locked `plans/DECISIONS.md` §"macOS parity is a
 /// *principle*, not a target" decision, the same `PlaybackSource`/
-/// `PlaybackView`/`Scrubber`/`PlayerLayerConverter` stack must work
+/// `PlaybackView`/`Scrubber`/`VideoGeometry` stack must work
 /// unchanged on iOS.
 struct ContentView: View {
     var body: some View {
@@ -68,8 +68,9 @@ struct CaptureContentView: View {
                 if let converter {
                     DetectionLayer(
                         store: resultStore,
-                        converter: converter,
-                        videoRect: .zero  // unused by PreviewLayerConverter
+                        // Capture: AVF owns the geometry off the live preview
+                        // layer, so the measured size is ignored.
+                        makeConverter: { _ in converter }
                     )
                     .ignoresSafeArea()
                 }
@@ -192,10 +193,13 @@ struct CaptureContentView: View {
 struct PlaybackContentView: View {
     @State private var controller: PlaybackController?
     @State private var resultStore = ResultStore()
-    @State private var converter = PlayerLayerConverter()
-    @State private var playerLayer: AVPlayerLayer?
     @State private var detectionTask: Task<Void, Never>?
     @State private var errorText: String?
+
+    /// Best-effort pipeline gauge. `@MainActor @Observable` — surfaced as a
+    /// small HUD pill over the playback area (avg inference ms · effective
+    /// det/s · drop %). Reset per video / detector swap.
+    @State private var metrics = DetectionMetrics()
 
     /// M5·P4: the general detector-selection layer. `catalog` lists the
     /// selectable detectors (built-in Vision rectangles + body pose);
@@ -256,38 +260,74 @@ struct PlaybackContentView: View {
         }
         .sheet(isPresented: $showTuning) {
             NavigationStack {
-                VStack(spacing: 0) {
-                    // M5·P4 follow-up: the detector picker lives at the TOP
-                    // of the tuning pane (above the settings), not in the
-                    // control bar. Always visible whenever the sheet opens —
-                    // outside the `if let session` guard — while the settings
-                    // below stay guarded on an active session. Changing the
-                    // selection rebuilds the active `session` and restarts the
-                    // detection loop (see `.onChange(of: selectedDetectorID)`).
-                    // `settingsView` is itself a `Form`, so the picker sits in
-                    // its own header above it rather than nesting Forms.
-                    HStack {
-                        Text("Detector")
-                            .font(.headline)
-                        Spacer()
-                        Picker("Detector", selection: $selectedDetectorID) {
-                            ForEach(catalog.entries) { entry in
-                                Text(entry.displayName).tag(entry.id)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        // M5·P5: the tuning sheet scrolls three regions
+                        // separated by rules — the filter controls (Detector
+                        // picker + Tuning) lead at the TOP; Live detections
+                        // takes the generous middle (it's the focus); Metrics
+                        // anchors the BOTTOM. `Divider()`s mark the region
+                        // boundaries and the wider `spacing` keeps it from
+                        // reading as jammed-together. The detector picker is
+                        // always visible (outside the `if let session` guard);
+                        // changing it rebuilds `session` + restarts the loop
+                        // (see `.onChange(of: selectedDetectorID)`). Live
+                        // detections is the `DetectionInspector` reading the
+                        // SAME `resultStore.lookup` the overlay reads; Metrics
+                        // is the verbose gauge.
+                        sheetSection("Detector") {
+                            Picker("Detector", selection: $selectedDetectorID) {
+                                ForEach(catalog.entries) { entry in
+                                    Text(entry.displayName).tag(entry.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                            .accessibilityLabel("Active detector")
+                        }
+
+                        // The session's `settingsView` is itself a `Form`,
+                        // which doesn't compose inside a ScrollView. Show it
+                        // only when present, in its own fixed-height frame so
+                        // the surrounding scroll owns the gesture.
+                        if let session {
+                            sheetSection("Tuning") {
+                                session.settingsView
+                                    .frame(minHeight: 240)
                             }
                         }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .accessibilityLabel("Active detector")
+
+                        Divider()
+
+                        // Live detections — same lookup the overlay reads.
+                        // The focus of the sheet: given a generous `minHeight`
+                        // so it reads as room to breathe, not a cramped row.
+                        sheetSection("Live detections") {
+                            if let controller {
+                                DetectionInspector(
+                                    store: resultStore,
+                                    displayTimeSource: { [controller] in
+                                        controller.currentTime
+                                    },
+                                    stalenessThreshold: resultStore.playbackStalenessThreshold
+                                )
+                            } else {
+                                Text("Open a video to inspect detections.")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(minHeight: 280, alignment: .top)
+
+                        Divider()
+
+                        sheetSection("Metrics") {
+                            DetectionMetricsView(metrics: metrics)
+                        }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color(.secondarySystemBackground))
-
-                    if let session {
-                        session.settingsView
-                    } else {
-                        Spacer()
-                    }
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .navigationTitle("Detector tuning")
                 .navigationBarTitleDisplayMode(.inline)
@@ -402,41 +442,97 @@ struct PlaybackContentView: View {
 
     // MARK: - Sub-views
 
+    /// One labeled section in the stacked tuning sheet: a headline title over
+    /// its content. Keeps the four sections (Detector / Tuning / Metrics /
+    /// Live detections) visually uniform.
+    @ViewBuilder
+    private func sheetSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     /// `PlaybackView` + `DetectionLayer` stack. Mirrors the macOS demo's
-    /// `playbackArea(controller:)` — the overlay is conditional on
-    /// `playerLayer` because `PlayerLayerConverter` needs the AVF layer
-    /// to compute `videoRect`.
+    /// `playbackArea(controller:)`. Player + overlay share the SAME
+    /// `ZStack` frame, and `PlaybackView` is locked to `.resizeAspect`
+    /// (centered aspect-fit). The overlay's own `GeometryReader` measures
+    /// that shared frame, so `VideoGeometry(contentSize: presentationSize,
+    /// containerSize: <that frame>, .aspectFit).displayRect` lands exactly
+    /// on the on-screen video. `presentationSize` is read at draw time
+    /// inside the converter closure (not in this body), and the overlay
+    /// self-suppresses while it's zero (`displayRect == .zero`).
     @ViewBuilder
     private func playbackArea(controller: PlaybackController) -> some View {
         ZStack {
-            PlaybackView(source: controller.source) { layer in
-                // `onPlayerLayerReady` fires inside `makeUIView`. Deferring
-                // the `@State` write one runloop tick avoids SwiftUI's
-                // "modifying state during view update" warning.
-                Task { @MainActor in
-                    self.converter = PlayerLayerConverter(playerLayer: layer)
-                    self.playerLayer = layer
-                }
-            }
+            PlaybackView(source: controller.source)
+                // Pin the representable's identity to the source's lifetime so
+                // sibling/parent re-evaluation can never re-make it (which would
+                // tear down the AVPlayerLayer + restart the tick driver mid-play).
+                .id(ObjectIdentifier(controller.source))
 
-            if let playerLayer {
-                // Same per-tick `playerLayer.videoRect` read as the macOS
-                // demo — propagates aspect / resize changes without KVO.
-                TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
-                    DetectionLayer(
-                        store: resultStore,
-                        converter: converter,
-                        videoRect: playerLayer.videoRect,
-                        stalenessThreshold: resultStore.playbackStalenessThreshold,
-                        tuning: session?.router,
-                        displayTimeSource: { [controller] in
-                            controller.currentTime
-                        }
-                    )
-                    .allowsHitTesting(false)
+            // Always present. `presentationSize` is read INSIDE the closure,
+            // which runs at draw time in `DetectionLayer`'s own
+            // `GeometryReader` — NOT in this body. That keeps `presentationSize`
+            // (a KVO-driven `@Observable` AVF can re-publish on seeks/stalls)
+            // from re-evaluating the slot holding `PlaybackView`. Until the
+            // size is non-zero, `VideoGeometry.displayRect` is `.zero`, so the
+            // overlay self-suppresses — no conditional branch toggling next to
+            // the player.
+            DetectionLayer(
+                store: resultStore,
+                makeConverter: { [controller] size in
+                    // `makeConverter` runs at draw time inside DetectionLayer's
+                    // GeometryReader, which SwiftUI evaluates on MainActor — so
+                    // reading the MainActor-isolated controller is safe. Assert
+                    // it to satisfy the `@Sendable` signature without a hop.
+                    MainActor.assumeIsolated {
+                        VideoGeometry(
+                            contentSize: controller.presentationSize,
+                            containerSize: size,
+                            contentMode: .aspectFit
+                        )
+                    }
+                },
+                stalenessThreshold: resultStore.playbackStalenessThreshold,
+                tuning: session?.router,
+                displayTimeSource: { [controller] in
+                    // Same MainActor draw-time guarantee as `makeConverter`.
+                    MainActor.assumeIsolated { controller.currentTime }
                 }
-            }
+            )
+            .allowsHitTesting(false)
+
+            // Best-effort pipeline gauge HUD: avg inference ms · effective
+            // detections/s · drop %. Top-trailing pill, subtle material so
+            // it doesn't obstruct the video. Always-on dev/eval readout.
+            metricsHUD
         }
+    }
+
+    /// Top-trailing HUD pill showing the best-effort pipeline gauge.
+    @ViewBuilder
+    private var metricsHUD: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Text(metrics.compactSummary)
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(8)
+            }
+            Spacer()
+        }
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -510,7 +606,12 @@ struct PlaybackContentView: View {
 
         // Register in MRU. `addOrPromote` is idempotent — tapping an
         // existing MRU row moves it to the front without duplicating.
-        recentVideos.addOrPromote(url)
+        // Wrap the model mutation in an animation transaction so the List
+        // row animates its move to the top (the ForEach is keyed by stable
+        // URL id, so SwiftUI can interpolate the reorder).
+        withAnimation(.snappy) {
+            recentVideos.addOrPromote(url)
+        }
 
         // `acquireScope: false` here because we already acquired it
         // ourselves above (couldn't do it inside `startSession` because
@@ -534,12 +635,17 @@ struct PlaybackContentView: View {
     private func startSession(url: URL, label: String, acquireScope: Bool) {
         _ = acquireScope  // Documentation parameter; see doc comment.
 
+        // Per-session counters reset on a new source.
+        metrics.reset()
+
         let source = PlaybackSource(url: url)
         let newController = PlaybackController(source: source)
 
         self.controller = newController
         self.errorText = nil
-        self.playerLayer = nil  // re-bound when PlaybackView attaches
+        // The overlay now keys off `controller.presentationSize` (an
+        // `@Observable` on the new controller) and the SwiftUI-measured
+        // frame — no `AVPlayerLayer` handle to thread across the swap.
         self.activeLabel = label
 
         // M5·P4: build the active detector session from the catalog and
@@ -592,11 +698,28 @@ struct PlaybackContentView: View {
         let store = resultStore
         let pipeline = DetectorPipeline([])
         let source = controller.source
+        let metrics = self.metrics
         let task = Task { [router = newSession.router] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
                 do {
+                    // Time the inference and feed the best-effort gauge.
+                    // `DetectionMetrics` is `@MainActor`, so record on the
+                    // main actor; the cumulative source drop counter is
+                    // bridged in alongside.
+                    let clock = ContinuousClock()
+                    let start = clock.now
                     _ = try await pipeline.detect(in: frame, cache: store, tuning: router)
+                    let elapsed = clock.now - start
+                    let seconds = Double(elapsed.components.seconds)
+                        + Double(elapsed.components.attoseconds) / 1e18
+                    let dropped = source.droppedFrameCount
+                    let emitted = source.emittedFrameCount
+                    await MainActor.run {
+                        metrics.recordInference(seconds: seconds)
+                        metrics.setDropped(dropped)
+                        metrics.setEmitted(emitted)
+                    }
                 } catch {
                     Logger.demo.error(
                         "detect failed: \(String(describing: error), privacy: .public)"
@@ -618,6 +741,8 @@ struct PlaybackContentView: View {
     private func swapDetector() {
         guard let controller else { return }
         resultStore.invalidateAll()
+        // Per-session counters reset on a new detector.
+        metrics.reset()
         buildSessionAndStartDetection(on: controller)
         // Re-emit the visible frame so a paused player still re-runs
         // detection under the freshly-selected detector. Same primitive as
@@ -650,7 +775,6 @@ struct PlaybackContentView: View {
         session?.router.onDetectorTierChange = nil
 
         controller = nil
-        playerLayer = nil
         scopedURL = nil
         session = nil
         showTuning = false

@@ -92,6 +92,18 @@ public final class PlaybackSource: Source, @unchecked Sendable {
     private var eofObservation: NSObjectProtocol?
     private var lastEmittedItemTime: CMTime = .invalid
 
+    /// Per-session frame-yield accounting, guarded by `lock` (same idiom as
+    /// `_state`). `_droppedFrameCount` increments whenever
+    /// `continuation.yield(_:)` reports `.dropped` (the `.bufferingNewest(3)`
+    /// buffer shed an in-flight frame because the consumer was behind);
+    /// `_emittedFrameCount` counts every `tick()`-produced frame handed to
+    /// the continuation. Counters are cumulative for the instance's life —
+    /// a new `PlaybackSource` is created per video, so they reset per
+    /// session without a dedicated reset method. They feed the demo's
+    /// best-effort gauge (`DetectionMetrics`).
+    private var _droppedFrameCount: Int = 0
+    private var _emittedFrameCount: Int = 0
+
     // MARK: - Init
 
     /// Build a `PlaybackSource` for the file at `url`.
@@ -227,6 +239,24 @@ public final class PlaybackSource: Source, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return _state
+    }
+
+    /// Cumulative count of frames the `.bufferingNewest(3)` buffer shed
+    /// because the consumer was behind (`continuation.yield` returned
+    /// `.dropped`). Per-instance, so it resets naturally per video session.
+    /// Feeds the demo's best-effort `DetectionMetrics` gauge.
+    public var droppedFrameCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _droppedFrameCount
+    }
+
+    /// Cumulative count of frames handed to the continuation by `tick()`
+    /// (regardless of whether they were enqueued or dropped). Per-instance.
+    public var emittedFrameCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _emittedFrameCount
     }
 
     /// Begin playback and emit frames. Idempotent.
@@ -456,7 +486,17 @@ public final class PlaybackSource: Source, @unchecked Sendable {
             format: .yuv420BiPlanarFull,
             dimensions: CGSize(width: width, height: height)
         )
-        continuation.yield(frame)
+        // Capture the yield result so the best-effort gauge can see buffer
+        // pressure. `.dropped` means the `.bufferingNewest(3)` buffer shed a
+        // frame because the consumer was still mid-inference — the signal
+        // the drop counter exists to surface. Counters share `lock`.
+        let result = continuation.yield(frame)
+        lock.lock()
+        _emittedFrameCount += 1
+        if case .dropped = result {
+            _droppedFrameCount += 1
+        }
+        lock.unlock()
     }
 
     // MARK: - End of item
