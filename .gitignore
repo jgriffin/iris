@@ -68,6 +68,10 @@ captures/
 *.swo
 *~
 
+# Git worktrees (kept inside the repo, ignored so they never show as untracked
+# in the main tree). Create with: git worktree add .worktrees/<name> <branch>
+.worktrees/
+
 # Claude / planning workspace artifacts
 .planning/cache/
 .claude/local/
