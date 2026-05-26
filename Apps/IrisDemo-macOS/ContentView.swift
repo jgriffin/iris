@@ -1,4 +1,3 @@
-@preconcurrency import AVFoundation
 import Iris
 import SwiftUI
 import UniformTypeIdentifiers
@@ -32,17 +31,15 @@ import os
 /// `stopAccessingSecurityScopedResource()`. Mirrors the iOS demo's Phase 2
 /// pattern.
 ///
-/// `videoRect` for the `DetectionLayer` is read from `playerLayer.videoRect`
-/// every TimelineView tick — that's the on-screen rect the video occupies
-/// after `.resizeAspect` letterbox/pillarbox, which `PlayerLayerConverter`
-/// needs as input. `PlaybackSession.videoRect: AsyncStream<CGRect>` is the
-/// eventual reactive plumbing per M3.md §Phase 3; for the smoke demo, the
-/// per-tick read is simpler and equivalent.
+/// The `DetectionLayer`'s geometry is computed by `VideoGeometry` from the
+/// controller's `presentationSize` (the upright displayed video size) and
+/// the SwiftUI-measured container size — no `AVPlayerLayer.videoRect` read.
+/// Player + overlay share one `.resizeAspect` (centered aspect-fit) frame,
+/// so `VideoGeometry.displayRect` lands on the on-screen video; window
+/// resizes propagate through the overlay's `GeometryReader` automatically.
 struct ContentView: View {
     @State private var controller: PlaybackController?
     @State private var resultStore = ResultStore()
-    @State private var converter = PlayerLayerConverter()
-    @State private var playerLayer: AVPlayerLayer?
     @State private var detectionTask: Task<Void, Never>?
     @State private var showFilePicker = false
     @State private var errorText: String?
@@ -342,43 +339,55 @@ struct ContentView: View {
         }
     }
 
-    /// The `PlaybackView` + `DetectionLayer` stack. The overlay is conditional
-    /// on `playerLayer` because `PlayerLayerConverter` needs the AVF layer to
-    /// compute `videoRect` — the layer is wired in via `PlaybackView`'s
-    /// `onPlayerLayerReady` callback, which fires the first time the view
-    /// is built.
+    /// The `PlaybackView` + `DetectionLayer` stack. Player + overlay share
+    /// the SAME `ZStack` frame, and `PlaybackView` is locked to
+    /// `.resizeAspect` (centered aspect-fit). The overlay's own
+    /// `GeometryReader` measures that shared frame, so
+    /// `VideoGeometry(contentSize: presentationSize, containerSize: <that
+    /// frame>, .aspectFit).displayRect` lands exactly on the on-screen
+    /// video — no `AVPlayerLayer.videoRect` read. The overlay is gated on a
+    /// non-zero `presentationSize` (zero until the item is ready); window
+    /// resizes flow through the `GeometryReader` automatically.
     @ViewBuilder
     private func playbackArea(controller: PlaybackController) -> some View {
         ZStack {
-            PlaybackView(source: controller.source) { layer in
-                // `onPlayerLayerReady` fires inside `makeNSView`. Deferring
-                // the `@State` write one runloop tick avoids SwiftUI's
-                // "modifying state during view update" warning.
-                Task { @MainActor in
-                    self.converter = PlayerLayerConverter(playerLayer: layer)
-                    self.playerLayer = layer
-                }
-            }
+            PlaybackView(source: controller.source)
+                // Pin the representable's identity to the source's lifetime so
+                // sibling/parent re-evaluation can never re-make it (which would
+                // tear down the AVPlayerLayer + restart the tick driver mid-play).
+                .id(ObjectIdentifier(controller.source))
 
-            if let playerLayer {
-                // Outer TimelineView samples `playerLayer.videoRect` at the
-                // same ~60 Hz cadence as the overlay's own TimelineView, so
-                // window resizes / aspect changes propagate without manual
-                // KVO. The overlay still owns its draw-time tick internally.
-                TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
-                    DetectionLayer(
-                        store: resultStore,
-                        converter: converter,
-                        videoRect: playerLayer.videoRect,
-                        stalenessThreshold: resultStore.playbackStalenessThreshold,
-                        tuning: session?.router,
-                        displayTimeSource: { [controller] in
-                            controller.currentTime
-                        }
-                    )
-                    .allowsHitTesting(false)
+            // Always present. `presentationSize` is read INSIDE the closure,
+            // which runs at draw time in `DetectionLayer`'s own
+            // `GeometryReader` — NOT in this body. That keeps `presentationSize`
+            // (a KVO-driven `@Observable` AVF can re-publish on seeks/stalls)
+            // from re-evaluating the slot holding `PlaybackView`. Until the
+            // size is non-zero, `VideoGeometry.displayRect` is `.zero`, so the
+            // overlay self-suppresses — no conditional branch toggling next to
+            // the player.
+            DetectionLayer(
+                store: resultStore,
+                makeConverter: { [controller] size in
+                    // `makeConverter` runs at draw time inside DetectionLayer's
+                    // GeometryReader, which SwiftUI evaluates on MainActor — so
+                    // reading the MainActor-isolated controller is safe. Assert
+                    // it to satisfy the `@Sendable` signature without a hop.
+                    MainActor.assumeIsolated {
+                        VideoGeometry(
+                            contentSize: controller.presentationSize,
+                            containerSize: size,
+                            contentMode: .aspectFit
+                        )
+                    }
+                },
+                stalenessThreshold: resultStore.playbackStalenessThreshold,
+                tuning: session?.router,
+                displayTimeSource: { [controller] in
+                    // Same MainActor draw-time guarantee as `makeConverter`.
+                    MainActor.assumeIsolated { controller.currentTime }
                 }
-            }
+            )
+            .allowsHitTesting(false)
         }
     }
 
@@ -483,14 +492,9 @@ struct ContentView: View {
         self.activeLabel = url.lastPathComponent
         self.controller = newController
         self.errorText = nil
-        // FIX 1: do NOT null `playerLayer` (nor reset `converter`). On a
-        // source swap the SwiftUI view identity is unchanged, so only
-        // `updateNSView` runs — it reuses the same `AVPlayerLayer` and just
-        // re-points its `.player`. `onPlayerLayerReady` (which writes
-        // `playerLayer`) fires only from `makeNSView`, so nulling here
-        // leaves `playerLayer` nil forever after the first swap and the
-        // overlay branch never re-mounts. The existing layer/converter
-        // remain valid across the swap.
+        // The overlay now keys off `controller.presentationSize` (an
+        // `@Observable` on the new controller) and the SwiftUI-measured
+        // frame — no `AVPlayerLayer` handle to thread across the swap.
 
         // M5·P4: build the active detector session from the catalog and
         // spin up the detection loop bound to its router. The demo holds
@@ -624,7 +628,6 @@ struct ContentView: View {
         session?.router.onDetectorTierChange = nil
 
         controller = nil
-        playerLayer = nil
         scopedURL = nil
         highlightedURL = nil
         activeLabel = ""

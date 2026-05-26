@@ -9,11 +9,11 @@ import CoreGraphics
 /// math and front-camera mirroring internally (per the locked decision in
 /// `explorations/display-pipeline-architecture/RECOMMENDATIONS.md` §26).
 ///
-/// **`videoRect` is unused.** AVF's `layerRectConverted(fromMetadataOutputRect:)`
+/// **No external box geometry.** AVF's `layerRectConverted(fromMetadataOutputRect:)`
 /// returns the on-screen rect in the *layer's* coordinate space, accounting
-/// for letterbox internally. The `in videoRect:` argument is accepted for
-/// protocol symmetry but ignored — for capture, the layer's own bounds and
-/// `videoGravity` are authoritative.
+/// for letterbox internally — for capture, the layer's own bounds and
+/// `videoGravity` are authoritative, so the converter takes no
+/// caller-supplied size or rect.
 ///
 /// **Main-actor requirement.** `AVCaptureVideoPreviewLayer` is a `CALayer`,
 /// which is `@MainActor`-isolated; calling `layerRectConverted` on a
@@ -38,16 +38,14 @@ public struct PreviewLayerConverter: NormalizedGeometryConverting, @unchecked Se
         self.previewLayer = previewLayer
     }
 
-    public func viewRect(forNormalized rect: CGRect, in videoRect: CGRect) -> CGRect {
-        _ = videoRect  // see "videoRect is unused" in the type doc-comment
-        return MainActor.assumeIsolated {
+    public func viewRect(forNormalized rect: CGRect) -> CGRect {
+        MainActor.assumeIsolated {
             previewLayer.layerRectConverted(fromMetadataOutputRect: rect)
         }
     }
 
-    public func viewPoint(forNormalized point: CGPoint, in videoRect: CGRect) -> CGPoint {
-        _ = videoRect
-        return MainActor.assumeIsolated {
+    public func viewPoint(forNormalized point: CGPoint) -> CGPoint {
+        MainActor.assumeIsolated {
             previewLayer.layerPointConverted(fromCaptureDevicePoint: point)
         }
     }

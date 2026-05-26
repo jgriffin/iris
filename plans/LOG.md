@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-🌱 **M5 — Honest detectors** (P1–P3 ✅ · P4 ✅ detector selection 👀 needs smoke-test · P5 📋 inspector ← next)
-👉 Next: smoke-test P4 in the player (pick Body Pose), then start M5·P5 inspector. → [`STATUS.md`](./STATUS.md)
+✅ **M5 — Honest detectors** (P1–P6 ✅ · the macOS overlay-render BLOCKER is resolved — `VideoGeometry` now owns coordinate mapping in pure SwiftUI space)
+👉 Next: source-orientation correctness — `PlaybackSource` `preferredTransform` (portrait) + capture front-mirror; or define M6/M7. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -392,3 +392,16 @@
 - 📌 **Process learning (user called it):** we slid into patch-then-screenshot integration debugging, which can't converge when the agent can't see the running app — every hypothesis is a full round-trip. **Pivot for the render bug:** stop guessing. The durable fix is to **stop depending on `AVPlayerLayer.videoRect`** and compute the video's on-screen rect in **pure SwiftUI space** (`GeometryReader` size + the video's known pixel dimensions → aspect-fit math) — platform-identical, no AppKit coordinate-space question, unit-testable. Verify at the artifact level with **static letterboxed `DetectionLayer` previews** (CLAUDE.md "favorite pattern": render a known skeleton against an *offset* videoRect inside a larger frame, wide + tall cases, in Xcode — no app run). Current `DetectionLayer` previews use `videoRect = (0,0,360,240)` with no offset, so they'd never have caught an offset/flip bug — that gap is the thing to close first.
 - Did: **Captured the work** (user asked, ahead of a `/clear` to restart fresh): committed the solid, tested pieces (P4 player fixes + paused-catch-up test + drop counting + metrics + inspector + layout) so nothing is lost; reverted the speculative render attempt; wrote this handoff.
 - 👉 Next (fresh session): fix the **macOS overlay render bug** via the SwiftUI-space videoRect approach above — (1) add letterboxed `DetectionLayer` static previews that reproduce the blank (offset videoRect, wide+tall), (2) make those previews place the skeleton correctly, (3) derive the demo's videoRect in SwiftUI space instead of `playerLayer.videoRect`, (4) confirm in the demo with the inspector open. Then resume M5 close-out.
+
+---
+
+## 2026-05-25 — VideoGeometry consolidation + macOS overlay fix (M5·P6)
+
+- **Did: resolved the macOS overlay render BLOCKER.** Root cause confirmed: the demo fed `AVPlayerLayer.videoRect` (AppKit bottom-left) into top-left Canvas math, so the overlay drew off the visible video. Fixed by computing the display box in pure SwiftUI space.
+- **Built `VideoGeometry`** — a pure `Sendable` value type (`contentSize` + `containerSize` + `contentMode` → `displayRect` + Y-flip), now the single authority for normalized→view mapping. `DetectionLayer` takes a size-keyed `makeConverter:` with one `GeometryReader` as the measurement point. Retired `PlayerLayerConverter` (math folded in); unified `NormalizedGeometryConverting` (dropped `videoRect:`). iOS capture still delegates to `AVCaptureVideoPreviewLayer` via `PreviewLayerConverter`.
+- **💡 Architecture pivot (the real lesson):** the first cut built rotation + mirror INTO the geometry. The static preview gallery surfaced that as the WRONG LAYER — frames + detections arrive UPRIGHT (capture rotates on the `AVCaptureConnection` + stamps `.up`; Vision gets `frame.orientation`; the player displays upright), so the overlay must only place upright-normalized coords into the displayed box. Rotation/mirroring are source concerns. Removed them. The "truth vs box" model: detection points are normalized truth tied to the upright source; the overlay scales that truth into whatever box the video is displayed in.
+- **💡 The preview pattern earned its keep at the architecture level** — the ground-truth gallery (test card + probes through two independent code paths) caught a design misfit, not just pixels.
+- **Fixed a player-reset regression** the migration introduced: reading `presentationSize` (`@Observable`) in the demo layout body + gating the overlay on it re-shaped the `ZStack` and re-made `PlaybackView` → `AVPlayerLayer` torn down mid-playback (`FigFilePlayer err=-12860` / `AQMEIO` timeouts). Fixed by reading `presentationSize` at draw-time inside `makeConverter` + pinning `PlaybackView` identity with `.id(ObjectIdentifier(controller.source))`.
+- Library `swift test` 207 green; both demo targets (`IrisDemo-macOS`, `IrisDemo-iOS`) compile.
+- 🗓 **Deferred → QUESTIONS.md:** (1) playback `preferredTransform` → upright detections for portrait clips; (2) capture front-camera `isVideoMirrored` (locked decision unimplemented); (3) pre-existing `DetectionInspector` Swift 6 warning in both demos.
+- 👉 **Next:** source-orientation correctness — `PlaybackSource` `preferredTransform` (portrait) + capture front-mirror; or define M6/M7.

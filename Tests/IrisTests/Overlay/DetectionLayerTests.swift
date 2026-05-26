@@ -17,7 +17,7 @@ import Testing
 struct DetectionLayerTests {
 
     @Test
-    func constructsWithPlayerLayerConverterAndIsUsableInAView() {
+    func constructsWithVideoGeometryConverterAndIsUsableInAView() {
         let store = ResultStore()
         let entry = TimestampedDetections(
             timestamp: CMTime(value: 10, timescale: 60),
@@ -34,8 +34,13 @@ struct DetectionLayerTests {
 
         let layer = DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 100, height: 100),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             style: .default,
             displayTimeSource: { .zero }
         )
@@ -54,8 +59,13 @@ struct DetectionLayerTests {
         let store = ResultStore()
         let layer = DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 100, height: 100),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             style: .default,
             stalenessThreshold: CMTime(value: 2, timescale: 1),
             displayTimeSource: { .zero }
@@ -84,7 +94,7 @@ struct DetectionLayerTests {
                 sourceModelID: "detection-layer-tests"
             ),
         ]
-        let result = DetectionLayer<PlayerLayerConverter>.applyTransform(
+        let result = DetectionLayer.applyTransform(
             nil,
             to: detections
         )
@@ -118,7 +128,7 @@ struct DetectionLayerTests {
         let transform: @Sendable ([Detection]) -> [Detection] = { input in
             input.filter { $0.confidence >= 0.5 }
         }
-        let result = DetectionLayer<PlayerLayerConverter>.applyTransform(
+        let result = DetectionLayer.applyTransform(
             transform,
             to: detections
         )
@@ -135,8 +145,13 @@ struct DetectionLayerTests {
         let model = TuningModel(detector: detector)
         let layer = DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 100, height: 100),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             style: .default,
             stalenessThreshold: nil,
             tuning: model,
@@ -156,8 +171,13 @@ struct DetectionLayerTests {
         let style = OverlayStyle(strokeWidth: 3.0, labelTextColor: .yellow)
         let layer = DetectionLayer(
             store: store,
-            converter: PlayerLayerConverter(),
-            videoRect: CGRect(x: 0, y: 0, width: 200, height: 200),
+            makeConverter: { size in
+                VideoGeometry(
+                    contentSize: CGSize(width: 200, height: 200),
+                    containerSize: size,
+                    contentMode: .aspectFit
+                )
+            },
             style: style,
             displayTimeSource: { frozen }
         )
@@ -192,7 +212,7 @@ struct DetectionLayerTests {
             sourceModelID: "detection-layer-tests"
         )
 
-        let corners = DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection)
+        let corners = DetectionLayer.quadCorners(of: detection)
         #expect(corners == [tl, tr, br, bl])
     }
 
@@ -207,7 +227,7 @@ struct DetectionLayerTests {
             sourceModelID: "detection-layer-tests"
         )
 
-        #expect(DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection) == nil)
+        #expect(DetectionLayer.quadCorners(of: detection) == nil)
     }
 
     @Test
@@ -230,7 +250,7 @@ struct DetectionLayerTests {
             sourceModelID: "detection-layer-tests"
         )
 
-        #expect(DetectionLayer<PlayerLayerConverter>.quadCorners(of: detection) == nil)
+        #expect(DetectionLayer.quadCorners(of: detection) == nil)
     }
 
     // MARK: - skeletonSegments
@@ -258,7 +278,7 @@ struct DetectionLayerTests {
             sourceModelID: "detection-layer-tests"
         )
 
-        let segments = DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection)
+        let segments = DetectionLayer.skeletonSegments(of: detection)
         let unwrapped = try? #require(segments)
         #expect(unwrapped?.count == 2)
         #expect(unwrapped?[0].0 == neck)
@@ -288,7 +308,7 @@ struct DetectionLayerTests {
             sourceModelID: "detection-layer-tests"
         )
 
-        let segments = DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection)
+        let segments = DetectionLayer.skeletonSegments(of: detection)
         let unwrapped = try? #require(segments)
         #expect(unwrapped?.count == 1)
         #expect(unwrapped?[0].0 == neck)
@@ -303,7 +323,7 @@ struct DetectionLayerTests {
             confidence: 0.9,
             sourceModelID: "detection-layer-tests"
         )
-        #expect(DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection) == nil)
+        #expect(DetectionLayer.skeletonSegments(of: detection) == nil)
     }
 
     @Test
@@ -326,7 +346,7 @@ struct DetectionLayerTests {
             ],
             sourceModelID: "detection-layer-tests"
         )
-        #expect(DetectionLayer<PlayerLayerConverter>.skeletonSegments(of: detection) == nil)
+        #expect(DetectionLayer.skeletonSegments(of: detection) == nil)
     }
 }
 
