@@ -34,12 +34,16 @@ import Vision
 public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
 
     /// The Vision container wrapping the compiled `MLModel`. Built once at
-    /// construction; immutable thereafter.
-    private let container: CoreMLModelContainer
+    /// construction; immutable thereafter. `internal` so the conditional
+    /// `TunableDetector` conformance (same module) can rebuild the detector
+    /// around a new decoder *without* recompiling the model — a knob change
+    /// reuses this container.
+    let container: CoreMLModelContainer
 
     /// The output decoder. Stateless; turns the request's observations into
-    /// `[Detection]`.
-    private let decoder: Decoder
+    /// `[Detection]`. `internal` so the conditional `TunableDetector`
+    /// conformance can read its threshold and rebuild it.
+    let decoder: Decoder
 
     public let modelIdentifier: String
 
@@ -47,25 +51,33 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
 
     // MARK: - Capabilities
 
-    /// Honest capability descriptor for a path-A YOLO box detector.
+    /// Honest capability descriptor for a YOLO box detector.
     ///
-    /// **Geometry: box.** A `nms=True` Detect export yields axis-aligned
-    /// boxes only — no keypoints, quad, or mask.
+    /// **Geometry: box.** A YOLO Detect export yields axis-aligned boxes only
+    /// — no keypoints, quad, or mask.
     ///
     /// **Confidence: `.probabilistic`.** Unlike the geometric Vision
     /// rectangle detector, a YOLO detection's confidence is a genuine
     /// class probability in `[0, 1]`, so it may honestly be shown as a chip.
     ///
-    /// **Knobs: none (P2).** Path-A thresholds are baked at export; the
-    /// schema is empty. Runtime tuning is the P3 question.
+    /// **Knobs: decoder-derived.** The single source of truth for tunability
+    /// is the *decoder*: a path-A ``VisionObjectDecoder`` (baked thresholds)
+    /// is not a ``TunableOutputDecoder``, so the schema is empty and no
+    /// tuning UI appears; a path-B ``YOLOEnd2EndDecoder`` *is* one, so its
+    /// confidence-threshold schema surfaces here (and the conditional
+    /// `TunableDetector` conformance lights up). Reading it off the decoder
+    /// keeps `capabilities`, `settings`, and `apply(_:)` from drifting.
     ///
     /// **Introspectable fields.** What a box detection carries: the bounding
     /// box, the class label, and the confidence.
     public var capabilities: DetectorCapabilities {
-        DetectorCapabilities(
+        let knobs = (decoder as? any TunableOutputDecoder).map {
+            type(of: $0).settingSchema
+        } ?? SettingSchema(knobs: [])
+        return DetectorCapabilities(
             geometryKinds: [.box],
             confidence: .probabilistic,
-            tunableKnobs: SettingSchema(knobs: []),
+            tunableKnobs: knobs,
             introspectableFields: [
                 DetectorCapabilities.IntrospectableField(
                     key: "boundingBox",
@@ -111,6 +123,23 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
         self.decoder = decoder
         self.modelIdentifier = modelIdentifier
         self.availability = .available
+    }
+
+    /// Rebuild init that reuses an already-built container + identity around a
+    /// new decoder. Used by the conditional `TunableDetector` conformance to
+    /// hot-swap the decoder on a knob change (per the M4 doctrine) *without*
+    /// recompiling the model — the container is the expensive part. `internal`
+    /// + non-throwing because no new model loading happens.
+    init(
+        container: CoreMLModelContainer,
+        decoder: Decoder,
+        modelIdentifier: String,
+        availability: DetectorAvailability
+    ) {
+        self.container = container
+        self.decoder = decoder
+        self.modelIdentifier = modelIdentifier
+        self.availability = availability
     }
 
     // MARK: - Detector

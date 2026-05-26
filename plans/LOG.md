@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-🌱 **M6 — Custom models + captioning** (P1 ✅ conversion pipeline · P2 ✅ CoreMLDetector + VisionObjectDecoder, YOLOv12 Path A · P3 📋 ← here · P4 📋)
-👉 Next: build M6·P3 — `YOLOEnd2EndDecoder` (Path B, YOLO26 raw `[1,300,6]`, no NMS) through the same `OutputDecoder` seam + model-swap catalog/loading (bundled + file-picked); runtime-tunable thresholds settle here too. → [`STATUS.md`](./STATUS.md)
+🌱 **M6 — Custom models + captioning** (P1 ✅ conversion pipeline · P2 ✅ CoreMLDetector + VisionObjectDecoder, YOLOv12 Path A · P3 🌱 — YOLOEnd2End decoder ✅, model-swap/file-picker loading 📋 ← here · P4 📋)
+👉 Next: finish M6·P3 — model-swap catalog/loading (bundled prewarm-at-launch + file-picked `.modelNotReady`-until-present models). The path-B `YOLOEnd2EndDecoder` + runtime confidence knob already shipped. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -435,3 +435,19 @@
 - 💡 Learned: **the macOS demo target had no Resources build phase at all** — bundling `yolo12n.mlpackage` for the Mac app required *creating* one in `IrisDemo.xcodeproj` (the iOS target already had one). Easy to miss; the model silently won't be in the bundle otherwise.
 - 📌 Decided: catalog integration is the additive non-tunable `DetectorCatalogEntry.make` overload + `PassthroughRouter` — keeps plain `Detector`s first-class in the picker without a sham `TunableDetector` conformance.
 - 👉 Next: **M6·P3** — `YOLOEnd2EndDecoder` (Path B: YOLO26 raw `[1,300,6]`, threshold + scale ≤300 rows, **no NMS**, labels from `userDefined` `names`) through the same `OutputDecoder` seam, plus model-swap catalog/loading (bundled + file-picked, `availability == .modelNotReady` until present). The runtime-tunable-threshold variant is decided here alongside it.
+
+---
+
+## 2026-05-26 — M6·P3 — path-B `YOLOEnd2EndDecoder` + tunability (decoder half; loading still 📋)
+
+- Did: **Shipped the path-B half of M6·P3 — the seam carries a raw-tensor decoder, proven.** `YOLOEnd2EndDecoder` runs the converted **YOLO26n** through the SAME `OutputDecoder` seam (no `CoreMLDetector` reshape), with a runtime confidence-threshold knob. New `Sources/Iris/Detection/CoreML/{COCOLabels.swift` (canonical COCO-80 constant), `YOLOEnd2EndDecoder.swift`, `CoreMLDetectorTunable.swift}` + `Tests/IrisTests/Detection/YOLOEnd2EndDecoderFixtureTests.swift`; bundled `yolo26n.mlpackage` in `Tests/IrisTests/Fixtures/` + `Apps/Shared/` (LFS-covered by existing globs).
+- Did: **Tunability via conditional conformance — path A stays honestly non-tunable.** Added `TunableOutputDecoder: OutputDecoder` (sub-protocol) to `OutputDecoder.swift`, and `extension CoreMLDetector: TunableDetector where Decoder: TunableOutputDecoder` — so `YOLOEnd2EndDecoder` (path B) gains a runtime confidence knob while `VisionObjectDecoder` (path A) keeps its baked, honest thresholds. Made `CoreMLDetector`'s container/decoder internal + added a container-reusing rebuild init; `capabilities.tunableKnobs` derived from the decoder. `apply(_:)` tiering: no-op → `.view`; **raise threshold → `.filter`** (higher-conf rows are a strict subset of the cache — a pure post-hoc predicate, no re-inference); **lower → `.detector(rebuilt:)`** (previously-dropped rows aren't cached — rebuilds the detector around the SAME compiled container, no model recompile). Hot-swap-by-rebuild per the M4 doctrine.
+- Did: **Catalog wiring (decoder side only).** `DemoCatalog.swift` gains a YOLO26n entry via the tunable `.make<D: TunableDetector>` path; YOLOv12n stays on P2's plain (non-tunable) overload. `Package.swift` `.copy`/`exclude` for the yolo26n fixture; `IrisDemo.xcodeproj` bundles yolo26n into both targets. (Model-swap/file-picker *loading* is the remaining P3 half — still 📋.)
+- Did: `swift build` clean, `swift test` **209 passed** (P2 was 208; +1 path-B fixture test, no regressions), both `xcodebuild` demo schemes BUILD SUCCEEDED, Swift 6 strict concurrency clean.
+- 💡 Learned (empirical plan-corrections — the artifact disproved M6.md's P3 assumptions; verify-before-Swift caught it):
+    - **Labels come from nowhere in the export — supplied externally.** The converted `yolo26n` has empty metadata (`METADATA keys: []`); path-A models carry labels in the NMS stage's `stringClassLabels`, but this raw `mlProgram` export embeds none. So labels are supplied via `YOLOEnd2EndDecoder(labels:)` + the COCO-80 constant — **not** read from `userDefined`/`names` as the P1 plan assumed.
+    - **The output is xyxy in 640-px space, not xywh.** Single tensor `var_1441` shape `[1,300,6]`; rows are `[x1,y1,x2,y2,confidence,classIndex]` = xyxy in 640-pixel space (NOT xywh, NOT normalized) — confirmed by running the model on a real frame.
+    - **The Sendable seam exposes `shapedArrayValue`, not `multiArrayValue`.** Raw-tensor models return a `CoreMLFeatureValueObservation`; on the MacOSX26.5 SDK the Sendable `MLSendableFeatureValue` exposes the tensor via `shapedArrayValue(of: Float.self)` — there is no `multiArrayValue` on the sendable wrapper.
+    - **Path B owns the letterbox-inverse + Y-flip.** Unlike path A, Vision does NOT inverse-map coords for raw-tensor output — the decoder inverts the `.scaleToFit` letterbox itself (using `frameSize`) AND flips Y (YOLO top-left → Vision lower-left). This was the box-misalignment risk; verified correct (logged person box on the dancer clip ≈ horizontally centered, full height).
+- 📌 Decided: tunability rides the `TunableOutputDecoder` sub-protocol + conditional `CoreMLDetector` conformance, so path A stays non-tunable while path B gains the knob. → [`DECISIONS.md`](./DECISIONS.md) (2026-05-26). Moved the runtime-threshold answered entry in [`QUESTIONS.md`](./QUESTIONS.md) from "re-scoped to P3" to "implemented in P3".
+- 👉 Next: finish **M6·P3** — model-swap/file-picker loading: register Core ML models as `DetectorCatalog` entries supporting **both** bundled (small FP16, Git LFS, loaded + `prewarm()` at launch) and **file-picked** (large/optional/user-supplied, `availability == .modelNotReady` until present) models.

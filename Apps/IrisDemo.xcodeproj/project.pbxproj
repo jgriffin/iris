@@ -19,6 +19,8 @@
 		DFE7EB47103AA9ECF21E20F2 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */; };
 		363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
 		6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
+		DFE5F6538973A2D4FED15009 /* yolo26n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */; };
+		D564F25D9BD30F9818BBA07E /* yolo26n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
 /* End PBXBuildFile section */
@@ -32,6 +34,7 @@
 		8486F9C7159F774FB48A6C3B /* RecentVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentVideos.swift; sourceTree = "<group>"; };
 		C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
 		C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = yolo12n.mlpackage; sourceTree = "<group>"; };
+		FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = yolo26n.mlpackage; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
 		D03976040AAEAF22317D9BE0 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
@@ -83,6 +86,7 @@
 				8486F9C7159F774FB48A6C3B /* RecentVideos.swift */,
 				C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */,
 				C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */,
+				FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -243,6 +247,7 @@
 			files = (
 				AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */,
 				363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */,
+				DFE5F6538973A2D4FED15009 /* yolo26n.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,6 +256,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */,
+				D564F25D9BD30F9818BBA07E /* yolo26n.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

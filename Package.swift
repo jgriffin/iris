@@ -17,17 +17,21 @@ let package = Package(
         .testTarget(
             name: "IrisTests",
             dependencies: ["Iris"],
-            // Exclude the `.mlpackage` from automatic resource discovery so
-            // the `.process("Fixtures")` rule doesn't claim it (which would
+            // Exclude each `.mlpackage` from automatic resource discovery so
+            // the `.process("Fixtures")` rule doesn't claim them (which would
             // flatten the bundle, dumping `model.mlmodel` / `weight.bin`
-            // loose). The explicit `.copy` rule below re-adds it intact.
-            exclude: ["Fixtures/yolo12n.mlpackage"],
+            // loose). The explicit `.copy` rules below re-add them intact.
+            exclude: [
+                "Fixtures/yolo12n.mlpackage",
+                "Fixtures/yolo26n.mlpackage",
+            ],
             resources: [
-                // `.copy` (not `.process`) preserves the `.mlpackage` as a
+                // `.copy` (not `.process`) preserves each `.mlpackage` as a
                 // locatable bundle directory so
                 // `Bundle.module.url(forResource:withExtension:"mlpackage")`
                 // resolves. The rest of Fixtures (video clips) is processed.
                 .copy("Fixtures/yolo12n.mlpackage"),
+                .copy("Fixtures/yolo26n.mlpackage"),
                 .process("Fixtures"),
             ]
         ),

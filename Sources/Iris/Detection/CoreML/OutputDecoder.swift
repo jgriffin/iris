@@ -47,3 +47,55 @@ public protocol OutputDecoder: Sendable {
         modelID: String
     ) throws -> [Detection]
 }
+
+/// An ``OutputDecoder`` that carries a runtime-tunable **confidence
+/// threshold** — the path-B knob M6·P3 adds.
+///
+/// **Why a sub-protocol, not a field on `OutputDecoder`.** The two decode
+/// paths differ on whether the threshold is *tunable at runtime at all*:
+///
+///   - **Path A** (`VisionObjectDecoder`) reads a `nms=True` pipeline whose
+///     confidence/IoU thresholds are **baked at export time** — there is no
+///     runtime knob to honor, so it stays a plain ``OutputDecoder`` and the
+///     detector wrapping it stays a plain `Detector` (no tuning UI).
+///   - **Path B** (`YOLOEnd2EndDecoder`) thresholds the raw `[1, 300, 6]`
+///     rows *in Swift*, so the confidence floor is a genuine runtime knob.
+///     Conforming here is what lets `CoreMLDetector` pick up a conditional
+///     `TunableDetector` conformance (see its `where Decoder:
+///     TunableOutputDecoder` extension).
+///
+/// Modeling the knob on a decoder sub-protocol — rather than on
+/// `CoreMLDetector` directly — keeps `CoreMLDetector` agnostic of *which*
+/// knobs its decoder has: the detector's tunability is derived from the
+/// decoder's, so a future path-B decoder with different knobs slots in by
+/// conforming a richer sub-protocol without reshaping the detector.
+///
+/// **Rebuild, don't mutate.** Per the M4 hot-swap doctrine, a knob change
+/// produces a *fresh* decoder via ``withConfidenceThreshold(_:)`` rather
+/// than mutating in place — the detector that wraps it is likewise rebuilt.
+/// `OutputDecoder` conformers are `Sendable` value types, so this is cheap.
+public protocol TunableOutputDecoder: OutputDecoder {
+
+    /// The current minimum confidence a decoded row must clear to become a
+    /// `Detection`. In `[0, 1]`; a genuine class probability for YOLO.
+    var confidenceThreshold: Float { get }
+
+    /// The schema describing this decoder's tunable knob(s) — surfaced by
+    /// the wrapping detector's `capabilities.tunableKnobs` and consumed by
+    /// the capability-derived tuning UI. The confidence knob's `key` is
+    /// ``confidenceThresholdKey``.
+    static var settingSchema: SettingSchema { get }
+
+    /// Build a fresh decoder identical to `self` but with a new confidence
+    /// threshold (hot-swap-by-rebuild, per the M4 doctrine). The wrapping
+    /// detector calls this in `apply(_:)` and rebuilds itself around the
+    /// returned decoder.
+    func withConfidenceThreshold(_ threshold: Float) -> Self
+}
+
+extension TunableOutputDecoder {
+    /// Stable schema key for the confidence-threshold knob. Single source of
+    /// truth shared by the schema, the detector's `apply(_:)` routing, and
+    /// the `CoreMLDetectorSettings` value bridge.
+    public static var confidenceThresholdKey: String { "confidenceThreshold" }
+}
