@@ -114,54 +114,30 @@ struct ContentView: View {
         }
         .frame(minWidth: 880, minHeight: 480)
         .inspector(isPresented: $showTuning) {
-            // M5·P5: one scrolling pane, three regions separated by rules —
-            // the filter controls (Detector picker + Tuning) lead at the
-            // TOP; Live detections takes the generous middle (it's the
-            // focus); Metrics anchors the BOTTOM. `Divider()`s mark the
-            // region boundaries and the wider `spacing` keeps it from
-            // reading as jammed-together. The detector picker is always
-            // visible (even on an empty workspace); tuning is the active
-            // session's capability-derived `settingsView`; Live detections
-            // is the `DetectionInspector` reading the SAME
+            // M5·P5: one scrolling pane, three regions separated by rules.
+            // The detector picker now lives in the toolbar (always visible);
+            // this pane leads with Tuning (the active session's
+            // capability-derived `settingsView`), then Live detections takes
+            // the generous middle (the `DetectionInspector` reading the SAME
             // `resultStore.lookup` the overlay reads, as a render/cache
-            // diagnostic; Metrics is the verbose `DetectionMetricsView`.
-            // The gear button stays toggleable.
+            // diagnostic), then Metrics anchors the BOTTOM (verbose
+            // `DetectionMetricsView`). `Divider()`s mark the boundaries and
+            // the wider `spacing` keeps it from reading as jammed-together.
+            // A failed custom-model load surfaces a caption above Tuning so
+            // the error stays visible even though the picker moved out.
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    // 1. Detector — always-visible picker. Changing the
-                    //    selection rebuilds `session` + restarts the loop
-                    //    (see `.onChange(of: selectedDetectorID)`).
-                    inspectorSection("Detector") {
-                        Picker("Detector", selection: $selectedDetectorID) {
-                            ForEach(catalog.entries) { entry in
-                                detectorRow(for: entry).tag(entry.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .accessibilityLabel("Active detector")
-
-                        // M6·P3: when the file-picked slot is selected and not
-                        // yet loaded, surface a "Load model…" button to open
-                        // the Core ML importer. Mirrors the video Open button.
-                        if selectedDetectorID == DemoCatalog.customEntryID,
-                            modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
-                        {
-                            Button {
-                                showModelPicker = true
-                            } label: {
-                                Label("Load model…", systemImage: "square.and.arrow.down")
-                            }
-                            .controlSize(.small)
-                        }
-                        if let modelError = modelStore.pickedModelError {
-                            Text(modelError)
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
+                    // Custom-model load error — relocated from the (now
+                    // moved-out) Detector section so a failed load is still
+                    // reported. A toolbar can't host a multiline caption.
+                    if let modelError = modelStore.pickedModelError {
+                        Text(modelError)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    // 2. Tuning — the session's capability-derived settings.
+                    // 1. Tuning — the session's capability-derived settings.
                     inspectorSection("Tuning") {
                         if let session {
                             session.settingsView
@@ -174,7 +150,7 @@ struct ContentView: View {
 
                     Divider()
 
-                    // 3. Live detections — same lookup the overlay reads.
+                    // 2. Live detections — same lookup the overlay reads.
                     //    The focus of the pane: given a generous `minHeight`
                     //    so it reads as room to breathe, not a cramped row.
                     inspectorSection("Live detections") {
@@ -196,7 +172,7 @@ struct ContentView: View {
 
                     Divider()
 
-                    // 4. Metrics — verbose, counts-lead gauge.
+                    // 3. Metrics — verbose, counts-lead gauge.
                     inspectorSection("Metrics") {
                         DetectionMetricsView(metrics: metrics)
                     }
@@ -208,9 +184,38 @@ struct ContentView: View {
             .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
         }
         .toolbar {
-            // M5·P4 follow-up: the detector picker moved INTO the inspector
-            // (at the top of the pane); only the gear "Tune" toggle remains
-            // in the toolbar as the entry point.
+            // The detector picker lives in the toolbar as an always-visible,
+            // quick-access control (the user switches detectors a lot). The
+            // inspector hosts only Tuning / Live detections / Metrics; the
+            // gear "Tune" toggle in `.primaryAction` opens it.
+            ToolbarItem(placement: .navigation) {
+                Picker("Detector", selection: $selectedDetectorID) {
+                    ForEach(catalog.entries) { entry in
+                        detectorRow(for: entry).tag(entry.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .accessibilityLabel("Active detector")
+            }
+
+            // M6·P3: when the file-picked slot is selected and not yet loaded,
+            // surface a "Load model…" toolbar button to open the Core ML
+            // importer. The `.onChange(of: selectedDetectorID)` auto-open also
+            // fires, but the explicit button keeps the affordance discoverable.
+            if selectedDetectorID == DemoCatalog.customEntryID,
+                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+            {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        showModelPicker = true
+                    } label: {
+                        Label("Load model…", systemImage: "square.and.arrow.down")
+                    }
+                    .help("Load a Core ML model")
+                }
+            }
+
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showTuning.toggle()

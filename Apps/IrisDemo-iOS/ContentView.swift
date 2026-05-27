@@ -292,47 +292,18 @@ struct PlaybackContentView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         // M5·P5: the tuning sheet scrolls three regions
-                        // separated by rules — the filter controls (Detector
-                        // picker + Tuning) lead at the TOP; Live detections
-                        // takes the generous middle (it's the focus); Metrics
-                        // anchors the BOTTOM. `Divider()`s mark the region
-                        // boundaries and the wider `spacing` keeps it from
-                        // reading as jammed-together. The detector picker is
-                        // always visible (outside the `if let session` guard);
-                        // changing it rebuilds `session` + restarts the loop
-                        // (see `.onChange(of: selectedDetectorID)`). Live
-                        // detections is the `DetectionInspector` reading the
-                        // SAME `resultStore.lookup` the overlay reads; Metrics
-                        // is the verbose gauge.
-                        sheetSection("Detector") {
-                            Picker("Detector", selection: $selectedDetectorID) {
-                                ForEach(catalog.entries) { entry in
-                                    detectorRow(for: entry).tag(entry.id)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .labelsHidden()
-                            .accessibilityLabel("Active detector")
-
-                            // M6·P3: when the file-picked slot is selected and
-                            // not yet loaded, surface a "Load model…" button to
-                            // open the Core ML document picker.
-                            if selectedDetectorID == DemoCatalog.customEntryID,
-                                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
-                            {
-                                Button {
-                                    showModelPicker = true
-                                } label: {
-                                    Label("Load model…", systemImage: "square.and.arrow.down")
-                                }
-                                .controlSize(.small)
-                            }
-                            if let modelError = modelStore.pickedModelError {
-                                Text(modelError)
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
-                            }
-                        }
+                        // separated by rules — Tuning leads at the TOP; Live
+                        // detections takes the generous middle (it's the
+                        // focus); Metrics anchors the BOTTOM. `Divider()`s mark
+                        // the region boundaries and the wider `spacing` keeps it
+                        // from reading as jammed-together. The detector picker
+                        // is now a top-level control in `controlBar` (always
+                        // visible without opening this sheet); changing it
+                        // rebuilds `session` + restarts the loop (see
+                        // `.onChange(of: selectedDetectorID)`). Live detections
+                        // is the `DetectionInspector` reading the SAME
+                        // `resultStore.lookup` the overlay reads; Metrics is the
+                        // verbose gauge.
 
                         // The session's `settingsView` is itself a `Form`,
                         // which doesn't compose inside a ScrollView. Show it
@@ -417,38 +388,85 @@ struct PlaybackContentView: View {
 
     // MARK: - Control bar + MRU list
 
-    /// "Pick video" button + a label for the active source. Sits below the
-    /// scrubber; on phone-sized screens this reads cleanly as a single row.
+    /// Detector picker + "Tune" + "Pick video" — the persistent control row
+    /// below the scrubber. The detector picker is the leading control as an
+    /// always-visible, quick-access switch (the user changes detectors a lot);
+    /// a `.menu`-style picker shows the current detector name and stays compact
+    /// on phone-sized screens. The "Load model…" button + error caption for
+    /// the custom-model flow sit just below the row (see `customModelRow`) so
+    /// they're reachable at top level without opening the sheet.
     @ViewBuilder
     private var controlBar: some View {
-        HStack {
-            // M5·P4 follow-up: the detector picker moved INTO the tuning
-            // sheet (at the top of the pane). The gear "Tune" button below
-            // is the entry point; the picker is no longer in the control bar.
-            Spacer()
-            // M5·P4: live tuning sheet over the active session's
-            // capability-derived settings view. Hosts the detector picker
-            // at the top of the pane plus the session's settings. The gear
-            // is enabled even without a session so the picker is reachable.
-            Button {
-                showTuning = true
-            } label: {
-                Label("Tune", systemImage: "slider.horizontal.3")
-                    .labelStyle(.iconOnly)
-            }
-            .controlSize(.small)
-            .accessibilityLabel("Tune detector")
+        VStack(spacing: 4) {
+            HStack {
+                // Always-visible detector picker — leads the row.
+                Picker("Detector", selection: $selectedDetectorID) {
+                    ForEach(catalog.entries) { entry in
+                        detectorRow(for: entry).tag(entry.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .accessibilityLabel("Active detector")
 
-            Button {
-                showPicker = true
-            } label: {
-                Label("Pick video", systemImage: "folder.badge.plus")
+                Spacer()
+
+                // M5·P4: live tuning sheet over the active session's
+                // capability-derived settings view (Tuning → Live detections →
+                // Metrics). The gear is enabled even without a session.
+                Button {
+                    showTuning = true
+                } label: {
+                    Label("Tune", systemImage: "slider.horizontal.3")
+                        .labelStyle(.iconOnly)
+                }
+                .controlSize(.small)
+                .accessibilityLabel("Tune detector")
+
+                Button {
+                    showPicker = true
+                } label: {
+                    Label("Pick video", systemImage: "folder.badge.plus")
+                }
+                .controlSize(.small)
             }
-            .controlSize(.small)
+
+            customModelRow
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color(.secondarySystemBackground))
+    }
+
+    /// Custom-model affordances, shown just below the control row so the
+    /// file-pick flow stays reachable at top level (the iOS control area has
+    /// more room than a macOS toolbar). When the custom slot is selected but
+    /// unloaded, a "Load model…" button opens the Core ML document picker (the
+    /// `.onChange(of: selectedDetectorID)` auto-open also fires). A failed load
+    /// surfaces a small caption so the error stays visible.
+    @ViewBuilder
+    private var customModelRow: some View {
+        if selectedDetectorID == DemoCatalog.customEntryID,
+            modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+        {
+            HStack {
+                Button {
+                    showModelPicker = true
+                } label: {
+                    Label("Load model…", systemImage: "square.and.arrow.down")
+                }
+                .controlSize(.small)
+                Spacer()
+            }
+        }
+        if let modelError = modelStore.pickedModelError {
+            HStack {
+                Text(modelError)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Spacer()
+            }
+        }
     }
 
     /// MRU list below the control bar. Empty state shows a hint to use the
