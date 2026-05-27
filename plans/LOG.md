@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-🌱 **M6 — Custom models + captioning** (P1 ✅ conversion pipeline · P2 ✅ CoreMLDetector + VisionObjectDecoder, YOLOv12 Path A · P3 ✅ — YOLOEnd2End decoder + model loading (prewarm, bundled-at-launch, file-picked Path-A) · P4 📋 captioning — remaining stretch)
-👉 Next: decide whether to take **P4** (captioning — stretch: `Captioner` protocol + a Foundation Models backend) or **close M6** here. M6's core (P1–P3) is done. → [`STATUS.md`](./STATUS.md)
+✅ **M6 — Custom models** closed (P1–P3 ✅ · P4 🚫 captioning dropped — Foundation Models is text-only; on-device captioning needs a VLM). M1–M6 all ✅.
+👉 Next: **milestone boundary — decide the next milestone.** M7 (Dataset, BRIEF §6) is the front-runner → define it → draft [`features/M7.md`](./features/M7.md). (M5·P6 orientation-correctness carryover is a smaller alternative.) → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -467,3 +467,13 @@
 - 🗓 Deferred: **Path-B file-picking.** File-picked models currently accept Path-A only (NMS-pipeline, self-describing). A Path-B picked model would need a label-supply UI + output-spec auto-detect — deferred. → [`QUESTIONS.md`](./QUESTIONS.md).
 - 📌 Decided: real synthetic-buffer prewarm + bundled-at-launch + file-picked Path-A-only, with file-picking/model UI in the demo and Iris owning the loading primitive + detector + availability. → [`DECISIONS.md`](./DECISIONS.md) (2026-05-26).
 - 👉 Next: **decide whether to take P4** (captioning — stretch: `Captioner` protocol + a Foundation Models backend) **or close M6** here. M6's core (P1–P3) is done; P4 is the only remaining stretch.
+
+---
+
+## 2026-05-26 — M6 closed (P1–P3); captioning (P4) dropped
+
+- Did: **Closed M6 — Custom models.** P1–P3 shipped + committed today (`da3b471` M6·P2 CoreMLDetector + VisionObjectDecoder / `1248d1d` M6·P3 YOLOEnd2EndDecoder + runtime confidence knob / `dfdd777` M6·P3 model loading; P1 conversion pipeline was `5fcb3bd`). End state: the Core ML detector runs end-to-end — conversion pipeline → path-A `VisionObjectDecoder` (Vision auto-decodes) → path-B `YOLOEnd2EndDecoder` (raw `[1,300,6]`, runtime confidence knob via conditional `TunableDetector`) → bundled + file-picked Path-A model loading. M1–M6 all ✅.
+- Did: **Dropped P4 (captioning) — not deferred.** Marked 🚫 in [`features/M6.md`](./features/M6.md) §P4, landed the close + drop in [`DECISIONS.md`](./DECISIONS.md) (2026-05-26), and added an answered entry in [`QUESTIONS.md`](./QUESTIONS.md). Rewrote [`STATUS.md`](./STATUS.md) to the milestone-boundary overview tree (M6 annotated `(P1–P3 ✅ · P4 🚫)`, matching M4).
+- 💡 Learned / 📌 **Foundation Models is text-only — verified against the MacOSX26.5 SDK.** `LanguageModelSession.respond(to:)` takes a `Prompt`/`String` and returns `Response<String>` (or a structured `Generable`); `Prompt` is built **purely from text** — there is **no `CGImage`/`CVPixelBuffer`/`CIImage` image-input path** (the only image-ish symbol, `logFeedbackAttachment`, is unrelated). Vision has **no natural-language caption request** (its catalog is detection/classification/saliency/text-recognition; the closest, `ClassifyImageRequest`, returns labels, not a caption). So on-device image→text captioning is **infeasible without a VLM** — it needs a vision-language model converted to Core ML, an off-plan lift, *not* a "Foundation Models backend". This corrects the original assumption in [`BRIEF.md`](./BRIEF.md) §3 and [`features/M6.md`](./features/M6.md). Combined with the user deprioritizing captioning, P4 is dropped; a future captioning milestone would start from a Core ML VLM.
+- ℹ️ The off-critical-path RF-DETR `DETRSetPredictionDecoder` item stays in [`QUESTIONS.md`](./QUESTIONS.md) as the future additive plug-in it already was — unaffected by the M6 close.
+- 👉 Next: **milestone boundary — decide the next milestone.** M7 (Dataset, BRIEF §6) is the next milestone-path entry — define it → draft [`features/M7.md`](./features/M7.md). The M5·P6 **source orientation-correctness** carryover (playback `preferredTransform` + capture front-mirror) is a smaller alternative if a quick win is preferred.

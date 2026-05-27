@@ -8,17 +8,14 @@ _Snapshot · 2026-05-26_
 ├─ ✅ M3 — Playback
 ├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
 ├─ ✅ M5 — Honest detectors  (P1–P6 ✅)
-└─ 🌱 M6 — Custom models + captioning
-   ├─ ✅ P1 — Core ML conversion pipeline (tooling + runbook + verified YOLO paths)
-   ├─ ✅ P2 — CoreMLDetector + VisionObjectDecoder (YOLOv12 Path A end-to-end)
-   ├─ ✅ P3 — YOLOEnd2End decoder + model loading; file-picked Path-A models
-   └─ 📋 P4 — captioning (Captioner + Foundation Models) — stretch   ← here
+└─ ✅ M6 — Custom models      (P1–P3 ✅ · P4 🚫)
 
 penciled in — not yet defined (ideas, traceable to you)
-   ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6 block)
-   ✏️ M7 — Dataset (BRIEF §6)
+   ✏️ M7 — Dataset (BRIEF §6)                                                          ← likely next
+   ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
+   ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — M6's core (P1–P3) is done; **decide whether to take P4** (captioning — *stretch*: `Captioner` protocol + a Foundation Models backend, define it first) **or close M6** here. P4 is the only remaining stretch — the honest gate is the take-it-or-close-it call, not the work. Plan: [features/M6.md](./features/M6.md). → [LOG.md](./LOG.md)
+👉 next — milestone boundary: **decide the next milestone**. M7 (Dataset) is the next milestone-path entry — define it → draft [features/M7.md](./features/M7.md). (The M5·P6 orientation-correctness carryover is a smaller alternative if a quick win is preferred.) → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
@@ -32,10 +29,10 @@ penciled in — not yet defined (ideas, traceable to you)
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M6 closed: P1–P3 ✅; captioning (P4) dropped — Foundation Models is text-only, on-device captioning needs a VLM (2026-05-26)
 - M6·P3 closed: model loading (prewarm, bundled-at-launch, file-picked Path-A) shipped (2026-05-26)
 - M6·P3: path-B YOLOEnd2EndDecoder + runtime confidence knob (conditional TunableDetector) shipped (2026-05-26)
 - M6·P2: Path-A CoreMLDetector shipped; runtime thresholds deferred to P3 (2026-05-26)
 - Core ML detector: start with YOLOv12 (Path A), pluggable `OutputDecoder` seam (2026-05-25)
 - VideoGeometry = single coordinate-mapping authority; orientation/mirroring upstream (2026-05-25)
 - Self-describing detections (skeleton + readout on `Detection`) (2026-05-25)
-- Detector capability model (2026-05-24)
