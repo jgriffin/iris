@@ -727,11 +727,16 @@ struct PlaybackContentView: View {
         // M5·P4: build the active detector session from the catalog and
         // spin up the detection loop bound to its router. The demo holds
         // only the type-erased `ActiveDetectorSession` — no concrete
-        // detector or tuning view is named here.
-        buildSessionAndStartDetection(on: newController)
+        // detector or tuning view is named here. The build is now async (it
+        // drains any prior single-consumer stream loop before starting a new
+        // one), so it runs in a `@MainActor` Task; playback starts after the
+        // new consumer is in place.
+        Task { @MainActor in
+            await buildSessionAndStartDetection(on: newController)
 
-        // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
-        newController.togglePlay()
+            // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
+            newController.togglePlay()
+        }
     }
 
     /// M5·P4: build the catalog session for `selectedDetectorID`, wire its
@@ -739,8 +744,16 @@ struct PlaybackContentView: View {
     /// bound to the session's router. Shared by initial session start and
     /// detector-swap. Cancels any running loop before starting a new one.
     @MainActor
-    private func buildSessionAndStartDetection(on controller: PlaybackController) {
+    private func buildSessionAndStartDetection(on controller: PlaybackController) async {
         detectionTask?.cancel()
+        // `PlaybackSource.frames` is a single-consumer `AsyncStream`. Cancellation
+        // is cooperative, so the old `for await` loop may still be draining when we
+        // get here. Awaiting the task's value blocks until that loop fully exits, so
+        // the new consumer below is the *only* consumer before we re-emit the seek
+        // frame — otherwise that one re-emitted frame races between two live
+        // consumers and the old (stale) detector can win. `AsyncStream`'s iterator
+        // is cancellation-aware, so this returns promptly.
+        await detectionTask?.value
         session?.router.onDetectorTierChange = nil
 
         guard
@@ -819,13 +832,20 @@ struct PlaybackContentView: View {
         resultStore.invalidateAll()
         // Per-session counters reset on a new detector.
         metrics.reset()
-        buildSessionAndStartDetection(on: controller)
-        // Re-emit the visible frame so a paused player still re-runs
-        // detection under the freshly-selected detector. Same primitive as
-        // the `.detector`-tier pause-emit hook.
-        let target = controller.currentTime
-        let source = controller.source
-        Task { try? await source.seek(to: target) }
+        // The build is async (it drains the prior single-consumer stream loop
+        // before starting the new one), and the re-emit seek MUST happen after
+        // that drain — otherwise the re-emitted frame races between the dying
+        // old consumer and the new one. Sequencing both inside one `@MainActor`
+        // Task preserves that ordering.
+        Task { @MainActor in
+            await buildSessionAndStartDetection(on: controller)
+            // Re-emit the visible frame so a paused player still re-runs
+            // detection under the freshly-selected detector. Same primitive as
+            // the `.detector`-tier pause-emit hook.
+            let target = controller.currentTime
+            let source = controller.source
+            try? await source.seek(to: target)
+        }
     }
 
     /// Tear down the active playback session. Idempotent.
