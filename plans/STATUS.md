@@ -9,9 +9,9 @@ _Snapshot · 2026-05-27_
 ├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
 ├─ ✅ M5 — Honest detectors  (P1–P6 ✅)
 ├─ ✅ M6 — Custom models     (P1–P3 ✅ · P4 🚫)
-└─ 📋 PlaybackDetectionCoordinator → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
-   ├─ 📋 P1 — coordinator in `Playback/` + swap regression test   ← next
-   ├─ 📋 P2 — rewire macOS demo (delete duplicated glue)
+└─ 🌱 PlaybackDetectionCoordinator → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
+   ├─ ✅ P1 — coordinator in `Playback/` + swap regression test
+   ├─ 📋 P2 — rewire macOS demo (delete duplicated glue)   ← next
    ├─ 📋 P3 — rewire iOS demo identically
    └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
 
@@ -20,7 +20,7 @@ penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **build P1**: land `PlaybackDetectionCoordinator` in `Sources/Iris/Playback/` + the swap regression test (closes the accepted test gap). On branch `fix-playback-detector-swap` (path 1 — fix + its test merge together; ⚖️ confirm before building). → [LOG.md](./LOG.md)
+👉 next — **build P2**: rewire the macOS demo onto the coordinator — delete its duplicated `buildSessionAndStartDetection` / `swapDetector` / `swapToExternal` / `teardown` glue and bind to the coordinator outputs. P2/P3 **actually fix the demo swap bug for the first time** — the demos' cancel→drain→respawn glue (`f4a6284`) is a no-op (single stored `AsyncStream` dies on consumer cancel; see 2026-05-27 correction), so mid-video swaps still show nothing until reload until the demos move onto the coordinator's single-loop + in-place router swap. On branch `fix-playback-detector-swap`. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -31,11 +31,12 @@ penciled in — not yet defined (ideas, traceable to you)
 - 🗓 Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 - 🗓 `Apps/project.yml` ↔ `.pbxproj` drift — an xcodegen regen would drop the bundled `.mlpackage` Resources entries; the hand-edited `.pbxproj` is authoritative (M6·P3)
 - 🗓 Path-B file-picking — file-picked models accept Path-A only; a Path-B picked model needs a label-supply UI + output-spec auto-detect (M6·P3)
-- 📋 Detector-swap regression test — now homed in coordinator [P1](./features/playback-detection-coordinator.md); the 2026-05-26 fix (`f4a6284`) ships untested until P1 lands
+- ✅ Detector-swap regression test — landed in coordinator [P1](./features/playback-detection-coordinator.md) (commit `51743c7`); building P1 also corrected the root cause (the 2026-05-26 `f4a6284` cancel→drain→respawn is a no-op) → now answered in [QUESTIONS.md](./QUESTIONS.md)
 - 🗓 Revisit bumped SwiftLint thresholds once detector churn settles
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- Swap root-cause corrected: the `f4a6284` cancel→drain→respawn fix proved a **no-op** (`PlaybackSource` exposes a single stored `AsyncStream` that dies permanently on consumer cancel — respawned `for await` gets zero frames); coordinator uses **one loop + in-place router swap** instead. P2/P3 fix the demo swap bug for the first time (2026-05-27)
 - PlaybackDetectionCoordinator defined: `@MainActor @Observable` library type in `Playback/`; 4 phases (P1 build+test, P2/P3 rewire demos, P4 deferred) (2026-05-27)
 - Playback session orchestration → a library `PlaybackDetectionCoordinator` in `Playback/`; demos keep only file/scope/catalog/layout; source-agnostic core not pre-split (2026-05-27)
 - M6 merged to `main` (fast-forward); playback detector-swap fix + this analysis on branch `fix-playback-detector-swap` (2026-05-27)

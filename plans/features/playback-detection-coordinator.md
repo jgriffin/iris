@@ -1,7 +1,7 @@
 # PlaybackDetectionCoordinator — own the playback detection-session orchestration
 
 <!-- Working plan. Lifetime ~ this feature; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Defined · 2026-05-27_ · **📋 P1 ready · P2–P3 📋 · P4 🗓 deferred**
+_Defined · 2026-05-27_ · **✅ P1 done (commit `51743c7`) · P2 📋 ← next · P3 📋 · P4 🗓 deferred**
 
 ## Scope / intent
 
@@ -75,14 +75,25 @@ public final class PlaybackDetectionCoordinator {
   `make(id:displayName:detector:)` (plain `Detector` → `PassthroughRouter` + `EmptyView`).
 - The detect loop runs `pipeline.detect(in: frame, cache: store, tuning: router)`
   over `source.frames` (`DetectorPipeline([])`, empty array — the router's
-  `currentDetector` is what runs, per the hot-swap contract).
+  `currentDetector` is what runs, per the hot-swap contract). The loop reads the
+  **live `session.router` per frame** — a `selectDetector` swap is an **in-place**
+  router replacement, so the next frame routes through the new detector with no
+  stream re-iteration (the loop is never cancelled/respawned mid-source).
 
 ## What the coordinator owns (moves out of `ContentView`)
 
-1. **The detect loop + its lifecycle** — `for await frame in source.frames { pipeline.detect(in:cache:tuning:) }`,
-   including the cancel → **`await detectionTask?.value` drain** → respawn
-   sequence the 2026-05-26 bugfix added (commit `f4a6284`; the single-consumer
-   `AsyncStream` race). One place, tested once.
+1. **The detect loop + its lifecycle** — **one loop per source**:
+   `for await frame in source.frames { pipeline.detect(in:cache:tuning: session.router) }`.
+   A detector swap is handled **in place** — `selectDetector` rebuilds the
+   session and the loop reads the **live `session.router` on every frame**, so the
+   next frame routes through the new detector with **no stream re-iteration**.
+   The cancel → `await detectionTask?.value` drain → **respawn** sequence the
+   2026-05-26 bugfix added (commit `f4a6284`) was found **non-functional** while
+   building P1: `PlaybackSource.frames` is a single *stored* `AsyncStream`, so
+   cancelling its consumer **terminates the stream permanently** — a respawned
+   `for await` gets zero frames. (Teardown is different: there the loop is being
+   killed for good, so its cancel → drain → `invalidate()` is correct.) One loop,
+   one place, tested once.
 2. **Cache + metrics** — constructs/holds `ResultStore` and `DetectionMetrics`;
    `resultStore.invalidateAll()` + `metrics.reset()` at the right moments
    (detector swap, new source).
@@ -123,34 +134,47 @@ iOS↔macOS.
 
 ## Phases
 
-### P1 — Land the coordinator in `Playback/` + tests  📋
+### P1 — Land the coordinator in `Playback/` + tests  ✅ (commit `51743c7`)
 
-Build `Sources/Iris/Playback/PlaybackDetectionCoordinator.swift` as the
-`@MainActor @Observable` class above. Move the four owned responsibilities off
+Built `Sources/Iris/Playback/PlaybackDetectionCoordinator.swift` as the
+`@MainActor @Observable` class above. The four owned responsibilities moved off
 the demos into it (loop + lifecycle, cache/metrics, session construction,
-self-wired pause-emit hook). No demo changes yet; `swift test` + both demo
-schemes stay green (they keep their existing inline glue until P2/P3).
+self-wired pause-emit hook). **The detect loop runs once per source and swaps the
+detector in place** — `selectDetector` rebuilds the session and the live loop
+reads `session.router` on the next frame; the loop is **never cancelled and
+respawned mid-source** (that approach was found non-functional — see the Finding
+below). No demo changes; `swift test` + both demo schemes stay green (they keep
+their inline glue until P2/P3). `swift test` **215 pass**, Swift 6
+strict-concurrency clean.
 
-**Tests — close the accepted gap** ([`QUESTIONS.md`](../QUESTIONS.md),
-`[open 2026-05-26]` "No regression test for the playback detector-swap path").
-The coordinator is now a library type, so it's testable under `swift test`:
-drive it with a manual/mock source and **two distinct fixture detectors**, then
-assert the *new* detector's output is what lands after a mid-stream swap. The
-test seam already exists in the package:
+> **Finding (2026-05-27).** The 2026-05-26 fix `f4a6284` (cancel → drain →
+> respawn) is a **no-op**. `PlaybackSource` exposes a single *stored*
+> `AsyncStream` (`_frames` + one `continuation`); cancelling its consuming task
+> **terminates the stream permanently**, so a respawned `for await source.frames`
+> receives **zero** frames and every later `yield` returns `.terminated`
+> (confirmed with an isolated `AsyncStream` repro). There is **no race** — the
+> drain serializes nothing load-bearing; the stream is simply dead after cancel.
+> The reported "swap does nothing until reload" symptom was therefore **never
+> actually fixed** by `f4a6284` (reload only masks it by building a fresh source
+> → fresh stream). This is why the coordinator departs from the demos' glue: it
+> runs **one loop per source + in-place router swap**, so a `selectDetector` swap
+> deterministically routes the next frame through the new detector. P2/P3
+> rewiring the demos onto the coordinator will **actually fix the demo swap bug
+> for the first time**.
 
-- `PlaybackSource(url:driver:)` accepts a `ManualTickDriver` (`fire()` advances
-  one tick deterministically) — or `MockSource` (`Sources/Iris/MockSource.swift`)
-  for a fixed `Frame` sequence with no AVF.
-- `MockDetector` (`Sources/Iris/Detection/MockDetector.swift`) — two instances
-  with distinct outputs as the "old" vs. "new" detector, registered as
-  `DetectorCatalogEntry.make(…)` entries.
-
-The **swap regression test**: start the loop on detector A, drive a frame,
-`selectDetector(B)`, drive (or re-emit) a frame, assert the cached/emitted
-detections are B's — the cancel → **drain** → respawn ordering is what makes B
-the sole consumer of the re-emitted frame (the bug commit `f4a6284` fixed, now
-guarded). Also cover: `setSource` resets metrics + cache; `teardown` returns
-only after the source is invalidated (the scope-ordering contract, below).
+**Tests — closed the accepted gap** ([`QUESTIONS.md`](../QUESTIONS.md),
+`[answered 2026-05-27]`). The coordinator is a library type, so it's testable
+under `swift test`. [`Tests/IrisTests/Playback/PlaybackDetectionCoordinatorTests.swift`](../../Tests/IrisTests/Playback/PlaybackDetectionCoordinatorTests.swift)
+drives two distinct `MockDetector`s (registered as `DetectorCatalogEntry.make(…)`
+entries) over a `PlaybackSource(url:driver:)` with a deterministic tick driver,
+**swaps mid-stream** via `selectDetector`, and asserts the new detector owns the
+**subsequent** frames' cached output. Frames are driven via `source.seek(to:)` to
+**distinct timestamps** (the paused same-time re-emit is a headless no-op, so it
+can't be relied on to deliver a post-swap frame). Plus: `setSource` resets
+metrics + cache; `teardown` returns **only after** the source is invalidated (the
+scope-ordering contract, below). The negative half asserts the **correct
+end-state** (after the swap, the new detector's output is what lands) rather than
+reproducing a race — **there is no race**; the in-place swap is deterministic.
 
 ### P2 — Rewire the macOS demo  📋
 
@@ -163,9 +187,13 @@ loop/hook/drain code inside `swapToExternal` / `teardown`; the demo's
 `await coordinator.setSource(source, detector: entry)` → `controller.togglePlay()`;
 its picker `.onChange` becomes `await coordinator.selectDetector(entry)`; its
 `teardown` becomes `await coordinator.teardown()` *then* release scope. Bind the
-views to coordinator outputs (the "stays in the demo" list). Verify by hand —
-swap detector mid-video, tune a `.detector`-tier knob while paused, scrub, open a
-new video — plus `xcodebuild` for the macOS scheme.
+views to coordinator outputs (the "stays in the demo" list). This **actually
+fixes the demo swap bug for the first time** — the demo's existing respawn glue
+(`f4a6284`) is a no-op (single stored `AsyncStream` dies on consumer cancel), so
+moving onto the coordinator's single-loop + in-place router swap is what makes a
+mid-video swap work without reload; it's not merely centralizing code. Verify by
+hand — swap detector mid-video, tune a `.detector`-tier knob while paused, scrub,
+open a new video — plus `xcodebuild` for the macOS scheme.
 
 ### P3 — Rewire the iOS demo identically  📋
 
@@ -173,9 +201,11 @@ Same rewrite on [`Apps/IrisDemo-iOS/ContentView.swift`](../../Apps/IrisDemo-iOS/
 which carries a byte-identical copy of the glue (`buildSessionAndStartDetection`
 / `swapDetector` / `swapToExternal` / `teardown`), plus its bundled-fixture
 `loadFixture` path (still demo-owned — it just builds a `PlaybackSource` from the
-bundled URL and calls `setSource`). Delete its glue; verify by hand on the
-Playback tab + `xcodebuild` for the iOS scheme. After P3 the only
-playback-detection orchestration left is in the one library type.
+bundled URL and calls `setSource`). Delete its glue; like P2 this **actually
+fixes the iOS demo's mid-video swap bug for the first time** (its respawn glue is
+the same no-op), not merely centralization. Verify by hand on the Playback tab +
+`xcodebuild` for the iOS scheme. After P3 the only playback-detection
+orchestration left is in the one library type.
 
 ### P4 — External-controls polish + source-agnostic core  🗓 deferred
 
@@ -228,5 +258,5 @@ Optional, later, and **off this feature's critical path**:
 - Exploration: [`explorations/2026-05-27-demo-library-boundary/RECOMMENDATIONS.md`](../../explorations/2026-05-27-demo-library-boundary/RECOMMENDATIONS.md)
   · [`SYNTHESIS.md`](../../explorations/2026-05-27-demo-library-boundary/SYNTHESIS.md)
 - Decision (placement): [`DECISIONS.md`](../DECISIONS.md) (2026-05-27)
-- Test gap this closes: [`QUESTIONS.md`](../QUESTIONS.md) (`[open 2026-05-26]` detector-swap regression)
-- Prior bugfix this guards: commit `f4a6284` (serialize detection-task teardown on mid-stream swap)
+- Test gap this closes: [`QUESTIONS.md`](../QUESTIONS.md) (`[answered 2026-05-27]` detector-swap regression)
+- Prior "bugfix" this supersedes: commit `f4a6284` (cancel→drain→respawn) — found a **no-op** (single stored `AsyncStream` dies on consumer cancel); see the Finding under P1 and [`LOG.md`](../LOG.md) (2026-05-27)
