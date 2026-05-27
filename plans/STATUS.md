@@ -8,17 +8,22 @@ _Snapshot · 2026-05-27_
 ├─ ✅ M3 — Playback
 ├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
 ├─ ✅ M5 — Honest detectors  (P1–P6 ✅)
-└─ ✅ M6 — Custom models      (P1–P3 ✅ · P4 🚫)
+├─ ✅ M6 — Custom models     (P1–P3 ✅ · P4 🚫)
+└─ 📋 PlaybackDetectionCoordinator → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
+   ├─ 📋 P1 — coordinator in `Playback/` + swap regression test   ← next
+   ├─ 📋 P2 — rewire macOS demo (delete duplicated glue)
+   ├─ 📋 P3 — rewire iOS demo identically
+   └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
 
 penciled in — not yet defined (ideas, traceable to you)
-   ✏️ Playback detection coordinator → library (placement `Playback/` decided, plan undrafted)        ← likely next
-   ✏️ M7 — Dataset (BRIEF §6)
+   ✏️ M7 — Dataset (BRIEF §6)            ← milestone-path next, behind the coordinator
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **define the playback detection coordinator** → draft [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md); API shape + phasing are in [the exploration RECOMMENDATIONS](../explorations/2026-05-27-demo-library-boundary/RECOMMENDATIONS.md), placement (`Playback/`) settled in [DECISIONS](./DECISIONS.md). (M7 Dataset remains the milestone-path entry behind it.) → [LOG.md](./LOG.md)
+👉 next — **build P1**: land `PlaybackDetectionCoordinator` in `Sources/Iris/Playback/` + the swap regression test (closes the accepted test gap). On branch `fix-playback-detector-swap` (path 1 — fix + its test merge together; ⚖️ confirm before building). → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
+- ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 - 🗓 RF-DETR Core ML spike — off the M6 critical path (direct PyTorch→Core ML fork, FP32, needs `DETRSetPredictionDecoder`)
@@ -26,11 +31,12 @@ penciled in — not yet defined (ideas, traceable to you)
 - 🗓 Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 - 🗓 `Apps/project.yml` ↔ `.pbxproj` drift — an xcodegen regen would drop the bundled `.mlpackage` Resources entries; the hand-edited `.pbxproj` is authoritative (M6·P3)
 - 🗓 Path-B file-picking — file-picked models accept Path-A only; a Path-B picked model needs a label-supply UI + output-spec auto-detect (M6·P3)
-- 🗓 Playback detector-swap fix (2026-05-26, committed) ships **untested** — demo `ContentView` has no testable seam; the `PlaybackDetectionCoordinator` extraction (now the 👉 next) is the planned home for the regression test that closes this
+- 📋 Detector-swap regression test — now homed in coordinator [P1](./features/playback-detection-coordinator.md); the 2026-05-26 fix (`f4a6284`) ships untested until P1 lands
 - 🗓 Revisit bumped SwiftLint thresholds once detector churn settles
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- PlaybackDetectionCoordinator defined: `@MainActor @Observable` library type in `Playback/`; 4 phases (P1 build+test, P2/P3 rewire demos, P4 deferred) (2026-05-27)
 - Playback session orchestration → a library `PlaybackDetectionCoordinator` in `Playback/`; demos keep only file/scope/catalog/layout; source-agnostic core not pre-split (2026-05-27)
 - M6 merged to `main` (fast-forward); playback detector-swap fix + this analysis on branch `fix-playback-detector-swap` (2026-05-27)
 - M6 closed: P1–P3 ✅; captioning (P4) dropped — Foundation Models is text-only, on-device captioning needs a VLM (2026-05-26)

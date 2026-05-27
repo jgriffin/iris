@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **M6 — Custom models** closed (P1–P3 ✅ · P4 🚫 captioning dropped — Foundation Models is text-only; on-device captioning needs a VLM). M1–M6 all ✅.
-👉 Next: **milestone boundary — decide the next milestone.** M7 (Dataset, BRIEF §6) is the front-runner → define it → draft [`features/M7.md`](./features/M7.md). (M5·P6 orientation-correctness carryover is a smaller alternative.) → [`STATUS.md`](./STATUS.md)
+📋 **PlaybackDetectionCoordinator defined** — `@MainActor @Observable` library type in `Playback/` that owns the playback detection-session orchestration both demos duplicate. Plan: [`features/playback-detection-coordinator.md`](./features/playback-detection-coordinator.md). M1–M6 all ✅.
+👉 Next: **build P1** — land the coordinator in `Sources/Iris/Playback/` + the swap regression test (closes the accepted test gap). On `fix-playback-detector-swap` (path 1; ⚖️ confirm branch before building). → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -499,3 +499,12 @@
 - Did (git): the 2026-05-26 **swap bugfix was uncommitted on the unmerged `m6-coreml-conversion` branch** (6 commits = all of M6, never merged). Per the user: **fast-forwarded M6 onto `main`**, then cut **`fix-playback-detector-swap`** off `main` for the bugfix + this analysis. (No git remote — all local.)
 - 🗓 Scope choice: kept clear-prep light — **decision + STATUS only**, no feature plan drafted yet (the exploration RECOMMENDATIONS already holds the API shape + phasing).
 - 👉 Next: **define the coordinator** → draft [`features/playback-detection-coordinator.md`](./features/playback-detection-coordinator.md) (P1 coordinator + regression test in the library; P2 rewire macOS demo; P3 rewire iOS demo), then build. M7 (Dataset) remains the milestone-path entry behind it. → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-27 — define: `PlaybackDetectionCoordinator` feature plan
+
+- Did: **Drafted [`features/playback-detection-coordinator.md`](./features/playback-detection-coordinator.md)** — transcribed the exploration RECOMMENDATIONS into a working feature plan, **grounded against the real source types** (not the sketch's working names). Sections: scope/intent, API sketch, owns/stays-in-demo split, 4 phases (P1 land in `Playback/` + swap regression test · P2 rewire macOS · P3 rewire iOS · P4 🗓 external-controls + source-agnostic `DetectionRunner`), opens/risks. The coordinator graduates ✏️→📋 — now in the STATUS tree.
+- 💡 Verified the API sketch held up; five benign sketch↔source refinements folded in: (1) `makeSession` takes `any DetectionCache` (`ResultStore` conforms), not a `ResultStore` param; (2) `make(detector:)` is two overloaded static factories — `make<D: TunableDetector>(…)` and the plain-`Detector` one (→ `PassthroughRouter` + `EmptyView`); (3) `onDetectorTierChange` is `(@Sendable @MainActor () -> Void)?` and the real hook spawns a `Task` around the async `source.seek`; (4) `PlaybackView` takes `controller.source`, not the controller; (5) the test seam is `PlaybackSource(url:driver:)` with `ManualTickDriver` (+ `MockSource`/`MockDetector`).
+- 🗓 Branch deferred: drafting is branch-neutral; proceeded on `fix-playback-detector-swap` (path 1 — so the 2026-05-26 fix `f4a6284` merges *with* its P1 regression test). ⚖️ The merge-now-vs-hold call is still open in [`QUESTIONS.md`](./QUESTIONS.md) — confirm before P1 build.
+- 👉 Next: **build P1** — `Sources/Iris/Playback/PlaybackDetectionCoordinator.swift` + the swap regression test (`swift test`, library-testable now); keep both demos green on their inline glue until P2/P3. → [`STATUS.md`](./STATUS.md)
