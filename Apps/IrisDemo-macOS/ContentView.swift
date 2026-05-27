@@ -9,27 +9,32 @@ import os
 /// picks (`RecentVideos`, the Phase 1 shared model). macOS-only target; the
 /// iOS demo (Phase 2) wires the same stack with a tab-bar shape.
 ///
+/// **Session orchestration lives in `PlaybackDetectionCoordinator`.** The
+/// detect loop, `ResultStore` + `DetectionMetrics`, `PlaybackController`,
+/// `ActiveDetectorSession`, and ordered teardown are owned by the library
+/// coordinator (a `@State` here). This view keeps only app-specific concerns:
+/// file picking, security scope, MRU, the detector catalog + custom-model UX,
+/// layout — and binds its library views to the coordinator's outputs.
+///
 /// Lifecycle:
 /// - `Open Video…` button presents an `NSOpenPanel`-backed `.fileImporter`
 ///   for `.movie` URLs. Sidebar rows for previously-picked clips re-open
 ///   them without the panel.
-/// - On pick OR sidebar tap: `swapToExternal(url:)` tears down the prior
-///   session (releasing any prior security scope), acquires a fresh scope
+/// - On pick OR sidebar tap: `swapToExternal(url:)` acquires a fresh scope
 ///   for the new URL, registers in `RecentVideos`, builds a
-///   `PlaybackController(source: PlaybackSource(url:))`, kicks off a
-///   detector task draining `controller.source.frames`, then
-///   `controller.togglePlay()`.
-/// - On view teardown: cancel the detector task, `source.invalidate()`, then
-///   `stopAccessingSecurityScopedResource()`. That ordering keeps the
-///   security scope alive while AVF still holds the URL.
+///   `PlaybackSource(url:)`, calls `await coordinator.setSource(source,
+///   detector:)` (which tears the prior source down internally), releases the
+///   *prior* scope after that returns, then `coordinator.controller?.togglePlay()`.
+/// - On view teardown: `await coordinator.teardown()` (cancel → drain →
+///   `invalidate()`), THEN `stopAccessingSecurityScopedResource()`. That
+///   ordering keeps the security scope alive while AVF still holds the URL.
 ///
-/// **Security-scope accounting.** Every source swap (pick OR MRU tap) goes
-/// through `swapToExternal(url:)`, which calls `teardown()` *first* to
-/// release any prior scope before acquiring the new one. `scopedURL` holds
-/// the URL currently under scope (nil when there is no active session) and
-/// is the single source of truth `teardown()` reads when balancing
-/// `stopAccessingSecurityScopedResource()`. Mirrors the iOS demo's Phase 2
-/// pattern.
+/// **Security-scope accounting.** `scopedURL` holds the URL currently under
+/// scope (nil when there is no active session). The coordinator never touches
+/// scope — the demo owns it end-to-end and sequences every release strictly
+/// AFTER the relevant coordinator `await` (`setSource` / `teardown`), honoring
+/// the coordinator's sandbox-scope ordering contract. Mirrors the iOS demo's
+/// Phase 2 pattern.
 ///
 /// The `DetectionLayer`'s geometry is computed by `VideoGeometry` from the
 /// controller's `presentationSize` (the upright displayed video size) and
@@ -38,9 +43,17 @@ import os
 /// so `VideoGeometry.displayRect` lands on the on-screen video; window
 /// resizes propagate through the overlay's `GeometryReader` automatically.
 struct ContentView: View {
-    @State private var controller: PlaybackController?
-    @State private var resultStore = ResultStore()
-    @State private var detectionTask: Task<Void, Never>?
+    /// Owns the playback detection-session orchestration: the per-source detect
+    /// loop, the `ResultStore` + `DetectionMetrics`, the `PlaybackController`,
+    /// and the `ActiveDetectorSession` (with its self-wired pause-emit hook).
+    /// The demo keeps only app-specific concerns (file picking, security scope,
+    /// MRU, the detector catalog + custom-model UX) and binds its library views
+    /// to this coordinator's outputs. Replaces the prior per-`@State`
+    /// `controller` / `resultStore` / `detectionTask` / `metrics` / `session`
+    /// glue (the duplicated `buildSessionAndStartDetection` / `swapDetector` /
+    /// loop-respawn dance, which the single-iteration `AsyncStream` made
+    /// non-functional — see `PlaybackDetectionCoordinator`).
+    @State private var coordinator = PlaybackDetectionCoordinator()
     @State private var showFilePicker = false
     @State private var errorText: String?
 
@@ -50,11 +63,6 @@ struct ContentView: View {
 
     /// M6·P3: presents the Core ML model importer (`.mlpackage` / `.mlmodel`).
     @State private var showModelPicker = false
-
-    /// Best-effort pipeline gauge. `@MainActor @Observable` — surfaced in
-    /// the bottom bar (avg inference ms · effective det/s · drop %). Reset
-    /// per video / detector swap.
-    @State private var metrics = DetectionMetrics()
 
     /// FIX 3 (macOS only): the sidebar row currently highlighted by the
     /// `List(selection:)` binding. Arrow keys move this highlight WITHOUT
@@ -80,12 +88,14 @@ struct ContentView: View {
 
     /// M5·P4: the general detector-selection layer. `catalog` lists the
     /// selectable detectors (built-in Vision rectangles + body pose);
-    /// `selectedDetectorID` is the toolbar picker binding; `session` is the
-    /// type-erased active detector + its capability-derived settings view,
-    /// rebuilt by `swapToExternal` and on every picker change. The demo
-    /// never names a concrete detector or tuning view in the playback path
-    /// — it goes through the catalog. Rectangles is the default so pre-M5
-    /// behavior is preserved until the user picks Body Pose.
+    /// `selectedDetectorID` is the toolbar picker binding. The active session
+    /// (type-erased detector + its capability-derived settings view) now lives
+    /// on `coordinator.session`, rebuilt by `coordinator.setSource` and
+    /// `coordinator.selectDetector`. The demo never names a concrete detector
+    /// or tuning view in the playback path — it goes through the catalog,
+    /// resolving the selection into a `DetectorCatalogEntry` (see
+    /// `resolvedEntry`) and handing that to the coordinator. Rectangles is the
+    /// default so pre-M5 behavior is preserved until the user picks Body Pose.
     // M6·P2: the demo catalog adds the converted Core ML YOLOv12n detector
     // (bundled `.mlpackage`, located in `Bundle.main`) after the built-in
     // Vision detectors. Computed so the bundle lookup stays cheap (it only
@@ -98,7 +108,15 @@ struct ContentView: View {
     // the user supplies a model).
     private var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
     @State private var selectedDetectorID: String = "vision.rectangles"
-    @State private var session: ActiveDetectorSession?
+
+    /// Resolve the current picker selection into a catalog entry, falling back
+    /// to the first entry. The single point where the demo turns a selection
+    /// (after any custom-model load) into the `DetectorCatalogEntry` it hands
+    /// the coordinator.
+    private var resolvedEntry: DetectorCatalogEntry? {
+        catalog.entries.first(where: { $0.id == selectedDetectorID })
+            ?? catalog.entries.first
+    }
 
     /// Whether the inspector panel is showing. Gear-icon toolbar toggle
     /// flips this; the inspector hosts the active session's
@@ -139,7 +157,7 @@ struct ContentView: View {
 
                     // 1. Tuning — the session's capability-derived settings.
                     inspectorSection("Tuning") {
-                        if let session {
+                        if let session = coordinator.session {
                             session.settingsView
                         } else {
                             Text("Open a video to start tuning.")
@@ -154,13 +172,13 @@ struct ContentView: View {
                     //    The focus of the pane: given a generous `minHeight`
                     //    so it reads as room to breathe, not a cramped row.
                     inspectorSection("Live detections") {
-                        if let controller {
+                        if let controller = coordinator.controller {
                             DetectionInspector(
-                                store: resultStore,
+                                store: coordinator.resultStore,
                                 displayTimeSource: { [controller] in
                                     controller.currentTime
                                 },
-                                stalenessThreshold: resultStore.playbackStalenessThreshold
+                                stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold
                             )
                         } else {
                             Text("Open a video to inspect detections.")
@@ -174,7 +192,7 @@ struct ContentView: View {
 
                     // 3. Metrics — verbose, counts-lead gauge.
                     inspectorSection("Metrics") {
-                        DetectionMetricsView(metrics: metrics)
+                        DetectionMetricsView(metrics: coordinator.metrics)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -278,7 +296,10 @@ struct ContentView: View {
         }
         // Tear down the active session when the view disappears so the
         // security-scoped resource is released and the AVF observers are
-        // unhooked. SwiftUI calls `onDisappear` on window close.
+        // unhooked. SwiftUI calls `onDisappear` on window close. The
+        // coordinator's `teardown()` is async (it drains the detect loop and
+        // awaits `source.invalidate()`); the scope release is sequenced strictly
+        // after it returns — see `releaseScope(after:)`.
         .onDisappear {
             teardown()
         }
@@ -399,7 +420,7 @@ struct ContentView: View {
     @ViewBuilder
     private var detailArea: some View {
         VStack(spacing: 0) {
-            if let controller {
+            if let controller = coordinator.controller {
                 playbackArea(controller: controller)
 
                 Scrubber(model: controller)
@@ -439,7 +460,7 @@ struct ContentView: View {
             // overlay self-suppresses — no conditional branch toggling next to
             // the player.
             DetectionLayer(
-                store: resultStore,
+                store: coordinator.resultStore,
                 makeConverter: { [controller] size in
                     // `makeConverter` runs at draw time inside DetectionLayer's
                     // GeometryReader, which SwiftUI evaluates on MainActor — so
@@ -453,8 +474,8 @@ struct ContentView: View {
                         )
                     }
                 },
-                stalenessThreshold: resultStore.playbackStalenessThreshold,
-                tuning: session?.router,
+                stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
+                tuning: coordinator.session?.router,
                 displayTimeSource: { [controller] in
                     // Same MainActor draw-time guarantee as `makeConverter`.
                     MainActor.assumeIsolated { controller.currentTime }
@@ -476,7 +497,7 @@ struct ContentView: View {
 
                 // Best-effort pipeline gauge: avg inference ms · effective
                 // detections/s · drop %. Placeholders until samples exist.
-                Text(metrics.compactSummary)
+                Text(coordinator.metrics.compactSummary)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -567,20 +588,23 @@ struct ContentView: View {
 
     /// Swap the active source to an external (picker- or MRU-supplied) URL.
     ///
-    /// Order matters: tear down the prior session FIRST (which releases any
-    /// prior `scopedURL`), THEN acquire the new security scope and build
-    /// the new controller. Reversing the order would double-scope or leak
-    /// the prior scope across the swap.
+    /// The session-orchestration dance (detect loop, cache/metrics reset,
+    /// session build, prior-source teardown) now lives in
+    /// `PlaybackDetectionCoordinator`; this stays purely demo-side: resolve the
+    /// detector entry, acquire the new security scope, hand the
+    /// `PlaybackSource` to the coordinator, then start playback. The
+    /// coordinator's `setSource` internally tears down the prior source and
+    /// returns only after its `invalidate()` completes — so the **prior** scope
+    /// is released strictly after that `await` (the sandbox-scope ordering
+    /// contract). The new scope is acquired before `setSource` so AVF can read
+    /// the new URL the moment the controller is built.
     ///
     /// Also registers `url` with `RecentVideos` so picking promotes the
     /// entry to the top of the MRU and tapping an existing MRU row
     /// re-promotes it (deduplicates inside `addOrPromote`).
     @MainActor
     private func swapToExternal(url: URL) {
-        // Tear down BEFORE acquiring the new scope — otherwise the prior
-        // URL's scope outlives its usefulness, and a same-URL re-tap
-        // would double-acquire without a matching `stop`.
-        teardown()
+        guard let entry = resolvedEntry else { return }
 
         guard url.startAccessingSecurityScopedResource() else {
             let message = "Could not access \(url.lastPathComponent) (security scope denied)."
@@ -600,188 +624,70 @@ struct ContentView: View {
             recentVideos.addOrPromote(url)
         }
 
-        // Per-session counters reset on a new video.
-        metrics.reset()
-
-        let source = PlaybackSource(url: url)
-        let newController = PlaybackController(source: source)
+        // The prior scope (if any) outlives the coordinator's internal
+        // teardown of the prior source — release it strictly AFTER
+        // `setSource` returns (which is after the prior `invalidate()`).
+        let priorScopedURL = scopedURL
 
         self.scopedURL = url
         self.highlightedURL = url
         self.activeLabel = url.lastPathComponent
-        self.controller = newController
         self.errorText = nil
-        // The overlay now keys off `controller.presentationSize` (an
-        // `@Observable` on the new controller) and the SwiftUI-measured
-        // frame — no `AVPlayerLayer` handle to thread across the swap.
+        // The overlay keys off `coordinator.controller.presentationSize` (an
+        // `@Observable` on the new controller) and the SwiftUI-measured frame —
+        // no `AVPlayerLayer` handle to thread across the swap.
 
-        // M5·P4: build the active detector session from the catalog and
-        // spin up the detection loop bound to its router. The demo holds
-        // only the type-erased `ActiveDetectorSession` — no concrete
-        // detector or tuning view is named here. The build is now async (it
-        // drains any prior single-consumer stream loop before starting a new
-        // one), so it runs in a `@MainActor` Task; playback starts after the
-        // new consumer is in place.
+        let source = PlaybackSource(url: url)
         Task { @MainActor in
-            await buildSessionAndStartDetection(on: newController)
+            // Coordinator tears down the prior source (cancel → drain →
+            // invalidate), resets cache + metrics, builds the controller +
+            // session, and spawns the one detect loop. It does NOT start
+            // playback.
+            await coordinator.setSource(source, detector: entry)
+
+            // Prior source is now invalidated — safe to drop its scope.
+            if let priorScopedURL {
+                priorScopedURL.stopAccessingSecurityScopedResource()
+            }
 
             // Kick off playback through the controller so its state mirror
             // refreshes alongside the source. From `.idle`, `togglePlay()`
             // transitions to `.running`; the controller surfaces AVF errors
             // via the periodic time observer (logged to `iris.playback`).
-            newController.togglePlay()
+            coordinator.controller?.togglePlay()
         }
     }
 
-    /// M5·P4: build the catalog session for `selectedDetectorID`, wire its
-    /// pause-emit hook to `controller`, and (re)start the detection loop
-    /// bound to the session's router. Shared by initial session start and
-    /// detector-swap. Cancels any running loop before starting a new one.
-    @MainActor
-    private func buildSessionAndStartDetection(on controller: PlaybackController) async {
-        detectionTask?.cancel()
-        // `PlaybackSource.frames` is a single-consumer `AsyncStream`. Cancellation
-        // is cooperative, so the old `for await` loop may still be draining when we
-        // get here. Awaiting the task's value blocks until that loop fully exits, so
-        // the new consumer below is the *only* consumer before we re-emit the seek
-        // frame — otherwise that one re-emitted frame races between two live
-        // consumers and the old (stale) detector can win. `AsyncStream`'s iterator
-        // is cancellation-aware, so this returns promptly.
-        await detectionTask?.value
-        session?.router.onDetectorTierChange = nil
-
-        guard
-            let entry = catalog.entries.first(where: { $0.id == selectedDetectorID })
-                ?? catalog.entries.first
-        else { return }
-
-        // `cache: resultStore` (passed into `makeSession`) means
-        // `.detector`-tier knob changes invalidate the playback cache so
-        // the next decode produces fresh detections under the new settings.
-        let newSession = entry.makeSession(resultStore)
-
-        // M4 polish: pause-emit hook. A `.detector`-tier change clears the
-        // cache; if the source is paused, no frames flow → overlay reads
-        // nil → detections disappear mid-tuning. Seeking to the current
-        // time re-emits a one-shot frame (the same primitive M3 Phase 2
-        // uses for `seek` / `step`), giving the pipeline a frame to re-run
-        // under the new detector.
-        newSession.router.onDetectorTierChange = { [weak controller] in
-            guard let controller else { return }
-            let source = controller.source
-            let target = controller.currentTime
-            Task { try? await source.seek(to: target) }
-        }
-
-        // Spawn the detector loop. Per the runtime decisions doc the
-        // `for await` loop owns task lifetime — we cancel by canceling the
-        // wrapping Task. The pipeline owns cache write-through on miss
-        // (playback-detection-cache Phase 2); cache hits on revisited
-        // timestamps skip the detector dispatch entirely. The pipeline's
-        // own detector array is empty — the router's `currentDetector`
-        // (the catalog-built detector) is what actually runs, per the
-        // `detect(in:cache:tuning:)` hot-swap contract.
-        let store = resultStore
-        let pipeline = DetectorPipeline([])
-        let source = controller.source
-        let metrics = self.metrics
-        let task = Task { [router = newSession.router] in
-            for await frame in source.frames {
-                if Task.isCancelled { break }
-                do {
-                    // Time the inference and feed the best-effort gauge.
-                    // `DetectionMetrics` is `@MainActor`, so record on the
-                    // main actor; the cumulative source drop counter is
-                    // bridged in alongside.
-                    let clock = ContinuousClock()
-                    let start = clock.now
-                    _ = try await pipeline.detect(in: frame, cache: store, tuning: router)
-                    let elapsed = clock.now - start
-                    let seconds = Double(elapsed.components.seconds)
-                        + Double(elapsed.components.attoseconds) / 1e18
-                    let dropped = source.droppedFrameCount
-                    let emitted = source.emittedFrameCount
-                    await MainActor.run {
-                        metrics.recordInference(seconds: seconds)
-                        metrics.setDropped(dropped)
-                        metrics.setEmitted(emitted)
-                    }
-                } catch {
-                    Logger.demo.error(
-                        "detect failed: \(String(describing: error), privacy: .public)"
-                    )
-                }
-            }
-        }
-
-        self.session = newSession
-        self.detectionTask = task
-    }
-
-    /// M5·P4: handle a picker selection change. Rebuilds the session for
-    /// the newly-selected detector, invalidates the cache (old detections
-    /// are from a different detector), restarts the detection loop bound to
-    /// the new router, and re-emits the current frame so the new detector's
-    /// output appears immediately even while paused.
+    /// M5·P4: handle a picker selection change. Resolves the newly-selected
+    /// entry and hands it to the coordinator, which invalidates the cache,
+    /// resets metrics, swaps the session's router in place (the live detect
+    /// loop picks it up on the next frame), and re-emits the current frame so
+    /// the new detector's output appears immediately even while paused.
     @MainActor
     private func swapDetector() {
-        guard let controller else { return }
-        resultStore.invalidateAll()
-        // Per-session counters reset on a new detector.
-        metrics.reset()
-        // The build is async (it drains the prior single-consumer stream loop
-        // before starting the new one), and the re-emit seek MUST happen after
-        // that drain — otherwise the re-emitted frame races between the dying
-        // old consumer and the new one. Sequencing both inside one `@MainActor`
-        // Task preserves that ordering.
+        guard let entry = resolvedEntry else { return }
         Task { @MainActor in
-            await buildSessionAndStartDetection(on: controller)
-            // Re-emit the visible frame so a paused player still re-runs
-            // detection under the freshly-selected detector. Same primitive as
-            // the `.detector`-tier pause-emit hook.
-            let target = controller.currentTime
-            let source = controller.source
-            try? await source.seek(to: target)
+            await coordinator.selectDetector(entry)
         }
     }
 
-    /// Tear down the active playback session. Idempotent.
+    /// Tear down the active playback session, then release the security scope.
+    /// Idempotent.
     ///
-    /// Order: cancel detector → invalidate source → release security scope.
-    /// Each step releases a hold on the file URL; reversing the order would
-    /// briefly let AVF read from a URL whose security scope has already
-    /// been dropped. `invalidate()` is `async`, so the security-scope release
-    /// runs after it inside the same `Task` to preserve ordering.
+    /// The coordinator's `teardown()` cancels the detect loop, drains it, and
+    /// awaits `source.invalidate()` — returning only after the source is
+    /// invalidated. The security-scope release is sequenced strictly AFTER that
+    /// `await` (the sandbox-scope ordering contract): AVF must not read from a
+    /// URL whose scope has already been dropped.
     @MainActor
     private func teardown() {
-        detectionTask?.cancel()
-        detectionTask = nil
-
-        let priorSource = controller?.source
         let priorScopedURL = scopedURL
-
-        // Clear the pause-emit hook before dropping the session reference
-        // — defensive: the closure captures `controller` weakly, but
-        // dropping the slot eliminates any chance of a stale fire
-        // crossing the swap boundary.
-        session?.router.onDetectorTierChange = nil
-
-        controller = nil
         scopedURL = nil
         highlightedURL = nil
         activeLabel = ""
-        session = nil
-        resultStore.clear()
 
-        // Detach AVF observers + finish the frame stream, then release the
-        // security scope. Capturing `priorSource` and `priorScopedURL`
-        // locally means a follow-up `swapToExternal` can reset `@State` to
-        // the new session synchronously while AVF tears the old one down
-        // in the background.
-        Task {
-            if let priorSource {
-                await priorSource.invalidate()
-            }
+        Task { @MainActor in
+            await coordinator.teardown()
             if let priorScopedURL {
                 priorScopedURL.stopAccessingSecurityScopedResource()
             }
