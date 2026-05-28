@@ -1,7 +1,7 @@
 <!-- Snapshot, rewritten each block. Tree = defined work; penciled-in = ideas. One 👉 next. Best viewed monospace. -->
 
 # Iris — Status
-_Snapshot · 2026-05-27_
+_Snapshot · 2026-05-28_
 
 ├─ ✅ M1 — Capture core
 ├─ ✅ M2 — Detection + overlay
@@ -14,18 +14,22 @@ _Snapshot · 2026-05-27_
 │  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
 │  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
 │  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
-├─ ✅ Demo simulator-runnable  (P1–P4 built · xcodebuild green · 👀 smoke pending · branch `demo-sim-runnable`) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
+├─ ✅ Demo simulator-runnable  (P1–P4 ✅ · merged to `main` ff `40cf0de` · 👀 hands-on smoke still owed) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
 │  ├─ ✅ P1 — Playback-first sidebar-adaptable TabView (iOS demo)  (`3a1388b`)
 │  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
 │  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
 │  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
-└─ ✏️ M7 — Dataset  (BRIEF §6)   ← milestone-path next, not yet defined
+└─ 📋 M7 — Dataset  (BRIEF §6 · defined · playback-context flag→extract loop) → [features/M7.md](./features/M7.md)
+   ├─ 📋 P1 — `FrameRef`+`AssetFingerprint`+`FlagStore` (library core, `Detection` Codable) + tests
+   ├─ 📋 P2 — Flagging UI: bookmark toggle, timeline markers, flagged-frames panel, jump-to-flag
+   ├─ 📋 P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`; deterministic-naming dedup
+   └─ 📋 P4 — COCO sidecar schema + `COCOExporter` (per-image → merged `annotations.json`)
 
 penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **hands-on smoke `demo-sim-runnable`, then merge to `main`.** P1–P4 built on branch `demo-sim-runnable` (`3a1388b` · `1319501` · `8a9e9c1` · `213e149`), iOS scheme `xcodebuild`-green. Remaining gate is by hand (no headless seam): on the **iOS Simulator** and **Mac (Designed for iPad)** — launches to Playback (sidebar on iPad/Mac, bottom bar on iPhone); Capture tab shows the no-camera fallback page (no error/hang); `just sim-add-video <clip>` then Pick video → Files → On My iPhone → Iris Demo plays it. Once smoked, merge → `main`. Then **M7 — Dataset** (BRIEF §6) is the milestone-path next. → [LOG.md](./LOG.md)
+👉 next — **build M7·P1 — `FrameRef` + `AssetFingerprint` + `FlagStore` (library core, no UI).** M7 is defined → [features/M7.md](./features/M7.md): playback-context loop — flag a bad frame while scrubbing (cheap, metadata-only), extract flagged frames later (deferred headless batch → image + COCO sidecar), dedup by deterministic naming, reload-stable via content fingerprint. Locked forks: content fingerprint (not URL), per-image sidecar + merge-exporter, app-managed `<Documents>/iris-dataset/`. P1 is pure library + tests (PTS round-trip, fingerprint-survives-move, flag-survives-reload, `Detection` Codable). ⚠️ `demo-sim-runnable` merged to `main` (ff `40cf0de`) **without** the owed hands-on smoke — smoke it soon so any sim/layout regression isn't lurking on `main`. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -41,6 +45,8 @@ penciled in — not yet defined (ideas, traceable to you)
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M7 defined ([features/M7.md](./features/M7.md)): frame address = `(AssetFingerprint, PTS)`; content fingerprint (filename+size+duration+head-hash) not URL; cheap flagging / deferred headless extraction; per-image COCO sidecar + merge-exporter; deterministic-naming dedup; output under `<Documents>/iris-dataset/`. Scope = **playback**; live-capture flagging is a follow-on (can't re-seek). (2026-05-28)
+- `demo-sim-runnable` fast-forwarded to `main` (`40cf0de`); hands-on smoke skipped (owed) (2026-05-28)
 - Swap root-cause corrected: the `f4a6284` cancel→drain→respawn fix proved a **no-op** (`PlaybackSource` exposes a single stored `AsyncStream` that dies permanently on consumer cancel — respawned `for await` gets zero frames); coordinator uses **one loop + in-place router swap** instead. P2/P3 fix the demo swap bug for the first time (2026-05-27)
 - PlaybackDetectionCoordinator defined: `@MainActor @Observable` library type in `Playback/`; 4 phases (P1 build+test, P2/P3 rewire demos, P4 deferred) (2026-05-27)
 - Playback session orchestration → a library `PlaybackDetectionCoordinator` in `Playback/`; demos keep only file/scope/catalog/layout; source-agnostic core not pre-split (2026-05-27)

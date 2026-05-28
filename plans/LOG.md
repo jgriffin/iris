@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **PlaybackDetectionCoordinator — P1–P3 ✅, smoked + merged to `main`** (P4 🗓 deferred) — the `@MainActor @Observable` library type (`51743c7`) plus both demos rewired onto it (macOS `1ea2cd1` −94, iOS `ad7428d` −102). Both demos smoke-tested; mid-video detector swap works for the first time (the `f4a6284` respawn glue was a no-op). Fast-forwarded `fix-playback-detector-swap` → `main` (`438998d`, branch deleted, not pushed). `swift test` 215 pass; both demo schemes `xcodebuild`-green, strict-concurrency clean. M1–M6 all ✅.
-👉 Next: **M7 — Dataset** (BRIEF §6) — milestone-path next now the coordinator arc is closed. → [`STATUS.md`](./STATUS.md)
+📋 **M7 — Dataset defined; `demo-sim-runnable` merged to `main`.** Demo-sim-runnable P1–P4 fast-forwarded to `main` (`40cf0de`) — hands-on smoke skipped (owed). M7 scoped into a playback-context flag→extract loop ([`features/M7.md`](./features/M7.md)): cheap metadata-only flagging while scrubbing, deferred headless extraction to image + COCO sidecar, reload-stable via content fingerprint, deterministic-naming dedup. Three forks locked with the user (content fingerprint / per-image sidecar+exporter / app-managed Documents). M1–M6 + coordinator all ✅.
+👉 Next: **M7·P1** — `FrameRef` + `AssetFingerprint` + `FlagStore` library core + tests (no UI). → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -563,3 +563,15 @@
 - ℹ️ Pre-existing `DetectionInspector`/`currentTime` Sendable-closure warning still the only one; not introduced here (confirmed against a clean stash).
 - 👀 **Remaining gate — hands-on smoke** (no headless seam): on the **iOS Simulator** and **Mac (Designed for iPad)** — launches to Playback (sidebar layout); Capture tab shows the fallback page; `just sim-add-video <clip>` → Pick video → Files → On My iPhone → Iris Demo plays it.
 - 👉 Next: **smoke `demo-sim-runnable`, then merge → `main`.** After merge, **M7 — Dataset** (BRIEF §6) is the milestone-path next. → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-28 — merge demo-sim-runnable; define M7 — Dataset
+
+- Did: **fast-forwarded `demo-sim-runnable` → `main`** (`4cc0c62..40cf0de`, 6 commits, no merge commit, not pushed). Clean tree. ⚠️ Merged **without** the owed hands-on smoke (the stated remaining gate) — flagged to the user and tracked in STATUS so a sim/layout regression isn't silently sitting on `main`. Branch not deleted yet.
+- Did: **drafted [`features/M7.md`](./features/M7.md)** — M7 scoped as a **playback-context dataset-curation loop**: scrub → spot a wrong frame → flag (cheap, metadata-only) → later extract flagged frames (deferred headless batch) to image + COCO sidecar. Grounded the design in existing seams: a playback frame is already addressable as `(asset, PTS)`, `seek(to:)` `.zero`-tolerance round-trips a stored PTS to the exact frame, and `PlaybackSource`'s default `TaskTickDriver` was built "for headless use (e.g. dataset processing)" — M7 is its intended consumer. Four phases: **P1** `FrameRef`+`AssetFingerprint`+`FlagStore` library core (+ `Detection` Codable) + tests · **P2** flagging UI (bookmark toggle, timeline markers, flagged-frames panel, jump-to-flag) · **P3** `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder` with deterministic-naming dedup · **P4** COCO sidecar schema + `COCOExporter`.
+- Did: **locked three forks with the user** — (1) asset identity = **content fingerprint** (filename+size+duration+optional head-hash), not bare URL, so reload-finds-flags survives moves; (2) **per-image COCO sidecar + merge-exporter**, not one growing file; (3) output to **app-managed `<Documents>/iris-dataset/`** (already Files.app-visible via the just-merged P3 file-sharing keys), `DatasetSink` protocol leaves iCloud/S3 room.
+- Decided: **canonical frame address = PTS** stored as exact `CMTime` `{value,timescale}` (rational, no float drift); frame-index rejected (variable frame rate). **FlagStore is library-side** (Iris's first on-disk persistence) but takes an injected `baseDir` — the library does not hardcode the app sandbox.
+- 🗓 Scope call: M7 v1 is **playback only**. Deferred extraction needs re-seek; **live-capture flagging** would have to snapshot the pixel buffer at flag time (a different, real-time-write path) — noted as a follow-on, not v1, even though BRIEF §6 says "both contexts".
+- 🚩 Opens parked in [`features/M7.md`](./features/M7.md): PTS-vs-`currentTime()` exactness (may need snap-to-sample on flag); `Detection` Codable may want a `DetectionRecord` DTO (self-describing skeleton/readout); reuse an Overlay-side CIImage path for PNG export rather than a new converter.
+- 👉 Next: **build M7·P1** — pure library + tests, no UI. Also owed: smoke the merged demo on Simulator + Mac (Designed for iPad). → [`STATUS.md`](./STATUS.md)
