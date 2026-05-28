@@ -25,6 +25,15 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
+    <!-- File sharing: expose the app's Documents folder under
+         Files → On My iPhone/iPad → Iris Demo, and allow opening documents
+         in place. Lets test videos be dropped in and reached via the
+         existing document picker. See plans/features/demo-sim-runnable.md P3. -->
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+
     <!-- Capability descriptions / scene config. -->
     <key>NSCameraUsageDescription</key>
     <string>Iris demo previews the live camera feed and logs frame timestamps.</string>
