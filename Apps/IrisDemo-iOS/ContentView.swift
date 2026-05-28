@@ -56,9 +56,20 @@ struct CaptureContentView: View {
     @State private var converter: PreviewLayerConverter?
     @State private var errorText: String?
 
+    /// Whether this environment has a video capture device at all. `nil` on the
+    /// iOS Simulator and Mac (Designed for iPad) — both lack camera hardware.
+    /// One runtime check covers `#if targetEnvironment(simulator)` *and*
+    /// `ProcessInfo.isiOSAppOnMac`. On a physical iPhone this is non-nil and the
+    /// capture path runs unchanged. See plans/features/demo-sim-runnable.md P2.
+    private var cameraAvailable: Bool {
+        AVCaptureDevice.default(for: .video) != nil
+    }
+
     var body: some View {
         ZStack {
-            if let session {
+            if !cameraAvailable {
+                cameraUnavailableView
+            } else if let session {
                 CameraPreview(
                     source: session.previewSource,
                     videoGravity: .resizeAspectFill,
@@ -92,6 +103,12 @@ struct CaptureContentView: View {
             }
         }
         .task {
+            // No camera hardware (Simulator / Mac Designed for iPad): never
+            // start a session — the informational fallback page is shown
+            // instead. Early-return before any AVF work so there's no failed
+            // start or hang. P2.
+            guard cameraAvailable else { return }
+
             let new = CaptureSession()
             do {
                 try await new.start()
@@ -133,6 +150,24 @@ struct CaptureContentView: View {
         }
         .onDisappear {
             teardown()
+        }
+    }
+
+    /// Informational page shown when no camera is available (Simulator / Mac
+    /// Designed for iPad). Purely informational — no session is started; the
+    /// user can switch to the Playback tab to work with video files. P2.
+    @ViewBuilder
+    private var cameraUnavailableView: some View {
+        ContentUnavailableView {
+            Label("Camera isn't available here", systemImage: "camera.fill")
+        } description: {
+            Text(
+                """
+                The Simulator and Mac (Designed for iPad) have no camera. \
+                Run on a physical iPhone to use Capture. Use the Playback tab \
+                to work with video files.
+                """
+            )
         }
     }
 
