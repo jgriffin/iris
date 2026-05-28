@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-✅ **PlaybackDetectionCoordinator — P1–P3 ✅** (P4 🗓 deferred) — the `@MainActor @Observable` library type (`51743c7`) plus both demos rewired onto it (macOS `1ea2cd1` −94, iOS `ad7428d` −102). Playback detection-session orchestration now lives in one library type; both demos' mid-video detector swap works for the first time (the `f4a6284` respawn glue was a no-op). `swift test` 215 pass; both demo schemes `xcodebuild`-green, strict-concurrency clean. M1–M6 all ✅.
-👉 Next: **hands-on smoke both demos** (swap mid-video / tune paused / scrub / new video), then fast-forward `fix-playback-detector-swap` → `main`. Then **M7 — Dataset** (BRIEF §6). → [`STATUS.md`](./STATUS.md)
+✅ **PlaybackDetectionCoordinator — P1–P3 ✅, smoked + merged to `main`** (P4 🗓 deferred) — the `@MainActor @Observable` library type (`51743c7`) plus both demos rewired onto it (macOS `1ea2cd1` −94, iOS `ad7428d` −102). Both demos smoke-tested; mid-video detector swap works for the first time (the `f4a6284` respawn glue was a no-op). Fast-forwarded `fix-playback-detector-swap` → `main` (`438998d`, branch deleted, not pushed). `swift test` 215 pass; both demo schemes `xcodebuild`-green, strict-concurrency clean. M1–M6 all ✅.
+👉 Next: **M7 — Dataset** (BRIEF §6) — milestone-path next now the coordinator arc is closed. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -531,3 +531,12 @@
 - 🗓 **P4 deferred** (external-controls polish + source-agnostic `DetectionRunner`) — off the critical path; the coordinator's `controller` already exposes the external-controls seam, and the runner extraction waits for a capture-side consumer ([`QUESTIONS.md`](./QUESTIONS.md) 2026-05-27).
 - 👀 **Remaining gate — hands-on smoke.** P1–P3 are `xcodebuild`-green but the swap fix is only *behaviorally* confirmable by hand (no headless seam for the demo UI): on both demos, swap detector mid-playback (should now show the new detector — the bug `f4a6284` never fixed), tune a `.detector`-tier knob while paused, scrub, open a new video.
 - 👉 Next: **smoke both demos, then fast-forward `fix-playback-detector-swap` → `main`.** After merge, **M7 — Dataset** (BRIEF §6) is the milestone-path next. → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-27 — close: coordinator smoked + merged to `main`
+
+- Did: **Both demos smoke-tested** (user-confirmed) — mid-video detector swap now shows the new detector's output, `.detector`-tier knob tunes while paused, scrub and open-new-video both clean, on macOS and iOS. The swap bug `f4a6284` never actually fixed is fixed for the first time via the coordinator's single-loop + in-place router swap.
+- Did: **Fast-forwarded `fix-playback-detector-swap` → `main`** (`f0b7858 → 438998d`, 8 commits, +1407/−401): coordinator + regression test, both demos rewired, swap root-cause correction, feature plan + demo/library-boundary exploration. Branch deleted. `main` is local-only ahead of any remote (not pushed).
+- 🗓 **P4 stays deferred** (external-controls polish + source-agnostic `DetectionRunner`) — waits for a capture-side consumer ([`QUESTIONS.md`](./QUESTIONS.md)).
+- 👉 Next: **M7 — Dataset** (BRIEF §6) — the milestone-path next now that the coordinator arc is closed. → [`STATUS.md`](./STATUS.md)

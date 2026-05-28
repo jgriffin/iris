@@ -9,18 +9,18 @@ _Snapshot · 2026-05-27_
 ├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
 ├─ ✅ M5 — Honest detectors  (P1–P6 ✅)
 ├─ ✅ M6 — Custom models     (P1–P3 ✅ · P4 🚫)
-└─ ✅ PlaybackDetectionCoordinator  (P1–P3 ✅ · P4 🗓) → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
-   ├─ ✅ P1 — coordinator in `Playback/` + swap regression test  (`51743c7`)
-   ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
-   ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
-   └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
+├─ ✅ PlaybackDetectionCoordinator  (P1–P3 ✅ · P4 🗓 · smoked + merged to `main`) → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
+│  ├─ ✅ P1 — coordinator in `Playback/` + swap regression test  (`51743c7`)
+│  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
+│  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
+│  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
+└─ ✏️ M7 — Dataset  (BRIEF §6)   ← milestone-path next, not yet defined
 
 penciled in — not yet defined (ideas, traceable to you)
-   ✏️ M7 — Dataset (BRIEF §6)            ← milestone-path next (coordinator P1–P3 done)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **hands-on smoke both demos, then merge to `main`.** P1–P3 are built + `xcodebuild`-green, but the swap fix is only *behaviorally* confirmed by hand (no headless seam): on macOS + iOS, load a video, swap detector mid-playback (now shows the new detector's output — the bug `f4a6284` never actually fixed), tune a `.detector`-tier knob while paused, scrub, open a new video. Once smoked, fast-forward `fix-playback-detector-swap` → `main`. Then **M7 — Dataset** is the milestone-path next (P4 stays 🗓 deferred). → [LOG.md](./LOG.md)
+👉 next — **M7 — Dataset (BRIEF §6).** The coordinator arc is closed: P1–P3 smoke-tested on both demos (mid-video swap now shows the new detector — the bug `f4a6284` never actually fixed), fast-forwarded → `main` (`438998d`, branch deleted, not pushed). P4 stays 🗓 deferred (waits for a capture-side `DetectionRunner` consumer). M7 is one-tap frame capture + COCO-JSON sidecar; it needs a phased feature plan before build. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
