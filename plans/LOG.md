@@ -540,3 +540,12 @@
 - Did: **Fast-forwarded `fix-playback-detector-swap` → `main`** (`f0b7858 → 438998d`, 8 commits, +1407/−401): coordinator + regression test, both demos rewired, swap root-cause correction, feature plan + demo/library-boundary exploration. Branch deleted. `main` is local-only ahead of any remote (not pushed).
 - 🗓 **P4 stays deferred** (external-controls polish + source-agnostic `DetectionRunner`) — waits for a capture-side consumer ([`QUESTIONS.md`](./QUESTIONS.md)).
 - 👉 Next: **M7 — Dataset** (BRIEF §6) — the milestone-path next now that the coordinator arc is closed. → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-27 — define: demo simulator-runnable (feature plan + branch)
+
+- Did: **Drafted [`features/demo-sim-runnable.md`](./features/demo-sim-runnable.md)** on new branch `demo-sim-runnable` — make the **iOS demo** pleasant to run with no camera (iOS Simulator + **Mac Designed-for-iPad**; not the native `IrisDemo-macOS` target). Four phases, all demo + tooling, **no `Sources/Iris/` changes**: P1 Playback-first sidebar-adaptable `TabView` · P2 camera fallback page when `AVCaptureDevice.default(for: .video) == nil` (no failed start / hang) · P3 `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` to expose Documents in Files.app · P4 `just sim-add-video <path>` (resolves bundle id from gitignored `Local.xcconfig`, copies into `simctl get_app_container booted … data`/Documents) + verify.
+- Did: decisions locked via the user — sidebar-adaptable layout (vs. plain reorder), file-sharing + copy helper (vs. in-app Documents auto-discovery), tracked as feature+branch (vs. a milestone). **M7 — Dataset stays the milestone-path next**; this runs alongside.
+- 🗓 Found: no `justfile` exists yet (P4 creates one); iOS bundle id is per-developer in gitignored `Apps/IrisDemo-iOS/Local.xcconfig` (`us.fofu.iris.demo` here), so the helper parses it rather than hardcoding.
+- 👉 Next: **build P1** — migrate the iOS demo root `TabView` (`ContentView.swift:25–35`) from `.tabItem` to the value-based `Tab(...)` API, Playback first, `.tabViewStyle(.sidebarAdaptable)`. Awaiting go-ahead. → [`STATUS.md`](./STATUS.md)

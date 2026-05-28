@@ -14,13 +14,18 @@ _Snapshot · 2026-05-27_
 │  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
 │  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
 │  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
+├─ 📋 Demo simulator-runnable  (P1–P4 planned · branch `demo-sim-runnable`) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
+│  ├─ 📋 P1 — Playback-first sidebar-adaptable TabView (iOS demo)
+│  ├─ 📋 P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)
+│  ├─ 📋 P3 — file sharing: expose Documents in Files.app
+│  └─ 📋 P4 — `just sim-add-video` helper + verify on sim + Mac
 └─ ✏️ M7 — Dataset  (BRIEF §6)   ← milestone-path next, not yet defined
 
 penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **M7 — Dataset (BRIEF §6).** The coordinator arc is closed: P1–P3 smoke-tested on both demos (mid-video swap now shows the new detector — the bug `f4a6284` never actually fixed), fast-forwarded → `main` (`438998d`, branch deleted, not pushed). P4 stays 🗓 deferred (waits for a capture-side `DetectionRunner` consumer). M7 is one-tap frame capture + COCO-JSON sidecar; it needs a phased feature plan before build. → [LOG.md](./LOG.md)
+👉 next — **Demo simulator-runnable, P1 (Playback-first sidebar layout).** New feature branch `demo-sim-runnable`: make the iOS demo pleasant to run with no camera (iOS Simulator + Mac Designed-for-iPad) — Playback default, camera-tab fallback page, Documents reachable in Files.app, a `just sim-add-video` helper. Plan defined ([features/demo-sim-runnable.md](./features/demo-sim-runnable.md)); **awaiting go-ahead to build P1**. Demo ergonomics, no `Sources/Iris/` changes — **M7 — Dataset stays the milestone-path next** behind it. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
