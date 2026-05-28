@@ -14,18 +14,18 @@ _Snapshot · 2026-05-27_
 │  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
 │  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
 │  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
-├─ 📋 Demo simulator-runnable  (P1–P4 planned · branch `demo-sim-runnable`) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
-│  ├─ 📋 P1 — Playback-first sidebar-adaptable TabView (iOS demo)
-│  ├─ 📋 P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)
-│  ├─ 📋 P3 — file sharing: expose Documents in Files.app
-│  └─ 📋 P4 — `just sim-add-video` helper + verify on sim + Mac
+├─ ✅ Demo simulator-runnable  (P1–P4 built · xcodebuild green · 👀 smoke pending · branch `demo-sim-runnable`) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
+│  ├─ ✅ P1 — Playback-first sidebar-adaptable TabView (iOS demo)  (`3a1388b`)
+│  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
+│  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
+│  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
 └─ ✏️ M7 — Dataset  (BRIEF §6)   ← milestone-path next, not yet defined
 
 penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **Demo simulator-runnable, P1 (Playback-first sidebar layout).** New feature branch `demo-sim-runnable`: make the iOS demo pleasant to run with no camera (iOS Simulator + Mac Designed-for-iPad) — Playback default, camera-tab fallback page, Documents reachable in Files.app, a `just sim-add-video` helper. Plan defined ([features/demo-sim-runnable.md](./features/demo-sim-runnable.md)); **awaiting go-ahead to build P1**. Demo ergonomics, no `Sources/Iris/` changes — **M7 — Dataset stays the milestone-path next** behind it. → [LOG.md](./LOG.md)
+👉 next — **hands-on smoke `demo-sim-runnable`, then merge to `main`.** P1–P4 built on branch `demo-sim-runnable` (`3a1388b` · `1319501` · `8a9e9c1` · `213e149`), iOS scheme `xcodebuild`-green. Remaining gate is by hand (no headless seam): on the **iOS Simulator** and **Mac (Designed for iPad)** — launches to Playback (sidebar on iPad/Mac, bottom bar on iPhone); Capture tab shows the no-camera fallback page (no error/hang); `just sim-add-video <clip>` then Pick video → Files → On My iPhone → Iris Demo plays it. Once smoked, merge → `main`. Then **M7 — Dataset** (BRIEF §6) is the milestone-path next. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands

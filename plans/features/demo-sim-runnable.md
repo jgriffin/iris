@@ -1,7 +1,7 @@
 # Demo simulator-runnable — iOS demo on the iOS Simulator + Mac (Designed for iPad)
 
 <!-- Working plan. Lifetime ~ this feature; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Defined · 2026-05-27_ · **📋 P1–P4 planned**
+_Defined · 2026-05-27_ · **✅ P1–P4 built (`3a1388b` · `1319501` · `8a9e9c1` · `213e149`) · iOS scheme xcodebuild-green · 👀 hands-on smoke pending**
 
 ## Scope / intent
 

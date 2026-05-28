@@ -549,3 +549,17 @@
 - Did: decisions locked via the user — sidebar-adaptable layout (vs. plain reorder), file-sharing + copy helper (vs. in-app Documents auto-discovery), tracked as feature+branch (vs. a milestone). **M7 — Dataset stays the milestone-path next**; this runs alongside.
 - 🗓 Found: no `justfile` exists yet (P4 creates one); iOS bundle id is per-developer in gitignored `Apps/IrisDemo-iOS/Local.xcconfig` (`us.fofu.iris.demo` here), so the helper parses it rather than hardcoding.
 - 👉 Next: **build P1** — migrate the iOS demo root `TabView` (`ContentView.swift:25–35`) from `.tabItem` to the value-based `Tab(...)` API, Playback first, `.tabViewStyle(.sidebarAdaptable)`. Awaiting go-ahead. → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-27 — build: demo simulator-runnable P1–P4
+
+- Did: **Built all four phases** on `demo-sim-runnable`, one commit each, iOS scheme `xcodebuild`-green (iPhone 17 / iOS 26.5) throughout; **no `Sources/Iris/` changes**.
+  - **P1** (`3a1388b`) — [`Apps/IrisDemo-iOS/ContentView.swift`](../Apps/IrisDemo-iOS/ContentView.swift): root `TabView` migrated from `.tabItem` to the value-based `Tab(...)` API, **Playback first** (leftmost ⇒ default), `.tabViewStyle(.sidebarAdaptable)` (left sidebar on iPad/Mac, bottom bar on iPhone).
+  - **P2** (`1319501`) — `CaptureContentView`: added `cameraAvailable` (`AVCaptureDevice.default(for: .video) != nil`); the `.task` now `guard cameraAvailable else { return }` before any AVF work, and renders a `ContentUnavailableView` (`camera.fill`) explaining the Simulator/Mac have no camera. Physical-iPhone path unchanged — no failed start, no hang.
+  - **P3** (`8a9e9c1`) — [`Apps/IrisDemo-iOS/Info.plist`](../Apps/IrisDemo-iOS/Info.plist): `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` = true → Documents reachable in Files.app, browsable from the existing `DocumentPicker`.
+  - **P4** (`213e149`) — new repo-root [`justfile`](../justfile) with `sim-add-video <path>`: resolves the bundle id from xcconfig (no hardcode), `xcrun simctl get_app_container booted <id> data`, copies into `Documents/`; clear errors for missing file / xcconfig / no-booted-sim-or-app.
+- 🚩 Caught + fixed a wrong-id bug in P4 before reporting done: there are **two** `Local.xcconfig` files with different ids — `Apps/IrisDemo-iOS/Local.xcconfig` (`us.fofu.iris.demo`, the one the iOS target's `Shared.xcconfig:31` actually `#include?`s) and a stray repo-level `Apps/Local.xcconfig` (`dev.griff.iris.demo`). The recipe initially preferred the stray file; reordered to check the **per-target** file first (authoritative), repo-level as fallback only. Verified it now resolves `us.fofu.iris.demo`. (P4 commit amended.)
+- ℹ️ Pre-existing `DetectionInspector`/`currentTime` Sendable-closure warning still the only one; not introduced here (confirmed against a clean stash).
+- 👀 **Remaining gate — hands-on smoke** (no headless seam): on the **iOS Simulator** and **Mac (Designed for iPad)** — launches to Playback (sidebar layout); Capture tab shows the fallback page; `just sim-add-video <clip>` → Pick video → Files → On My iPhone → Iris Demo plays it.
+- 👉 Next: **smoke `demo-sim-runnable`, then merge → `main`.** After merge, **M7 — Dataset** (BRIEF §6) is the milestone-path next. → [`STATUS.md`](./STATUS.md)
