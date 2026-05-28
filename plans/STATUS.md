@@ -19,8 +19,8 @@ _Snapshot · 2026-05-28_
 │  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
 │  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
 │  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
-└─ 📋 M7 — Dataset  (BRIEF §6 · defined · playback-context flag→extract loop) → [features/M7.md](./features/M7.md)
-   ├─ 📋 P1 — `FrameRef`+`AssetFingerprint`+`FlagStore` (library core, `Detection` Codable) + tests
+└─ 🌱 M7 — Dataset  (BRIEF §6 · playback-context flag→extract loop · branch `m7-dataset`) → [features/M7.md](./features/M7.md)
+   ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
    ├─ 📋 P2 — Flagging UI: bookmark toggle, timeline markers, flagged-frames panel, jump-to-flag
    ├─ 📋 P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`; deterministic-naming dedup
    └─ 📋 P4 — COCO sidecar schema + `COCOExporter` (per-image → merged `annotations.json`)
@@ -29,7 +29,7 @@ penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **build M7·P1 — `FrameRef` + `AssetFingerprint` + `FlagStore` (library core, no UI).** M7 is defined → [features/M7.md](./features/M7.md): playback-context loop — flag a bad frame while scrubbing (cheap, metadata-only), extract flagged frames later (deferred headless batch → image + COCO sidecar), dedup by deterministic naming, reload-stable via content fingerprint. Locked forks: content fingerprint (not URL), per-image sidecar + merge-exporter, app-managed `<Documents>/iris-dataset/`. P1 is pure library + tests (PTS round-trip, fingerprint-survives-move, flag-survives-reload, `Detection` Codable). ⚠️ `demo-sim-runnable` merged to `main` (ff `40cf0de`) **without** the owed hands-on smoke — smoke it soon so any sim/layout regression isn't lurking on `main`. → [LOG.md](./LOG.md)
+👉 next — **build M7·P2 — flagging UI.** P1 landed (`e685f09`): library core green — `FrameRef = (content-fingerprint, exact CMTime)`, `FlagStore` (`@MainActor @Observable`, injected `baseDir`, per-asset `.v1` JSON, reload-stable), `Detection` Codable (direct synthesis + `Mask` tripwire). P2 wires the demo-visible UX: a **bookmark toggle** on the scrubber (flag/unflag current frame), **flag markers** along the timeline, a **flagged-frames side panel** (mirror macOS `NavigationSplitView`+`List`), and **jump-to-flag** (`seek(to: pts)`). Thin built-in views per the M4 UI doctrine; wire the current `FrameRef` from coordinator asset-fingerprint + live `Frame.timestamp`. ⚠️ still owed: hands-on smoke of `demo-sim-runnable` on `main` (ff `40cf0de`) — two manual taps left (Capture→fallback page, iPad sidebar expand); automatable gates already PASS. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands

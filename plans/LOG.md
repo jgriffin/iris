@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
-📋 **M7 — Dataset defined; `demo-sim-runnable` merged to `main`.** Demo-sim-runnable P1–P4 fast-forwarded to `main` (`40cf0de`) — hands-on smoke skipped (owed). M7 scoped into a playback-context flag→extract loop ([`features/M7.md`](./features/M7.md)): cheap metadata-only flagging while scrubbing, deferred headless extraction to image + COCO sidecar, reload-stable via content fingerprint, deterministic-naming dedup. Three forks locked with the user (content fingerprint / per-image sidecar+exporter / app-managed Documents). M1–M6 + coordinator all ✅.
-👉 Next: **M7·P1** — `FrameRef` + `AssetFingerprint` + `FlagStore` library core + tests (no UI). → [`STATUS.md`](./STATUS.md)
+🌱 **M7 — Dataset: P1 landed (library core, green); P2 (flagging UI) next.** `FrameRef = (content-fingerprint, exact CMTime)`, `AssetFingerprint` (rename-stable content id), `FrameFlag`/`FlagReason`, `FlagStore` (`@MainActor @Observable`, injected `baseDir`, per-asset `.v1` JSON, reload-stable), `Detection` Codable (direct synthesis + `Mask` tripwire). 225 tests green (8 Dataset), Swift 6 clean (`e685f09`, branch `m7-dataset`). M7 defined earlier this block ([`features/M7.md`](./features/M7.md)); `demo-sim-runnable` ff-merged to `main` (`40cf0de`) — automatable smoke PASS, two manual taps still owed.
+👉 Next: **M7·P2** — flagging UI: bookmark toggle on scrubber, timeline flag markers, flagged-frames side panel, jump-to-flag. → [`STATUS.md`](./STATUS.md)
 <!-- /STATUS -->
 
 ---
@@ -575,3 +575,14 @@
 - 🗓 Scope call: M7 v1 is **playback only**. Deferred extraction needs re-seek; **live-capture flagging** would have to snapshot the pixel buffer at flag time (a different, real-time-write path) — noted as a follow-on, not v1, even though BRIEF §6 says "both contexts".
 - 🚩 Opens parked in [`features/M7.md`](./features/M7.md): PTS-vs-`currentTime()` exactness (may need snap-to-sample on flag); `Detection` Codable may want a `DetectionRecord` DTO (self-describing skeleton/readout); reuse an Overlay-side CIImage path for PNG export rather than a new converter.
 - 👉 Next: **build M7·P1** — pure library + tests, no UI. Also owed: smoke the merged demo on Simulator + Mac (Designed for iPad). → [`STATUS.md`](./STATUS.md)
+
+---
+
+## 2026-05-28 (cont.) — build: M7·P1 library core + smoke the merged demo
+
+- Did: **built M7·P1** on branch `m7-dataset` (`e685f09`) — the flag-side library core, no UI. New `Sources/Iris/Dataset/`: `AssetFingerprint` (content-derived `id` = byteSize + ms-quantized duration + optional 1 MiB SHA-256 head-hash; **filename excluded** so a rename/move preserves identity), `FrameRef` (`(AssetFingerprint, CMTime)`; PTS stored as exact `CMTime` via a 4-field `CMTimeCodable` wrapper — bit-exact round-trip), `FrameFlag`+`FlagReason` (`.wrong`/`.nearMiss`/`.other`), `FlagStore` (`@MainActor @Observable`, injected `baseDir`, per-asset `.v1` JSON envelope at `<baseDir>/iris-dataset/flags/<id>.json`, atomic writes, lazy load+cache — Iris's first library-side on-disk persistence). `Detection` (+ `Keypoint`/`Mask`/`Skeleton`/`Readout`) gained direct synthesized `Codable`.
+- Decided (resolves two M7 opens): **`Detection` → direct synthesized `Codable`, no DTO** — every field is flat/synthesizable; the self-describing skeleton/readout aren't polymorphic. Swift won't synthesize from a cross-file extension, so `: Codable` lives on the type decls and the rationale lives in `Dataset/Detection+Codable.swift` (+ a `Mask` tripwire: a future pixel payload must stay `Codable` or the build breaks). **PTS → store raw, don't snap in P1** — snapping needs the P3 sample-table walk; `// M7·P3:` tripwire left on `FrameRef` to validate raw-vs-snap and add `snapped(in:)` on the extraction side if needed.
+- Verified: `swift test` **225 pass / 0 fail** (8 Dataset tests: fingerprint-survives-rename, distinct-clips-distinct-id, PTS bit-exact, `Detection` Codable, `FlagStore` reload/toggle/dedup). Swift 6 strict-concurrency clean. Reviewed all five files + the `Detection` diff before committing — clean, matches house idiom.
+- Did: **automatable demo-sim smoke** (isolated worktree, on `main` state) — `IrisDemo-iOS` builds GREEN for the iOS Simulator; launches clean on **iPhone 17** (bottom bar, Playback default, detections+scrubber render) and **iPad Pro M5** (`.sidebarAdaptable` form, not a bottom bar). Screenshots surfaced to the user. Runtime is iOS 26.5 (only iPhone 17 / iPad M5 sims exist) so those substituted for the 16/M4 named — layout keys on size class, validates the same behavior.
+- 🗓 Still owed (tracked in STATUS, not blocking): **two manual smoke taps** — Capture tab → no-camera fallback page (`idb` not installed → no headless tap; source confirmed wired at `ContentView.swift:64–71,156–167`, session guarded so it can't start), and the iPad sidebar-toggle → expanded sidebar.
+- 👉 Next: **M7·P2** — flagging UI (bookmark toggle on scrubber, timeline flag markers, flagged-frames side panel, jump-to-flag via `seek(to: pts)`). Thin built-in views per the M4 UI doctrine. → [`STATUS.md`](./STATUS.md)
