@@ -22,17 +22,21 @@ import os
 /// unchanged on iOS.
 struct ContentView: View {
     var body: some View {
+        // Playback first ⇒ leftmost + default selection (tab order picks it).
+        // `.sidebarAdaptable` renders as a bottom bar on iPhone and a left
+        // sidebar on iPad / Mac (Designed for iPad). Value-based `Tab(...)`
+        // API (iOS 18+; baseline is iOS 26) replaces the old `.tabItem`
+        // modifier — see plans/features/demo-sim-runnable.md P1.
         TabView {
-            CaptureContentView()
-                .tabItem {
-                    Label("Capture", systemImage: "camera")
-                }
+            Tab("Playback", systemImage: "play.rectangle") {
+                PlaybackContentView()
+            }
 
-            PlaybackContentView()
-                .tabItem {
-                    Label("Playback", systemImage: "play.rectangle")
-                }
+            Tab("Capture", systemImage: "camera") {
+                CaptureContentView()
+            }
         }
+        .tabViewStyle(.sidebarAdaptable)
     }
 }
 
