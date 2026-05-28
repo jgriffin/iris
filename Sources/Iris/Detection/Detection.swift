@@ -18,7 +18,18 @@ import CoreGraphics
 /// future backend produces an observation type that isn't `Sendable`-clean,
 /// the adapter is responsible for unwrapping it into this struct rather
 /// than smuggling a non-Sendable reference through.
-public struct Detection: Sendable, Hashable {
+/// **Serialization (M7·P1).** `Detection` conforms to `Codable` via Swift's
+/// synthesized conformance. The choice between direct conformance and a
+/// separate `DetectionRecord` DTO was settled in favor of direct conformance:
+/// every field is a plain value type with synthesizable `Codable` (`CGRect`,
+/// `String`, `Float`, and the nested `Keypoint` / `Mask` / `Skeleton` /
+/// `Readout` value types), and the self-describing `skeleton` / `readout`
+/// fields are flat structs with no polymorphism — the thing that would
+/// otherwise force a DTO. A DTO would duplicate the whole field set for zero
+/// schema benefit. Synthesis requires the conformance to be declared on the
+/// type itself (not a cross-file extension), so it lives here; the rationale
+/// note lives next to its consumer in `Sources/Iris/Dataset/`.
+public struct Detection: Sendable, Hashable, Codable {
 
     /// Normalized bounding box in `[0, 1]` source-frame coordinates,
     /// Vision-native (bottom-left) origin.
@@ -94,7 +105,7 @@ extension Detection {
 
     /// A single labeled point in the same normalized coordinate space as
     /// the enclosing `Detection.boundingBox`.
-    public struct Keypoint: Sendable, Hashable {
+    public struct Keypoint: Sendable, Hashable, Codable {
         /// Joint / landmark identifier (e.g., `"left_shoulder"`, `"nose"`).
         public let name: String
         /// Normalized `[0, 1]` position, Vision-native origin.
@@ -111,7 +122,7 @@ extension Detection {
 
     /// Placeholder segmentation-mask payload. See `Detection.mask` for the
     /// open `TODO M2+:` on the eventual shape.
-    public struct Mask: Sendable, Hashable {
+    public struct Mask: Sendable, Hashable, Codable {
         /// Width of the mask in pixels.
         public let width: Int
         /// Height of the mask in pixels.
