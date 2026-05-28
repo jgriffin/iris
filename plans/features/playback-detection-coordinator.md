@@ -1,7 +1,7 @@
 # PlaybackDetectionCoordinator — own the playback detection-session orchestration
 
 <!-- Working plan. Lifetime ~ this feature; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Defined · 2026-05-27_ · **✅ P1 done (commit `51743c7`) · P2 📋 ← next · P3 📋 · P4 🗓 deferred**
+_Defined · 2026-05-27_ · **✅ P1–P3 done (`51743c7` · `1ea2cd1` · `ad7428d`) · P4 🗓 deferred · 👀 hands-on smoke pending**
 
 ## Scope / intent
 
@@ -176,7 +176,7 @@ scope-ordering contract, below). The negative half asserts the **correct
 end-state** (after the swap, the new detector's output is what lands) rather than
 reproducing a race — **there is no race**; the in-place swap is deterministic.
 
-### P2 — Rewire the macOS demo  📋
+### P2 — Rewire the macOS demo  ✅ (commit `1ea2cd1`, −94 lines, xcodebuild green; smoke pending)
 
 Replace [`Apps/IrisDemo-macOS/ContentView.swift`](../../Apps/IrisDemo-macOS/ContentView.swift)'s
 `@State` for `controller` / `resultStore` / `detectionTask` / `metrics` /
@@ -195,7 +195,7 @@ mid-video swap work without reload; it's not merely centralizing code. Verify by
 hand — swap detector mid-video, tune a `.detector`-tier knob while paused, scrub,
 open a new video — plus `xcodebuild` for the macOS scheme.
 
-### P3 — Rewire the iOS demo identically  📋
+### P3 — Rewire the iOS demo identically  ✅ (commit `ad7428d`, −102 lines, xcodebuild green; smoke pending)
 
 Same rewrite on [`Apps/IrisDemo-iOS/ContentView.swift`](../../Apps/IrisDemo-iOS/ContentView.swift),
 which carries a byte-identical copy of the glue (`buildSessionAndStartDetection`
