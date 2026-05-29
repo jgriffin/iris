@@ -32,6 +32,10 @@ struct ContentView: View {
                 PlaybackContentView()
             }
 
+            Tab("Image", systemImage: "photo") {
+                ImageContentView()
+            }
+
             Tab("Capture", systemImage: "camera") {
                 CaptureContentView()
             }

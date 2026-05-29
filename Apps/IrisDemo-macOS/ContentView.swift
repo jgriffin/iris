@@ -159,12 +159,78 @@ struct ContentView: View {
     /// capability-derived `settingsView`.
     @State private var showTuning = false
 
+    // MARK: - M8·P4: Images mode
+
+    /// Top-level sidebar source mode. Additive over the existing playback shell:
+    /// `.videos` renders the playback sidebar + detail EXACTLY as before;
+    /// `.images` swaps in the still-image inspector (its own coordinator + MRU).
+    /// Selected via the segmented picker at the top of the sidebar.
+    private enum SourceMode: String, CaseIterable, Identifiable {
+        case videos = "Videos"
+        case images = "Images"
+        var id: String { rawValue }
+    }
+
+    @State private var mode: SourceMode = .videos
+
+    /// One-shot image detection orchestration for `.images` mode: a held still
+    /// `Frame`, the `ResultStore` + `DetectionMetrics`, and the
+    /// `ActiveDetectorSession`. Lives alongside the playback `coordinator`; only
+    /// one is shown at a time per `mode`.
+    @State private var imageCoordinator = ImageDetectionCoordinator()
+
+    /// MRU of recently-opened images. The image-page sibling of `recentVideos`.
+    @State private var recentImages = RecentImages()
+
+    /// `.images`-mode picker selection. Independent of the playback selection so
+    /// switching modes doesn't clobber either.
+    @State private var imageSelectedDetectorID: String = "vision.rectangles"
+
+    /// Whether the image-mode tuning sheet is presented.
+    @State private var showImageTuning = false
+
+    /// Presents the macOS image `.fileImporter`.
+    @State private var showImagePicker = false
+
+    /// The URL currently held under a security scope for `.images` mode, if any.
+    @State private var imageScopedURL: URL?
+
+    /// Last image-mode error (decode / scope), surfaced below the detail.
+    @State private var imageErrorText: String?
+
+    /// Whether the image-mode launch selection has been applied once.
+    @State private var imageDidApplyLaunchSelection = false
+
     var body: some View {
         NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            VStack(spacing: 0) {
+                // M8·P4: top-level source-mode selector. Additive — `.videos`
+                // shows the existing playback sidebar + detail unchanged;
+                // `.images` swaps in the still-image inspector.
+                Picker("Source", selection: $mode) {
+                    ForEach(SourceMode.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+
+                switch mode {
+                case .videos:
+                    sidebar
+                case .images:
+                    imageSidebar
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
-            detailArea
+            switch mode {
+            case .videos:
+                detailArea
+            case .images:
+                imageDetail
+            }
         }
         .frame(minWidth: 880, minHeight: 480)
         .inspector(isPresented: $showTuning) {
@@ -962,6 +1028,228 @@ struct ContentView: View {
             if let priorScopedURL {
                 priorScopedURL.stopAccessingSecurityScopedResource()
             }
+        }
+    }
+
+}
+
+// MARK: - M8·P4: Images mode (extracted to keep the struct body under the lint cap)
+extension ContentView {
+    // MARK: - M8·P4: Images mode
+
+    fileprivate static let imageContentTypes: [UTType] = [.image]
+
+    /// Resolve the image-mode picker selection into a catalog entry.
+    fileprivate var imageResolvedEntry: DetectorCatalogEntry? {
+        catalog.entries.first(where: { $0.id == imageSelectedDetectorID })
+            ?? catalog.entries.first
+    }
+
+    /// `.images` sidebar: "Open Image…" button + recent-images list. Mirrors the
+    /// `.videos` sidebar shape (the recent-videos rows / empty state), driven by
+    /// `RecentImages`.
+    @ViewBuilder
+    private var imageSidebar: some View {
+        let recents = recentImages.resolve()
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                showImagePicker = true
+            } label: {
+                Label("Open Image…", systemImage: "photo.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            HStack {
+                Text("Recent images")
+                    .font(.headline)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
+            if recents.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.tertiary)
+                    Text("No recent images")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text("Use Open Image… to pick a still.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            } else {
+                List {
+                    ForEach(recents, id: \.self) { url in
+                        imageRecentRow(url: url)
+                            .tag(url)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                pickImage(url: url)
+                            }
+                    }
+                }
+                .listStyle(.sidebar)
+            }
+        }
+        // Apply the launch detector selection + warm bundled models once, when
+        // the images sidebar first appears.
+        .task {
+            guard !imageDidApplyLaunchSelection else { return }
+            imageDidApplyLaunchSelection = true
+            if let mru = recentDetectors.firstAvailable(in: catalog) {
+                imageSelectedDetectorID = mru
+            } else if let first = catalog.entries.first {
+                imageSelectedDetectorID = first.id
+            }
+            await modelStore.prewarmBundledModels()
+        }
+        // M8·P4: the image importer lives HERE, on the images sidebar — NOT
+        // stacked on the root view with the movie + model importers. SwiftUI
+        // honors only one `.fileImporter(isPresented:)` per view; a third stacked
+        // importer silently never presents (the "Open Image… does nothing" bug).
+        // Co-locating it with its trigger button is the reliable fix.
+        .fileImporter(
+            isPresented: $showImagePicker,
+            allowedContentTypes: Self.imageContentTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                pickImage(url: url)
+            case .failure(let error):
+                Logger.demo.error(
+                    "image picker failed: \(error.localizedDescription, privacy: .public)"
+                )
+                imageErrorText = "Could not open image: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func imageRecentRow(url: URL) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "photo")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(url.lastPathComponent)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(url.deletingLastPathComponent().path)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
+        }
+        .help(url.path)
+        .contextMenu {
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.path, forType: .string)
+            } label: {
+                Label("Copy Path", systemImage: "doc.on.clipboard")
+            }
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
+            }
+        }
+    }
+
+    /// `.images` detail: the shared `ImageDetailView` plus an inline error line.
+    @ViewBuilder
+    private var imageDetail: some View {
+        VStack(spacing: 0) {
+            ImageDetailView(
+                coordinator: imageCoordinator,
+                catalog: catalog,
+                recentDetectors: recentDetectors,
+                modelStore: modelStore,
+                selectedDetectorID: $imageSelectedDetectorID,
+                showTuning: $showImageTuning
+            )
+            if let imageErrorText {
+                Text(imageErrorText)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+            }
+        }
+        .onChange(of: imageSelectedDetectorID) {
+            if imageSelectedDetectorID == DemoCatalog.customEntryID,
+                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
+            {
+                showModelPicker = true
+            }
+            recentDetectors.addOrPromote(id: imageSelectedDetectorID)
+            selectImageDetector()
+        }
+    }
+
+    /// Pick `url`: acquire scope, register in the MRU, decode to an upright
+    /// `Frame`, run detection once, then release the PRIOR scope strictly after
+    /// `setImage` returns (the sandbox-scope ordering contract). Mirrors the
+    /// playback `swapToExternal` scope ordering.
+    @MainActor
+    private func pickImage(url: URL) {
+        guard let entry = imageResolvedEntry else { return }
+
+        guard url.startAccessingSecurityScopedResource() else {
+            let message = "Could not access \(url.lastPathComponent) (security scope denied)."
+            Logger.demo.error(
+                "startAccessingSecurityScopedResource failed for \(url.path, privacy: .public)"
+            )
+            imageErrorText = message
+            return
+        }
+
+        withAnimation(.snappy) {
+            recentImages.addOrPromote(url)
+        }
+
+        let frame: Frame
+        do {
+            frame = try ImageFrameDecoder().frame(fromImageAt: url)
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            let message = "Could not decode \(url.lastPathComponent): \(error)"
+            Logger.demo.error("\(message, privacy: .public)")
+            imageErrorText = message
+            return
+        }
+
+        let priorScopedURL = imageScopedURL
+        imageScopedURL = url
+        imageErrorText = nil
+
+        Task { @MainActor in
+            await imageCoordinator.setImage(frame, detector: entry)
+            if let priorScopedURL {
+                priorScopedURL.stopAccessingSecurityScopedResource()
+            }
+        }
+    }
+
+    /// Re-run detection on the held image under the newly-selected detector.
+    @MainActor
+    private func selectImageDetector() {
+        guard let entry = imageResolvedEntry else { return }
+        Task { @MainActor in
+            await imageCoordinator.selectDetector(entry)
         }
     }
 }
