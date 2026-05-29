@@ -11,17 +11,22 @@ This project uses the planning structure described in
 [`plans/WORKFLOW.md`](./plans/WORKFLOW.md). Read it before making non-trivial
 changes. In short:
 
-- [`plans/STATUS.md`](./plans/STATUS.md) — where work stands now (read first); rewrite at the end of each block
-- [`plans/BRIEF.md`](./plans/BRIEF.md) — what & why (design intent, components, milestones)
-- [`plans/DECISIONS.md`](./plans/DECISIONS.md) — settled questions (check before proposing architectural changes)
-- [`plans/QUESTIONS.md`](./plans/QUESTIONS.md) — open questions (land new ones here, don't speculate in code)
-- [`plans/LOG.md`](./plans/LOG.md) — append a dated entry at the end of each work block
-- `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`
+- [`plans/BOARD.md`](./plans/BOARD.md) — where work stands now: **Status** (the tree + the one next), **Milestones** (roadmap), **Backlog** (deferred work + ideas + known issues). Read first; rewrite §Status each block.
+- [`plans/BRIEF.md`](./plans/BRIEF.md) — what & why (stable design intent; not a living doc).
+- [`plans/DECISIONS.md`](./plans/DECISIONS.md) — settled questions (check before proposing architectural changes).
+- [`plans/QUESTIONS.md`](./plans/QUESTIONS.md) — **open** questions only (settled → DECISIONS; deferred work → BOARD §Backlog).
+- [`plans/LOG.md`](./plans/LOG.md) — append a dated entry at the end of each work block.
+- `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`.
+
+Two explicit rules:
+
+- **"Add to the backlog"** → the item goes to [`plans/BOARD.md`](./plans/BOARD.md) §Backlog (stub + ≤4-line body, link out if it has a home), **never** to `QUESTIONS.md`.
+- **"next" / "next?" / "what's next" / `/next`** → surface status per [`plans/WORKFLOW.md`](./plans/WORKFLOW.md) §"Surfacing status in conversation" (focus tree if a milestone is active, overview tree at a boundary), then the 👉 next + a brief offer. This is the Iris board; never route to the get-shit-done / `.planning/` workflow.
 
 **Surfacing status in conversation** ("what's next?", mid-block check-ins, handoffs)
 → lead with the status tree per [`plans/WORKFLOW.md`](./plans/WORKFLOW.md) §"Status
 trees" (focus tree if a milestone is active, overview tree at a boundary), *then*
-the recommendation and an offer.
+the recommendation and an offer. The trees live in [`plans/BOARD.md`](./plans/BOARD.md) §Status.
 
 This file (`CLAUDE.md`) is the **constitution**: stack, conventions, and
 invariants that constrain how code gets written. Anything more volatile —
@@ -56,7 +61,7 @@ discipline is the right level of separation. Locked verdicts in
 | `Sources/Iris/Detection/` | iOS + macOS  | `Detector` protocol; Vision / Core ML / Foundation Models    |
 | `Sources/Iris/Overlay/`   | iOS + macOS  | SwiftUI views drawing `[Detection]`; coordinate-space mgmt   |
 | `Sources/Iris/Tuning/`    | iOS + macOS  | `@Observable` filter/threshold controls — **deferred to M4** |
-| `Sources/Iris/Dataset/`   | iOS + macOS  | One-tap frame + COCO-JSON sidecar — **deferred to M7**       |
+| `Sources/Iris/Dataset/`   | iOS + macOS  | Flag frames → extract as provenance-bearing images (no sidecar; filenames are the ledger) |
 
 \*Capture source files are gated by `#if os(iOS)` at the file level. On
 macOS, `import Iris` succeeds; Capture types are simply not visible.

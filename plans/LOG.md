@@ -2,9 +2,9 @@
 
 <!-- Append-only. Newest at bottom. -->
 
-<!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
+<!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
 ✅ **M7 — Dataset COMPLETE (P1–P4 ✅, 244 green, both demo schemes build, models bundled); branch `m7-dataset` unmerged.** P4 = a `FrameExporter` frame-export sweep (resumable + interruptible) driven by `FrameExportCoordinator` in both demos: triggers on `scenePhase`→background + manual "Export now" (**launch trigger dropped** — contends with playback); `export-status.json` records last-run counts + unreachable sources. Build-system doctrine **reversed** this block (user): `Apps/project.yml` is canonical, regenerate freely, never hand-edit `.pbxproj` (the old "pbxproj authoritative" belief was an unverified, wrong assumption — empirically debunked: the loader wants `.mlmodelc`, Compile-Sources produces it).
-👉 Next: **merge `m7-dataset` → `main`** (optionally a hands-on demo run first: flag → background → confirm `frames/` fills). → [`STATUS.md`](./STATUS.md)
+👉 Next: **merge `m7-dataset` → `main`** (optionally a hands-on demo run first: flag → background → confirm `frames/` fills). → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---

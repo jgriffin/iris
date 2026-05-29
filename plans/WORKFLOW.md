@@ -8,10 +8,10 @@ A lightweight file structure for keeping Claude Code (and your future self) on t
 CLAUDE.md                    # constitution: stack, conventions, invariants
 plans/
   WORKFLOW.md                # this document — how the planning files work
-  BRIEF.md                   # north star: what & why (1 page, rarely changes)
-  STATUS.md                  # at-a-glance snapshot: milestone tree, the one next, open Qs (links to sources)
-  DECISIONS.md               # settled questions, with refs to explorations
-  QUESTIONS.md               # open questions with lifecycle tags
+  BRIEF.md                   # north star: what & why (1 page, rarely changes; not a roadmap)
+  BOARD.md                   # the board — 3 sections: Status (the tree + the one next, rewritten each block) / Milestones (roadmap legend) / Backlog (deferred work + ideas + known issues)
+  DECISIONS.md               # settled questions, with refs to explorations (optional leading `Q:` line)
+  QUESTIONS.md               # OPEN questions only (settled → DECISIONS; deferred work → BOARD §Backlog)
   LOG.md                     # append-only work-block journal
   features/                  # working plans for milestones & big features
     <slug>.md                # scope, phases, opens, risks; lifetime ~ that work
@@ -32,10 +32,10 @@ The rule: match the file to the **volatility** of the content.
 | File             | Changes      | Contains                                                                                |
 | ---------------- | ------------ | --------------------------------------------------------------------------------------- |
 | `CLAUDE.md`      | rarely       | invariants that constrain all future code                                               |
-| `BRIEF.md`       | rarely       | problem, success criteria, non-goals                                                    |
-| `STATUS.md`      | per block    | derived snapshot dashboard — milestone/phase tree, the one `👉 next`, rolled-up open questions & decisions; links to each source of truth. Rewritten (not appended) each block. |
-| `DECISIONS.md`   | per decision | dated paragraphs with enough context to act on; link to exploration RECOMMENDATIONS.md for the deep case |
-| `QUESTIONS.md`   | per question | `[open]` / `[exploring]` / `[answered]`                                                 |
+| `BRIEF.md`       | rarely       | problem, success criteria, non-goals, enduring design intent. **Not** the roadmap — milestones live in `BOARD.md` §Milestones. |
+| `BOARD.md`       | mixed        | **§Status** — milestone/phase tree, the one `👉 next`, rolled-up open questions & decisions; rewritten (not appended) each block. **§Milestones** — one-line roadmap legend (edited as the path changes). **§Backlog** — deferred work, ideas, known issues as stub + ≤4-line body (edited as items land/graduate). |
+| `DECISIONS.md`   | per decision | dated paragraphs with enough context to act on; optional leading `Q:` line for the question resolved; link to exploration RECOMMENDATIONS.md for the deep case |
+| `QUESTIONS.md`   | per question | **open questions only** — ⚖️ needs-decision / ❓ genuine-unknown. Settled → DECISIONS.md (with `Q:` line); deferred work → BOARD.md §Backlog. |
 | `LOG.md`         | per block    | append-only, dated headers                                                              |
 | `features/<slug>.md` | per phase | working plan for a milestone or big feature — scope, phase breakdown, opens, risks. Lifetime tracks the work; delete or supersede when the work closes (LOG.md keeps the trail). |
 
@@ -43,9 +43,23 @@ If you're tempted to add something to CLAUDE.md, ask: *does this constrain how c
 
 **File references should be clickable markdown links** — both within `plans/` (e.g. `[`DECISIONS.md`](./DECISIONS.md)`) and out to explorations (e.g. `[`explorations/.../RECOMMENDATIONS.md`](../explorations/...)`). It's much easier to navigate a workflow when every cross-reference is one click away.
 
+## Index vs. home (where detail lives)
+
+Every doc is either an **index** (a scannable list, one line per item) or a **home** (where an item's full detail lives). Pain comes from files trying to be both. The rule: **index lines point; homes hold depth; each item's detail lives in exactly one home, and the index line links to it. Never duplicate — when an item changes status, it MOVES between homes; the old copy is deleted.**
+
+**Smallest home that fits** (the overflow rule):
+
+| Detail size | Home | Shape |
+| --- | --- | --- |
+| One line | the stub itself | `🗓 headline — ½-line hook` |
+| A paragraph (≤~4 lines) | indented body directly under the stub, hard-capped at ~4 lines | headline line, then indented body lines |
+| More than a paragraph | a `features/<slug>.md` or an exploration; the stub links out | `🗓 headline — hook → [features/foo.md]` |
+
+**Category-level application:** a category gets its OWN file only when its items are *reliably* detail-heavy. Open questions are → `QUESTIONS.md` stays as their home. Backlog items are usually one-liners → there is NO backlog file; overflow rides as a capped indented body in `BOARD.md` §Backlog and graduates to `features/` when it gets big.
+
 ## Status trees
 
-`plans/STATUS.md` is the project's `git status` — where work stands right now,
+`plans/BOARD.md` §Status is the project's `git status` — where work stands right now,
 rewritten each block (`LOG.md` is the history). It's built from two reusable
 components — the **focus tree** and the **overview tree** — that also appear in
 handoffs and inline whenever you ask *"what's next?"*. They're building blocks,
@@ -130,7 +144,7 @@ When a milestone is active, its node expands like the focus tree:
 
 ### Surfacing status in conversation
 
-Lead with the trees when reporting, not only in `STATUS.md`:
+Lead with the trees when reporting, not only in `BOARD.md` §Status:
 
 - **"what's next?" (and kin)** → lead with the tree that fits: the **focus tree** if
   a milestone is active, the **overview tree** at a boundary. *Which tree appears is
@@ -148,11 +162,14 @@ need to investigate    → explorations/YYYY-MM-DD-topic/QUESTIONS.md
 work happens           → whatever files needed inside exploration folder
 exploration wraps      → SYNTHESIS.md (options, tradeoffs)
                          RECOMMENDATIONS.md (what to do)
-decision made          → plans/DECISIONS.md (refs RECOMMENDATIONS.md)
-                         plans/QUESTIONS.md → [answered]
+decision made          → plans/DECISIONS.md (refs RECOMMENDATIONS.md; prepend a `Q:` line)
+                         plans/QUESTIONS.md → delete the now-answered entry
+deferred work (no       → plans/BOARD.md §Backlog (stub + ≤4-line body; link out if it has a home)
+  decision, just a       plans/QUESTIONS.md → delete the entry (it was never an open question)
+  chore/bug/idea)
 affects all code       → CLAUDE.md
 end of work block      → append plans/LOG.md
-                         rewrite plans/STATUS.md + advance the one 👉 next
+                         rewrite plans/BOARD.md §Status + advance the one 👉 next
 ```
 
 ## CLAUDE.md hookup
@@ -164,17 +181,23 @@ Add this block near the top of `CLAUDE.md` so Claude Code wires into the workflo
 
 This project uses the planning structure described in `plans/WORKFLOW.md`. Read it before making non-trivial changes. In short:
 
-- `plans/STATUS.md` — where work stands now (read first); rewrite at the end of each block
-- `plans/BRIEF.md` — what & why
-- `plans/DECISIONS.md` — settled questions (check before proposing architectural changes)
-- `plans/QUESTIONS.md` — open questions (land new ones here, don't speculate in code)
-- `plans/LOG.md` — append a dated entry at the end of each work block
-- `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`
+- `plans/BOARD.md` — where work stands now: **Status** (the tree + the one next), **Milestones** (roadmap), **Backlog** (deferred work + ideas + known issues). Read first; rewrite §Status each block.
+- `plans/BRIEF.md` — what & why (stable design intent; not a living doc).
+- `plans/DECISIONS.md` — settled questions (check before proposing architectural changes).
+- `plans/QUESTIONS.md` — **open** questions only (settled → DECISIONS; deferred work → BOARD §Backlog).
+- `plans/LOG.md` — append a dated entry at the end of each work block.
+- `explorations/YYYY-MM-DD-topic/` — investigations that wrap with `SYNTHESIS.md` and `RECOMMENDATIONS.md`.
+
+Two rules: **"add to the backlog"** → the item goes to `plans/BOARD.md` §Backlog, never to QUESTIONS.md. **"next" / "what's next"** → surface status per §"Surfacing status in conversation" (focus tree if active, overview tree at a boundary), then the 👉 next + an offer.
 ```
 
 ## File templates
 
 ### `plans/BRIEF.md`
+
+The stable north star — problem, why, enduring design intent. **Not** the roadmap:
+milestone descriptions and status live in `BOARD.md` (§Milestones / §Status), not here.
+New decisions land in `DECISIONS.md`, not by editing the brief.
 
 ```markdown
 # <Project name>
@@ -201,9 +224,13 @@ This project uses the planning structure described in `plans/WORKFLOW.md`. Read 
 <!-- Newest at top. Each entry: short title with date, a paragraph that captures
      the decision clearly enough to act on without opening the reference, then a
      link to the exploration that justifies it. Leave a blank line between entries.
-     The linked RECOMMENDATIONS.md carries the deep case — don't restate it here. -->
+     The linked RECOMMENDATIONS.md carries the deep case — don't restate it here.
+     Optional leading `Q:` line — when the entry resolves a question that was
+     tracked in QUESTIONS.md, prepend `Q: <the question>` for traceability. -->
 
 ### 2026-05-21 — Use MPS over CPU for inference
+
+Q: MPS or CPU for the training loop and replay-buffer reads?
 
 Switch the training loop and replay-buffer reads to MPS despite the float64 →
 float32 conversion at load time. The per-step gain on Apple Silicon more than
@@ -228,24 +255,42 @@ The shape: an `### YYYY-MM-DD — Short title` header, one paragraph that gives 
 
 ### `plans/QUESTIONS.md`
 
+Open questions only — there is no "Answered" graveyard. When a question settles, it MOVES
+to `DECISIONS.md` (with a `Q:` line) and the copy here is deleted; deferred work (a chore/bug/idea
+with nothing to decide) MOVES to `BOARD.md` §Backlog. This file is itself the dossier home, so
+each item is a scannable headline + its detail paragraph.
+
 ```markdown
 # Open questions
 
-<!-- Status tags: [open] [exploring] [answered DATE]. File references should be clickable markdown links. -->
+<!-- OPEN questions only — ⚖️ needs-decision / ❓ genuine-unknown. This file is the dossier home:
+     each item = a scannable headline + its detail paragraph.
+     · Settled → move to DECISIONS.md (prepend a `Q:` line there); delete the copy here.
+     · Deferred WORK (a chore/bug/idea with nothing to decide) → BOARD.md §Backlog; delete the copy here.
+     File references should be clickable markdown links. -->
 
-- [open] <question>
-- [exploring] <question> — see [`explorations/2026-05-21-foo/`](../explorations/2026-05-21-foo/)
-- [answered 2026-05-19] <question> — see [`DECISIONS.md`](./DECISIONS.md)
+- ⚖️ **<needs-decision headline>.** <The detail paragraph — enough context to decide; link the
+  exploration / feature where the case lives.>
+- ❓ **<genuine-unknown headline>.** <What's unknown and how it gets resolved.>
 ```
 
-### `plans/STATUS.md`
+### `plans/BOARD.md`
 
-The overview tree is the headline; links point to the source of truth, never copy
-it. One 👉 next, always last. (See "Status trees" above for the full format.)
+Three sections. **§Status** is the headline tree (links point to the source of truth, never copy
+it; one 👉 next, always last — see "Status trees" above for the full format) and is rewritten each
+block. **§Milestones** is a one-line-per-milestone roadmap legend (state lives in §Status; this
+answers "what is M5 again?"). **§Backlog** is deferred work / ideas / known issues as stub + ≤4-line
+body. The §Status tree and §Milestones legend both name the milestones, but carry different content
+(state vs. description) — intentional, not duplication.
 
 ```markdown
-# <Project> — Status
+<!-- The board: where work stands (Status), the path (Milestones), what's deferred (Backlog).
+     Status rewritten each block; Milestones/Backlog edited as they change. Best viewed monospace. -->
+
+# <Project> — Board
 _Snapshot · <date>_
+
+## Status
 
 ├─ ✅ M1 — <name>
 ├─ 🌱 M2 — <name>
@@ -253,12 +298,26 @@ _Snapshot · <date>_
 │  └─ 🌱 P2 — <name>     ← here
 └─ 📋 M3 — <name>
 
-penciled in — not yet defined (ideas, traceable to you)
-   ✏️ M4 — <name> (<source>)     ← likely next
-
 👉 next  <the one thing>. → [`LOG.md`](./LOG.md)
 
-❓ open → [`QUESTIONS.md`](./QUESTIONS.md)   ·   📌 recent → [`DECISIONS.md`](./DECISIONS.md)
+❓ open → [`QUESTIONS.md`](./QUESTIONS.md)
+- ⚖️ <open-question stub>   (only ⚖️/❓ true unknowns; deferred work lives in §Backlog)
+
+📌 recent → [`DECISIONS.md`](./DECISIONS.md)
+- <recent-decision stub>
+
+## Milestones
+
+- **M1 — <name>** — <½-line of what it delivers> → [`features/<slug>.md`](./features/<slug>.md)
+- **M2 — <name>** — <½-line> → [`features/<slug>.md`](./features/<slug>.md)
+
+## Backlog
+
+<!-- Stub = one line (`🗓 headline — hook`). Add a ≤4-line indented body only when needed.
+     Link out (→ features/ or exploration) when the item has a real home. -->
+
+- 🗓 <deferred-work headline> — <½-line hook>
+- 🗓 <bigger item> — <hook> → [`features/<slug>.md`](./features/<slug>.md)
 ```
 
 ### `plans/LOG.md`
@@ -266,9 +325,9 @@ penciled in — not yet defined (ideas, traceable to you)
 ```markdown
 # Work log
 
-<!-- STATUS · snapshot, rewritten each block · full board in STATUS.md -->
+<!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
 🌱 **M2 — <name>** (P1 ✅ · P2 🌱 ← here)
-👉 Next: <the one thing>. → [`STATUS.md`](./STATUS.md)
+👉 Next: <the one thing>. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---

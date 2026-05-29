@@ -146,27 +146,7 @@ and [`../explorations/swift-ecosystem/`](../explorations/swift-ecosystem/)
 (external Swift packages). Open questions live in
 [`QUESTIONS.md`](./QUESTIONS.md).
 
-## Milestone path
-
-- **M1 — Capture core.** `IrisCapture` + `CameraPreview` SwiftUI view + frame
-  stream. Smoke test: render preview, log frame timestamps. iOS only.
-- **M2 — Detection + overlay.** `IrisDetection` with a Vision adapter (body
-  pose or object detection). `IrisOverlay` drawing boxes. End-to-end live demo
-  on iOS.
-- **M3 — Playback.** `IrisPlayback` with the same `Frame` stream interface. Same
-  overlay code works on recorded video. **First macOS target lands here** —
-  playback + detection + overlay on Mac.
-- **M4 — Tuning.** `IrisTuning` — confidence slider, class filter, NMS controls
-  bound via `@Observable`. "What if" mode for near-misses.
-- **M5 — Honest detectors.** Capability model every built-in Vision detector
-  declares, driving derived per-detector tuning UI and capability-honest overlays —
-  render only what the model knows; ratios not percentages. Audits the built-in
-  Vision request surface; proves the model on reworked rectangles + a human
-  body-pose skeleton. Adds a raw-data inspector panel exposing the literal fields
-  each detection returns. See [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md).
-- **M6 — Custom models + captioning.** Core ML adapter with YOLO-style output
-  decoder. Model swap UI. Foundation Models captioning integration.
-- **M7 — Dataset.** `IrisDataset` — flag frames during playback, then extract them
-  as provenance-bearing images on disk (filename carries source + frame identity;
-  no per-image sidecar). Training-format export deferred until a pipeline names it.
-  Playback-context first; live-capture flagging is a follow-on.
+Milestone status and the roadmap (what M1–M7 are, where each stands) live in
+[`BOARD.md`](./BOARD.md) — §Status for current state, §Milestones for the
+one-line legend. This brief is the stable north star, not a living roadmap;
+new decisions land in [`DECISIONS.md`](./DECISIONS.md), not here.

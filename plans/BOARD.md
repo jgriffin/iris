@@ -1,7 +1,10 @@
-<!-- Snapshot, rewritten each block. Tree = defined work; penciled-in = ideas. One 👉 next. Best viewed monospace. -->
+<!-- The board: where work stands (Status), the path (Milestones), what's deferred (Backlog).
+     Status rewritten each block; Milestones/Backlog edited as they change. Best viewed monospace. -->
 
-# Iris — Status
+# Iris — Board
 _Snapshot · 2026-05-28_
+
+## Status
 
 ├─ ✅ M1 — Capture core
 ├─ ✅ M2 — Detection + overlay
@@ -19,31 +22,18 @@ _Snapshot · 2026-05-28_
 │  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
 │  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
 │  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
-└─ ✅ M7 — Dataset  (P1–P4 ✅ · branch `m7-dataset`, unmerged) → [features/M7.md](./features/M7.md)
+└─ ✅ M7 — Dataset  (P1–P4 ✅ · on `main` `0835d48`) → [features/M7.md](./features/M7.md)
    ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
    ├─ ✅ P2 — Flagging UI: on-frame bookmark (primary) + aligned timeline markers + flagged panel + jump-to-flag  (230 green · `4a10fb8`)
    ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (237 green · `e3ce965`)
    └─ ✅ P4 — Frame export sweep: library `FrameExporter` (resumable/interruptible, drives P3 `DatasetBuilder` over `RecentVideos` URLs) + `FrameExportCoordinator` triggers (`scenePhase` background + "Export now"; **launch trigger dropped** — contends with playback) + `export-status.json`  (244 green; `DatasetExporter` format conversion still deferred)
 
-penciled in — not yet defined (ideas, traceable to you)
-   ✏️ Detector selection MRU / remember-last-selected (not default-to-rectangle) — demo-side (user, 2026-05-28)
-   ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
-   ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
-
-👉 next — **merge `m7-dataset` → `main`** (M7 complete, P1–P4 ✅, 244 green, both demo schemes build, models bundled). M7 ships the full flag→extract loop: flag frames while scrubbing (on-frame bookmark primary, persisted reload-stably) → frames write themselves to `<Documents>/iris-dataset/frames/<sourceNameHash>_<fingerprintID>_<ptsMillis>.png` (**no sidecar**; the dataset's own filenames are the suffix-dedup ledger). P4's `FrameExporter` sweep (resumable + interruptible) is driven by `FrameExportCoordinator` in both demos: triggers on **`scenePhase`→background** (cancelled on foreground) + manual **"Export now"** button — the **launch trigger was dropped** (contended with playback). `export-status.json` records last-run counts + unreachable sources. Parked ideas (not wanted now): a **delayed-after-launch** sweep; loading `export-status.json` into the footer so automatic runs are visible in-UI; the unbounded "flagged sources" ledger (MRU-cap-10 follow-up); the real `DatasetExporter` (training-FORMAT conversion). Possible pre-merge: hands-on demo run (flag → background → confirm `frames/` fills) — manual-button path already user-verified. → [LOG.md](./LOG.md)
+👉 next — **clean boundary: M7 shipped and on `main`** (every milestone ✅; 244 green). Pick the next thrust — define a new milestone, or pull from §Backlog. (Owed, optional: a hands-on M7 demo run — flag → background → confirm `frames/` fills; the manual "Export now" path is already user-verified.) → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
-- 🗓 RF-DETR Core ML spike — off the M6 critical path (direct PyTorch→Core ML fork, FP32, needs `DETRSetPredictionDecoder`)
-- 🗓 Playback portrait `preferredTransform` + capture front-mirror (`isVideoMirrored`) — M5·P6 carryover
-- 🗓 Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
-- ✅ `Apps/project.yml` ↔ `.pbxproj` drift — RESOLVED (M7·P4): models declared explicitly in `project.yml`, regen verified to bundle both `.mlmodelc`; **`project.yml` canonical, regenerate freely, never hand-edit `.pbxproj`** → [QUESTIONS.md](./QUESTIONS.md)
-- 🗓 Path-B file-picking — file-picked models accept Path-A only; a Path-B picked model needs a label-supply UI + output-spec auto-detect (M6·P3)
-- ✅ Detector-swap regression test — landed in coordinator [P1](./features/playback-detection-coordinator.md) (commit `51743c7`); building P1 also corrected the root cause (the 2026-05-26 `f4a6284` cancel→drain→respawn is a no-op) → now answered in [QUESTIONS.md](./QUESTIONS.md)
-- 🗓 Revisit bumped SwiftLint thresholds once detector churn settles
-- ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
 - M7·P4 redefined (user — **refines**, doesn't contradict, the same-day "seam only"): P4 now ships a concrete **`FrameExporter` frame-export sweep** (resumable/interruptible; drives P3's `DatasetBuilder` over `RecentVideos`-resolved URLs; app-side launch/`scenePhase`-background/"Export now" triggers; `export-status.json` operational telemetry incl. unreachable sources). `DatasetExporter` training-FORMAT conversion stays deferred. `RecentVideos` MRU-10 caveat noted (ledger approach (b) = follow-up). (2026-05-28)
@@ -62,3 +52,33 @@ penciled in — not yet defined (ideas, traceable to you)
 - Core ML detector: start with YOLOv12 (Path A), pluggable `OutputDecoder` seam (2026-05-25)
 - VideoGeometry = single coordinate-mapping authority; orientation/mirroring upstream (2026-05-25)
 - Self-describing detections (skeleton + readout on `Detection`) (2026-05-25)
+
+## Milestones
+
+The roadmap legend — one line per milestone, what it delivers. State lives in §Status above; this section answers "what is M5 again?".
+
+- **M1 — Capture core** — `IrisCapture` + `CameraPreview` SwiftUI view + `AsyncStream<Frame>`; iOS only.
+- **M2 — Detection + overlay** — `IrisDetection` Vision adapter + `IrisOverlay` box drawing; end-to-end live iOS demo. → [features/M2.md](./features/M2.md)
+- **M3 — Playback** — `IrisPlayback` with the same `Frame` stream; same overlay on recorded video; first macOS target. → [features/M3.md](./features/M3.md)
+- **M4 — Tuning** — `IrisTuning` confidence/class/NMS controls via `@Observable`; three-tier change taxonomy. → [features/M4.md](./features/M4.md)
+- **M5 — Honest detectors** — per-detector capability model driving derived tuning UI + capability-honest overlays + a raw-data inspector. → [features/M5-honest-detectors.md](./features/M5-honest-detectors.md)
+- **M6 — Custom models** — Core ML adapter with a pluggable YOLO-style `OutputDecoder`; model-swap UI. (Captioning dropped — Foundation Models is text-only.) → [features/M6.md](./features/M6.md)
+- **M7 — Dataset** — `IrisDataset`: flag frames during playback → extract as provenance-bearing images (filenames are the dedup ledger; no sidecar); training-format export deferred. → [features/M7.md](./features/M7.md)
+
+## Backlog
+
+<!-- Stub = one line (`🗓 headline — hook`). Add a ≤4-line indented body only when needed.
+     Link out (→ features/ or exploration) when the item has a real home. -->
+
+- 🗓 Detector selection MRU / remember-last-selected — demo-side; default-to-rectangle is wrong (the common workflow is object models, switching among several).
+      Minimum: remember the last-selected detector across launches per demo; better: an MRU of detector order. Catalog + picker live in `Apps/Shared/DemoCatalog.swift` + the demo `ContentView`s; could reuse the `RecentVideos` MRU/`UserDefaults` pattern. (user, 2026-05-28)
+- 🗓 Offline file-reader pre-pass — pre-computed detection tracks for smooth playback; an `AVAssetReader`-backed offline pass that decodes a file frame-by-frame, runs the detector over every frame, and caches the full `[Detection]` track.
+      The natural shape for the Mac eval/curation target (the live pipeline stays best-effort + strobes on purpose). Opens when it lands: reuse `ResultStore` or a dedicated dense track? progress/cancel UI? sibling `Frame` source vs. pre-fill step. Likely M6/M7-adjacent. (user, 2026-05-25)
+- 🗓 Revisit bumped SwiftLint thresholds — `file_length`(→1000), `type_body_length`(→600), `nesting`(→2), `cyclomatic_complexity`(→15) were raised in block 8 to silence warnings during detector churn.
+      Real length debt: `DetectionLayer.swift`(482), `VisionRectanglesDetector.swift`(734), `PlaybackSource.swift`(523) want splitting. Once churn settles, split the long files and ratchet thresholds back down. See `.swiftlint.yml` dated comment + [LOG.md](./LOG.md) block 8.
+- 🗓 RF-DETR Core ML spike — off the M6 critical path; direct PyTorch→Core ML via patched forks, FP32-only, needs a Swift `DETRSetPredictionDecoder` (path B, no NMS). → [`explorations/2026-05-25-coreml-model-conversion/RECOMMENDATIONS.md`](../explorations/2026-05-25-coreml-model-conversion/RECOMMENDATIONS.md)
+- 🗓 Path-B file-picking — file-picked models accept Path-A only; a Path-B picked model would need a label-supply UI + output-spec auto-detect to pick the right `OutputDecoder`. Bundled Path-B (yolo26n) ships fine (decoder + labels wired in code). (M6·P3) → [features/M6.md](./features/M6.md)
+- 🗓 Playback portrait `preferredTransform` — `PlaybackSource` stamps `Frame.orientation = .up` unconditionally; a portrait clip is delivered sideways but labeled upright, so Vision returns sideways-normalized coords. Fix upstream: derive `CGImagePropertyOrientation` + upright dims from `preferredTransform`. (M5·P6)
+- 🗓 Capture front-camera mirroring — the preview connection's `isVideoMirrored` is never set to `(position == .front)`; front-camera overlays will be unmirrored vs. the displayed selfie. Locked in `explorations/display-pipeline-architecture/RECOMMENDATIONS.md`, omitted in code. (M5·P6)
+- 🗓 DetectionInspector Swift 6 warning — pre-existing strict-concurrency warning in both demos: `displayTimeSource: { controller.currentTime }` (macOS `ContentView.swift:149`, iOS `:310`). Clears with `MainActor.assumeIsolated`. Minor. (M5·P6)
+- 🗓 M7 export follow-ups — deferred polish on the dataset export loop, behind the existing seams. A **delayed-after-launch** sweep; surface `export-status.json` in the demo footer (automatic-run visibility); MRU-cap-10 the unbounded "flagged sources" ledger; the real `DatasetExporter` (training-format conversion). → [features/M7.md](./features/M7.md)

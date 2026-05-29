@@ -3,9 +3,16 @@
 <!-- Newest at top. Each entry: short title with date, a paragraph that captures
      the decision clearly enough to act on without opening the reference, then a
      link to the exploration that justifies it. Leave a blank line between entries.
-     The linked RECOMMENDATIONS.md carries the deep case — don't restate it here. -->
+     The linked RECOMMENDATIONS.md carries the deep case — don't restate it here.
+
+     Optional leading `Q:` line — when an entry resolves a question that was
+     tracked in QUESTIONS.md, prepend a one-line `Q: <the question it answers>`
+     for traceability (QUESTIONS.md holds open questions only; settled ones move
+     here, the QUESTIONS copy is deleted). -->
 
 ### 2026-05-28 — Demo project: `project.yml` is canonical; regenerate freely; never hand-edit the `.pbxproj` (reverses the M6·P3 "pbxproj authoritative" stance)
+
+Q: Does `Apps/project.yml` ↔ `.pbxproj` drift break model bundling — is the hand-edited `.pbxproj` authoritative?
 
 **This reverses the 2026-05-26 M6·P3 belief that the hand-edited `Apps/IrisDemo.xcodeproj/project.pbxproj` was authoritative and that `xcodegen generate` would break model bundling.** That belief was a cautious assumption, never verified — and it's **wrong**. Verified empirically during M7·P4: `DemoCatalog`'s primary model lookup is the **compiled `.mlmodelc`** (`Bundle.main.url(forResource: name, withExtension: "mlmodelc")`), and Xcode produces that `.mlmodelc` from the **Compile Sources** build phase — which is exactly where xcodegen's default classification places a `.mlpackage`. So a regen yields precisely what the loader wants; the hand-edit was solving a non-problem (and an opaque, unreadable `.pbxproj` is the worse design — it violates single-source-of-truth). **Decision:** `Apps/project.yml` is the single source of truth for the demo Xcode project; regenerate with `xcodegen generate` whenever it changes; **never hand-edit the `.pbxproj`** (the checked-in generated file is a build artifact, kept in git only so contributors can open the demos without installing xcodegen). The two bundled Core ML models are now **declared explicitly in `project.yml`** — excluded from the `Shared` source glob and listed per target in the default (Compile Sources) phase, with a comment — so they're *visible* in the readable spec rather than implicitly swept by the glob. Confirmed: a regen + build puts real `yolo12n.mlmodelc` + `yolo26n.mlmodelc` (with `coremldata.bin`/`weights`, no raw `.mlpackage`) in both `.app` bundles, both schemes green, 244 tests green. New files under `Apps/Shared/` are picked up automatically by the glob — no manual project surgery. (Consistent with the user's empirical-verification-over-docs principle: the doc claim was wrong; the run-to-verify corrected it.)
 
@@ -33,7 +40,9 @@ M7 is a **playback-context** dataset-curation loop (defined in [`features/M7.md`
 
 ### 2026-05-27 — Detector swap is a single-loop in-place router swap; the `f4a6284` cancel→drain→respawn "fix" was a no-op
 
-Building `PlaybackDetectionCoordinator` P1 (commit `51743c7`) corrected a misdiagnosis baked into the 2026-05-26 bugfix and the placement entry below. **`PlaybackSource` exposes a single *stored* `AsyncStream` (`_frames` + one `continuation`); cancelling its consuming task terminates the stream permanently**, so a respawned `for await source.frames` receives **zero** frames and every later `yield` returns `.terminated` (verified by an isolated repro). There is **no race** — the "two overlapping `for await` loops" model in the 2026-05-26 LOG is wrong, and the drain serializes nothing load-bearing. The reported "swap does nothing until reload" symptom was therefore **never actually fixed** by `f4a6284` (reload only masks it by building a fresh source → fresh stream). The coordinator instead runs **one detect loop per source** (never respawned) and swaps the detector **in place** by replacing `session.router`; the loop reads the live router on every frame, so `selectDetector` deterministically routes the next frame through the new detector. Teardown keeps cancel→drain→`invalidate()` — there the drain *is* correct (the loop is being killed for good, and the awaited `invalidate()` is the sandbox-scope-release ordering point). **Consequence: the demos still carry the non-functional respawn glue; P2/P3 rewiring them onto the coordinator fixes the demo swap bug for the first time.** This supersedes the "(incl. the cancel→drain→respawn lifecycle)" clause in the placement entry below.
+Q: Is there a regression test for the playback detector-swap path, given the demo had no testable seam? (And is the swap failure a non-deterministic race?)
+
+Building `PlaybackDetectionCoordinator` P1 (commit `51743c7`) corrected a misdiagnosis baked into the 2026-05-26 bugfix and the placement entry below. **`PlaybackSource` exposes a single *stored* `AsyncStream` (`_frames` + one `continuation`); cancelling its consuming task terminates the stream permanently**, so a respawned `for await source.frames` receives **zero** frames and every later `yield` returns `.terminated` (verified by an isolated repro). There is **no race** — the "two overlapping `for await` loops" model in the 2026-05-26 LOG is wrong, and the drain serializes nothing load-bearing. The reported "swap does nothing until reload" symptom was therefore **never actually fixed** by `f4a6284` (reload only masks it by building a fresh source → fresh stream). The coordinator instead runs **one detect loop per source** (never respawned) and swaps the detector **in place** by replacing `session.router`; the loop reads the live router on every frame, so `selectDetector` deterministically routes the next frame through the new detector. Teardown keeps cancel→drain→`invalidate()` — there the drain *is* correct (the loop is being killed for good, and the awaited `invalidate()` is the sandbox-scope-release ordering point). **Consequence: the demos still carry the non-functional respawn glue; P2/P3 rewiring them onto the coordinator fixes the demo swap bug for the first time.** This supersedes the "(incl. the cancel→drain→respawn lifecycle)" clause in the placement entry below. The regression test now has a home because the coordinator is a library type: [`Tests/IrisTests/Playback/PlaybackDetectionCoordinatorTests.swift`](../Tests/IrisTests/Playback/PlaybackDetectionCoordinatorTests.swift) drives two distinct `MockDetector`s, swaps mid-stream via `selectDetector`, and asserts the new detector owns the subsequent frames' output — a deterministic end-state assertion, not a flaky race.
 
 → [`features/playback-detection-coordinator.md`](./features/playback-detection-coordinator.md) (P1 · Finding 2026-05-27)
 
@@ -45,6 +54,8 @@ The session-orchestration logic currently duplicated across both demos' `Content
 
 ### 2026-05-26 — M6 closed (P1–P3); captioning (P4) dropped — Foundation Models is text-only
 
+Q: Could the planned P4 `Captioner` be a Foundation Models backend that captions images on-device?
+
 M6 delivered the Core ML detector end-to-end: the conversion pipeline (P1) → the path-A `VisionObjectDecoder` (P2, Vision auto-decodes an NMS pipeline, zero Swift decode) → the path-B `YOLOEnd2EndDecoder` (P3, raw `[1,300,6]` tensor with a runtime confidence knob via a conditional `TunableDetector` conformance) → bundled + file-picked Path-A model loading (P3, real prewarm, launch-prewarmed bundled models, `.modelNotReady`-aware picker). **P4 (captioning) is dropped, not deferred.** Verified against the MacOSX26.5 SDK: `FoundationModels` is **text-only** — `LanguageModelSession.respond(to:)` takes a `Prompt`/`String` and returns `Response<String>` (or a structured `Generable`); `Prompt` is built purely from text, with **no `CGImage`/`CVPixelBuffer`/`CIImage` image-input path** (the only image-ish symbol, `logFeedbackAttachment`, is unrelated). Vision has **no caption request** (its catalog is detection/classification/saliency/text-recognition; the closest, `ClassifyImageRequest`, returns labels, not a caption). So on-device image→text captioning needs a **vision-language model (VLM) converted to Core ML** — an off-plan lift — which corrects the original "Foundation Models backend" assumption in [`BRIEF.md`](./BRIEF.md) §3 and [`features/M6.md`](./features/M6.md). The user also deprioritized captioning. A future captioning milestone would start from a Core ML VLM, not Foundation Models.
 
 ### 2026-05-26 — M6·P3 model loading: real prewarm, bundled-at-launch, file-picked Path-A only
@@ -55,11 +66,15 @@ M6 delivered the Core ML detector end-to-end: the conversion pipeline (P1) → t
 
 ### 2026-05-26 — M6·P3: path-B decoder + tunability via conditional conformance
 
+Q: Should a Core ML `CoreMLDetector` expose its detection thresholds as runtime `TunableDetector` knobs?
+
 The `OutputDecoder` seam from the 2026-05-25 decision carries a **raw-tensor decoder with no `CoreMLDetector` reshape**: a raw-tensor model comes back as a `CoreMLFeatureValueObservation`, and on the MacOSX26.5 SDK the **Sendable** `MLSendableFeatureValue` exposes the tensor via `shapedArrayValue(of: Float.self)` (there is **no `multiArrayValue`** on the sendable wrapper). `YOLOEnd2EndDecoder` decodes the single `[1,300,6]` output — rows `[x1,y1,x2,y2,confidence,classIndex]` = **xyxy in 640-pixel space** (NOT xywh, NOT normalized) — with **no NMS** (the one-to-one head self-dedupes), and **inverts the `.scaleToFit` letterbox + flips Y itself** (path B owns the inverse-mapping Vision does for free on path A, and the YOLO top-left → Vision lower-left flip — this is the box-misalignment risk, verified correct on the dancer clip). **Labels are supplied externally** (`YOLOEnd2EndDecoder(labels:)` + a canonical COCO-80 constant) because the converted `yolo26n` embeds none (empty metadata — disproving the P1 plan's `userDefined`/`names` assumption; the artifact corrected the doc). **Runtime confidence tuning rides a `TunableOutputDecoder: OutputDecoder` sub-protocol + `extension CoreMLDetector: TunableDetector where Decoder: TunableOutputDecoder`** — a conditional conformance, so path A (`VisionObjectDecoder`) stays honestly non-tunable (baked thresholds) while path B gains the knob. `apply` tiering: no-op → `.view`; **raise threshold → `.filter`** (higher-conf rows are a strict subset of the cache — a pure post-hoc predicate, no re-inference); **lower → `.detector(rebuilt:)`** (previously-dropped rows aren't cached — rebuilds the detector around the SAME compiled container, no model recompile; hot-swap-by-rebuild per the M4 doctrine).
 
 → [`features/M6.md`](./features/M6.md)
 
 ### 2026-05-26 — M6·P2: ship Path-A `CoreMLDetector` with baked thresholds; defer runtime tuning to P3
+
+Q: What's the exact value-type observation name an auto-decoded Core ML detector returns under the new `CoreMLRequest` API (vs. legacy `VNRecognizedObjectObservation`)? — Confirmed at runtime against the MacOSX26.5 SDK: `CoreMLRequest.Result == [any VisionObservation]`, and an NMS object-detection pipeline yields concrete **`RecognizedObjectObservation`** (`boundingBox: NormalizedRect` = normalized lower-left, no flip; best-first `labels: [ClassificationObservation]`; `confidence: Float`).
 
 The one-detector + pluggable `OutputDecoder` seam from the 2026-05-25 decision is now realized in code (`Sources/Iris/Detection/CoreML/`): `CoreMLDetector<Decoder: OutputDecoder>` (a `Sendable final class` wrapping a `CoreMLModelContainer`, running `CoreMLRequest.perform(on:orientation:)` with `cropAndScaleAction = .scaleToFit`) + the `OutputDecoder` protocol + `VisionObjectDecoder`. **P2 ships `VisionObjectDecoder` (Path A) only and conforms `CoreMLDetector` to `Detector`, not `TunableDetector`** — Path-A NMS pipelines bake the IoU/confidence thresholds at export time, so there are no runtime threshold knobs to expose; adding them is the P3 question (it forces a path-B raw-tensor decoder + Swift NMS, decided alongside `YOLOEnd2EndDecoder`). Empirical SDK confirmations baked into the design: `CoreMLRequest.Result == [any VisionObservation]`, and an NMS object-detection pipeline yields concrete `RecognizedObjectObservation` (probed at runtime) carrying `boundingBox: NormalizedRect` (normalized lower-left, matches `Detection.boundingBox` — no flip, no letterbox-inverse) + best-first `labels` + `confidence`; `cropAndScaleAction = .scaleToFit` is aspect-preserving letterbox **and** Vision applies the inverse transform to the returned boxes, so "never hardcode 640" is satisfied for free (Vision reads the model's input size). Catalog integration is an additive non-tunable `DetectorCatalogEntry.make(id:displayName:detector:)` overload for plain `Detector`s + a `PassthroughRouter` — no fake `TunableDetector` conformance; a `DemoCatalog` composes `builtInVision + YOLOv12n` for both demo apps.
 
@@ -81,19 +96,41 @@ M5·P3 needed the generic overlay to draw skeletons and honest numerics without 
 
 → commits `e0700a7` (quad), `8ba40e6` (skeleton), `1ef2f3e` (readouts); plan in [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md)
 
+### 2026-05-24 — M4 polish backlog folded into M5 (rectangle confidence, quadrature filter, "double detections")
+
+Q: Three items punted at M4 close — revisit on return?
+
+Three M4-close deferrals, resolved: **(a)** Vision `RectangleObservation.confidence` empirically appears to always be `1.0` — either disable the confidence slider in `VisionRectanglesTuningView` for this detector or compute a synthetic confidence (quadrature error / aspect-from-perfect / size). **(b)** The `quadratureToleranceDegrees` filter-arm in `VisionRectanglesDetector.currentTransform()` is a TODO pass-through; it needs the four-corner-angle math from `Detection.keypoints` for the lowering direction. Both (a) and (b) were **folded into M5** — see [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md) (the capability model's `derivedScalar`/confidence-semantics work supersedes the rectangle-confidence question, and the honest-overlay work owns the quadrature math). **(c)** A reported "double detections" feeling after filter-flipping was **not reproducible on re-smoke** (2026-05-24) once filter projection actually worked — closed. None were blocking; the user explicitly punted at M4 close. See work blocks 4–5 of 2026-05-23 in [`LOG.md`](./LOG.md).
+
 ### 2026-05-24 — Detector capability model (M5)
 
 Built-in Vision detectors differ along axes a flat `[Detection]` can't express, so each detector declares a **capability descriptor** — the single source of truth for tuning UI, overlay rendering, and the raw-data inspector. Axes: **(1) geometry kind** (a *set*: box / quad / keypoints / contour / mask / heatmap / labelOnly / scalar); **(2) confidence semantics** — `probabilistic` / `perElement` / `none` / `derivedScalar(label:)`, never a bare `confidence: Float` that fabricates certainty; **(3) tunable-knob set** (reuses `SettingSchema`); **(4) introspectable field set**. Renderability (P3) and inspectability (P4) are two *projections* of the same descriptor, so they can't drift. `derivedScalar(label:)` is how geometric detectors surface a labeled quality ratio (rectangle quadrature deviation / aspect) without it masquerading as confidence. Proven on rectangles (confidence `none`) + 2D human body pose (confidence `perElement`); requires `SettingKind.string` + `.enum` additions for text/symbology knobs.
 
 → [`explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md`](../explorations/2026-05-24-vision-capability-audit/RECOMMENDATIONS.md)
 
+### 2026-05-23 — Cache fingerprinting for `ResultStore` under M4: global invalidation, not per-entry fingerprints
+
+Q: What's the cache fingerprinting strategy for `ResultStore` under M4's tunable knobs?
+
+Per-entry fingerprinting was the wrong shape — the cache is *globally* a record of "what the current detector configuration produced," not a heterogeneous mix of per-setting snapshots. The Phase 2 `invalidateAll()` on detector-tier change IS the global model and was already correct; a 24-byte fingerprint × 108k entries with per-knob inequality checks was inventing complexity to solve a non-problem (user pushback caught it). The genuinely interesting alternative — running the detector at maximally-permissive settings so all threshold knobs become filter-tier by construction — was investigated and found not free: cheap for shape knobs (aspect, size, quadrature), bad for `minimumConfidence` and `maximumObservations` (garbage-output explosion + cache bloat). Deferred indefinitely; the paused-frame re-emit hook + working filter projection make detector-tier changes feel fast enough in practice. See work blocks 4–5 of 2026-05-23 in [`LOG.md`](./LOG.md).
+
+### 2026-05-23 — Tuning-settings persistence is a consumer concern, not a `TuningModel` responsibility
+
+Q: Settings persistence — does `TuningModel` own it, or the consumer?
+
+Consumer-concern, as suspected. M4 Phase 3 demos didn't persist tuning state across launches, and that was right — it matches the M3 doctrine of UI-shaped state living outside the package. Consumers wanting cross-launch tuning persistence wire it themselves (UserDefaults, file, or whatever suits — the same way `RecentVideos` is consumer-owned in the demos, not a library type). M4 closed without library-side persistence. See work block 3 of 2026-05-23 in [`LOG.md`](./LOG.md).
+
 ### 2026-05-22 — Best-effort temporal match in `ResultStore.lookup` via timestamp-keyed cache
+
+Q: How to handle the `displayTime` semantic divergence between capture (host clock) and playback (asset time), and the exact-equality assumption in `ResultStore.lookup`? — The per-source `Frame.timestamp` contract still differs (capture = host clock, playback = asset time), but nearest-neighbor lookup no longer assumes exact equality, so the divergence stops mattering at the millisecond scale that tripped up playback. The originally-suspected exact-equality assumption was a minor factor; the load-bearing failures were the 30-frame ring buffer evicting playback history and the lack of cross-revisit reuse — both fixed in this work.
 
 `ResultStore` is a `[CMTime: TimestampedDetections]` dictionary keyed on *quantized* asset-time buckets (default: one 30fps frame); `lookup(at:)` is nearest-neighbor within `min(2 × quantization, stale:)`. `DetectorPipeline.detect(in:cache:)` consults the cache via a `DetectionCache` protocol (in `Sources/Iris/Detection/`) before dispatching detectors — re-visiting an already-detected timestamp returns the cached detections without re-running inference. `PlaybackSource` uses `.bufferingNewest(3)` (not `(1)`) so seek-emitted and frame-step frames survive detector congestion; the original 2026-05-20 "Runtime frame pipeline" `.bufferingNewest(1)` contract is preserved for `CaptureSession`. No eviction policy in v1 — revisit when M5's dataset workflows want long-form footage handling.
 
 → [`features/playback-detection-cache.md`](./features/playback-detection-cache.md) (commits `c6c250f`, `75a9b88`, `3f748d4`, `aa068ee`)
 
 ### 2026-05-20 — Single SwiftPM target, folder-organized internally
+
+Q: Should the package fork into separate targets/adapter packages, or stay single-target? (Revisited & re-confirmed 2026-05-21: stay single-target until adapters actually need to grow separately — splitting later is non-breaking.)
 
 Iris ships as one Swift package target with a single umbrella library product.
 Components (`Capture`, `Playback`, `Detection`, `Overlay`, `Tuning`, `Dataset`)
@@ -107,6 +144,8 @@ mattering.
 
 ### 2026-05-20 — Runtime frame pipeline
 
+Q: What async model carries frames — and what back-pressure policy? (Answered: `AsyncStream<Frame>` exposed via an `AsyncSequence` protocol, `.bufferingNewest(1)` from day one.)
+
 A `Source<Frame>` protocol sits upstream of `IrisCapture` and `IrisPlayback` so
 both feed the same downstream pipeline. Detector and overlay code never branch
 on where a frame came from. The contract is `AsyncStream<Frame>` with
@@ -119,6 +158,8 @@ protocol so consumers don't depend on the concrete type. The framework does
 
 ### 2026-05-20 — Display pipeline
 
+Q: How does the overlay reach macOS parity — what's the coordinate/rendering shape? (Answered: SwiftUI `Canvas` + centralized Y-flip + `NormalizedGeometryConverting` protocol with per-source backends.)
+
 Overlay rendering is a SwiftUI `Canvas` with one centralized Y-flip. Coordinate
 math lives behind a `NormalizedGeometryConverting` protocol with per-source
 backends: preview-layer-backed for live capture (delegating to
@@ -130,6 +171,8 @@ and never touch a flip transform or re-derive aspect-fit math.
 
 ### 2026-05-20 — Foundation Models scope: two protocols, not one
 
+Q: Does VLM/Foundation-Models work collapse into the `Detector` protocol or get its own? (Answered: two protocols — `Detector` + `Captioner`; VLM backends conform to both.)
+
 `Detector` (`image → [Detection]`) and `Captioner` (`image → text`) are separate
 protocols. VLM backends conform to both rather than collapsing into a merged
 super-protocol. Rationale: detection output (bounding boxes) and captioning
@@ -139,6 +182,8 @@ text would break the protocol's single responsibility.
 → [`explorations/swift-ecosystem/RECOMMENDATIONS.md`](../explorations/swift-ecosystem/RECOMMENDATIONS.md)
 
 ### 2026-05-20 — `@CaptureActor` in `IrisCapture`'s public API
+
+Q: Where do the concurrency boundaries sit — does capture's actor isolation extend to `Detector`? (Answered: `@CaptureActor` in `IrisCapture`'s public API; not extended to `Detector`.)
 
 `IrisCapture` is an `actor` with `nonisolated unownedExecutor` bound to a
 `DispatchSerialQueue` (the working blueprint is Apple AVCam's `CaptureService`).
@@ -150,6 +195,8 @@ stateful conformers wrap state in an internal `actor`).
 → [`explorations/swift-ecosystem/RECOMMENDATIONS.md`](../explorations/swift-ecosystem/RECOMMENDATIONS.md) (Apple AVCam blueprint)
 
 ### 2026-05-20 — Hot-swap by replacing the instance
+
+Q: How do you swap a model/detector mid-session, and what shape do stateful `Detector` conformers take? (Reaffirmed 2026-05-21: the protocol stays `Sendable`-only; stateful conformers wrap state in an internal `actor` by their own choice — forcing actor-ness at the protocol level buys no real type-safety.)
 
 To swap a model or detector mid-session, construct a fresh instance and replace
 the reference — never reach into a running detector to mutate its model.
