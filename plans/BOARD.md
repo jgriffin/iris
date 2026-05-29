@@ -9,14 +9,14 @@ _Snapshot · 2026-05-29_
 done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tuning (P4 🚫) · M5 Honest detectors · M6 Custom models (P4 🚫) · PlaybackDetectionCoordinator (P1–P3 ✅ · P4 🗓) · Demo simulator-runnable · M7 Dataset (P1–P4 ✅)
 
 🌱 **M8 — Image** (static-image detection; the source-agnostic decomposition's second consumer) → [features/M8.md](./features/M8.md)
-├─ 🗓 P1 — extract `DetectionRunner` (loop+cache+metrics+session-swap) into `Detection/`; recompose playback coordinator  ← here
-├─ 🗓 P2 — image → upright `Frame` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF/orientation upstream)
+├─ ✅ P1 — `DetectionRunner` (loop-free core: cache+metrics+session-swap+per-frame `run`) in `Detection/`; playback coordinator composes it  (244 green · demos build · branch `m8-p1-detection-runner`)
+├─ 🗓 P2 — image → upright `Frame` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF/orientation upstream)  ← here
 ├─ 🗓 P3 — `ImageDetectionCoordinator` (one-shot detect; model-swap re-runs once; composes `DetectionRunner`)
 ├─ 🗓 P4 — demo Image page (iOS+macOS): image picker + `RecentImages` MRU + detector picker + tuning sheet, no scrubber
 ├─ 🗓 P5 — freeze-from-live: "Inspect frame" from playback/capture → Image page
 └─ 🗓 P6 — dataset tie-in: image-shaped `AssetFingerprint` (no `durationSeconds`) + PTS/seek-free `FlaggingSource` + flag→PNG export
 
-👉 next — **M8·P1 — extract `DetectionRunner`** (the source-agnostic core: loop+cache+metrics+detector-session-swap out of `PlaybackDetectionCoordinator` into `Detection/`, recompose playback to use it). **Pure refactor — keep 244 green**, no behavior change; closes the source-agnostic-decomposition open question. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
+👉 next — **M8·P2 — image → upright `Frame`.** Add `SourceKind.image` + a `CGImage`/`CVPixelBuffer`→`Frame` helper that bakes EXIF orientation upstream (keeps `VideoGeometry` rotation-free), with fixture-image unit tests. New `Sources/Iris/Image/` folder. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)

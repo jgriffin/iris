@@ -1,34 +1,36 @@
 import Foundation
 import Observation
-import os
 
 // MARK: - PlaybackDetectionCoordinator
 
 /// Owns the playback **detection-session orchestration** the two demos used
-/// to duplicate verbatim: the detect loop and its lifecycle, the
-/// `ResultStore` + `DetectionMetrics` it resets at the right moments, the
-/// `ActiveDetectorSession` it builds from a catalog entry, the self-wired
-/// `onDetectorTierChange` pause-emit hook, and the `PlaybackController`
-/// lifecycle + ordered teardown.
+/// to duplicate verbatim: the per-source detect loop and its lifecycle, the
+/// self-wired `onDetectorTierChange` pause-emit hook, and the
+/// `PlaybackController` lifecycle + ordered teardown.
 ///
-/// **Why this lives in `Playback/`.** The coordinator is playback-coupled —
-/// the pause-emit hook needs a `PlaybackController` + `seek` to re-emit the
-/// visible frame so a `.detector`-tier change shows through while paused.
-/// The detect-loop + cache + metrics core is genuinely source-agnostic, but
-/// it is **deliberately not pre-split** into a `Detection/`-side runner;
-/// per the single-target doctrine, lifting it out later is a non-breaking
-/// change, and there is no capture-side detection consumer yet to justify
-/// the seam (`plans/features/playback-detection-coordinator.md` §Opens).
+/// **Composes a `DetectionRunner` (M8·P1).** The source-agnostic core — the
+/// `ResultStore` + `DetectionMetrics`, the `ActiveDetectorSession` built from a
+/// catalog entry, and the per-frame "run + time + record" unit — now lives in
+/// [`DetectionRunner`](../Detection/DetectionRunner.swift), which the image
+/// inspector also composes. This coordinator adds the *playback* layer: the
+/// frame-stream detect loop, the `PlaybackController` lifecycle, the
+/// source-specific drop/emit counter bridge, and the seek-based re-emit hook.
+/// The runner's `resultStore` / `metrics` / `session` are re-surfaced here
+/// unchanged so the demo's library-view bindings are stable.
 ///
-/// **Detector swap is an in-place router swap — NOT a loop respawn.**
+/// **Why this layer lives in `Playback/`.** It is playback-coupled — the
+/// pause-emit hook needs a `PlaybackController` + `seek` to re-emit the visible
+/// frame so a `.detector`-tier change shows through while paused.
+///
+/// **Detector swap is an in-place session swap — NOT a loop respawn.**
 /// `PlaybackSource.frames` is a *single-iteration* `AsyncStream`: cancelling
 /// the consuming task **finishes the stream**, so a second `for await` over
 /// the same `frames` receives nothing (verified empirically; this is plain
 /// `AsyncStream` semantics, not a `PlaybackSource` quirk). The coordinator
 /// therefore spawns **one** detect loop per source, alive for the source's
-/// lifetime, and a detector swap replaces the active `session` (and its
-/// router) *in place*. The loop reads the coordinator's current router on
-/// every frame and hands it to `DetectorPipeline.detect(in:cache:tuning:)`,
+/// lifetime, and a detector swap replaces the runner's active `session` (and
+/// its router) *in place*. The loop hands each frame to `runner.run(on:)`,
+/// which reads the live router and runs `DetectorPipeline.detect(in:cache:tuning:)`,
 /// whose hot-swap contract runs `router.currentDetector`. That makes the
 /// freshly-selected detector the sole producer for every subsequent frame,
 /// with no stream re-iteration and no two-consumer race. (This is a
@@ -62,33 +64,38 @@ import os
 /// [`ResultStore`](../Overlay/ResultStore.swift) idiom: a SwiftUI-shaped
 /// observable that fronts a non-MainActor frame pipeline without leaking the
 /// underlying threading model. The detect loop runs off the main actor and
-/// hops to read the current router + record metrics.
+/// hops (inside `runner.run(on:)`) to read the current router + record metrics.
 @MainActor
 @Observable
 public final class PlaybackDetectionCoordinator {
 
+    // MARK: - Source-agnostic core
+
+    /// The shared detection core: cache + metrics + active session + per-frame
+    /// inference. This coordinator drives it from a frame-stream loop; the image
+    /// inspector drives the same type one-shot.
+    public let runner: DetectionRunner
+
     // MARK: - Outputs the demo binds its library views to
 
     /// Detection cache. → `DetectionLayer(store:)` + `DetectionInspector(store:)`.
-    /// Held for the coordinator's lifetime; `invalidateAll()` clears it on a
-    /// detector swap or new source.
-    public let resultStore: ResultStore
+    /// Re-surfaced from the runner so existing bindings are stable.
+    public var resultStore: ResultStore { runner.resultStore }
 
     /// Best-effort pipeline gauge. → `DetectionMetricsView(metrics:)`.
-    /// `reset()` on a detector swap or new source.
-    public let metrics: DetectionMetrics
+    /// Re-surfaced from the runner.
+    public var metrics: DetectionMetrics { runner.metrics }
+
+    /// The active detector session. → `.router` for `DetectionLayer(tuning:)`,
+    /// `.settingsView` for the tuning sheet. Re-surfaced from the runner; `nil`
+    /// before the first `setSource` and after `teardown`. Swapped in place by
+    /// `selectDetector`.
+    public var session: ActiveDetectorSession? { runner.session }
 
     /// The active playback controller, created per source. → `Scrubber(model:)`
     /// + `PlaybackView(source: controller.source)`. `nil` before the first
     /// `setSource` and after `teardown`.
     public private(set) var controller: PlaybackController?
-
-    /// The active detector session. → `.router` for `DetectionLayer(tuning:)`,
-    /// `.settingsView` for the tuning sheet. `nil` before the first `setSource`
-    /// and after `teardown`. Swapped in place by `selectDetector` — the detect
-    /// loop reads `session?.router` on every frame, so the swap takes effect on
-    /// the next frame without re-iterating the stream.
-    public private(set) var session: ActiveDetectorSession?
 
     // MARK: - Stored
 
@@ -97,19 +104,17 @@ public final class PlaybackDetectionCoordinator {
     /// single-iteration — see the type doc).
     @ObservationIgnored private var detectionTask: Task<Void, Never>?
 
-    private let logger = Logger(subsystem: "iris.playback", category: "detection-coordinator")
-
     // MARK: - Init
 
-    /// Build a coordinator holding the supplied cache + metrics. Both default
-    /// to fresh instances; the demo can inject its own if it needs to share
-    /// them with other UI before a source is set.
+    /// Build a coordinator holding the supplied cache + metrics (forwarded to
+    /// its `DetectionRunner`). Both default to fresh instances; the demo can
+    /// inject its own if it needs to share them with other UI before a source
+    /// is set.
     public init(
         resultStore: ResultStore = .init(),
         metrics: DetectionMetrics = .init()
     ) {
-        self.resultStore = resultStore
-        self.metrics = metrics
+        self.runner = DetectionRunner(resultStore: resultStore, metrics: metrics)
     }
 
     // MARK: - Intent 1: a new video
@@ -135,8 +140,7 @@ public final class PlaybackDetectionCoordinator {
         await teardown()
 
         // Per-session counters + cache reset on a new video.
-        metrics.reset()
-        resultStore.invalidateAll()
+        runner.resetForNewSession()
 
         let newController = PlaybackController(source: source)
         self.controller = newController
@@ -159,13 +163,13 @@ public final class PlaybackDetectionCoordinator {
     public func selectDetector(_ entry: DetectorCatalogEntry) async {
         guard let controller else { return }
 
-        resultStore.invalidateAll()
-        metrics.reset()
+        runner.resetForNewSession()
 
-        // In-place router swap. The single detect loop reads `session?.router`
-        // every frame, so the next frame routes through the new detector — no
-        // stream re-iteration (the single-iteration `AsyncStream` can't be
-        // re-consumed; see the type doc).
+        // In-place session swap. The single detect loop hands each frame to
+        // `runner.run(on:)`, which reads `session?.router` every frame, so the
+        // next frame routes through the new detector — no stream re-iteration
+        // (the single-iteration `AsyncStream` can't be re-consumed; see the
+        // type doc).
         installSession(entry: entry, on: controller)
 
         // Re-emit the visible frame so a paused player re-runs detection under
@@ -178,9 +182,9 @@ public final class PlaybackDetectionCoordinator {
     /// Tear down the active session. Idempotent.
     ///
     /// Order: cancel detect loop → **drain** (`await task.value`) → clear the
-    /// pause-emit hook → `source.invalidate()`. Cancelling the loop finishes
-    /// the single-consumer stream; the `await` on `invalidate()` is what lets
-    /// the demo release its security scope strictly afterward (the
+    /// session (+ its pause-emit hook) → `source.invalidate()`. Cancelling the
+    /// loop finishes the single-consumer stream; the `await` on `invalidate()`
+    /// is what lets the demo release its security scope strictly afterward (the
     /// scope-ordering contract on this type).
     public func teardown() async {
         let task = detectionTask
@@ -191,14 +195,13 @@ public final class PlaybackDetectionCoordinator {
         // cancellation-aware, so this returns promptly.
         await task?.value
 
-        // Defensive: drop the pause-emit hook before releasing the session so
-        // no stale fire can cross the teardown boundary.
-        session?.router.onDetectorTierChange = nil
+        // Drop the session (clears its pause-emit hook) before releasing the
+        // source so no stale fire can cross the teardown boundary.
+        runner.clearSession()
 
         let priorSource = controller?.source
         controller = nil
-        session = nil
-        resultStore.clear()
+        runner.resultStore.clear()
 
         // Detach AVF observers + finish the frame stream. Awaited so the
         // caller can sequence its security-scope release after this returns.
@@ -209,79 +212,47 @@ public final class PlaybackDetectionCoordinator {
 
     // MARK: - Private
 
-    /// Build the catalog session for `entry`, wire its self-emit hook to
-    /// `controller`, and install it as the active `session`. Does **not** touch
-    /// the detect loop — the loop reads the live `session?.router` each frame,
-    /// so installing a new session is the whole of a detector swap.
+    /// Install the catalog session for `entry` via the runner, supplying the
+    /// playback-specific seek-based re-emit hook. A `.detector`-tier change
+    /// clears the cache; if the source is paused, no frames flow → overlay reads
+    /// nil → detections disappear mid-tuning. Seeking to the current time
+    /// re-emits a one-shot frame, giving the pipeline a frame to re-run under
+    /// the new settings. A `PassthroughRouter` (non-tunable detector) never
+    /// fires this — the wiring is a harmless no-op there.
     private func installSession(
         entry: DetectorCatalogEntry,
         on controller: PlaybackController
     ) {
-        // Clear the prior session's hook so a late fire can't cross the swap.
-        session?.router.onDetectorTierChange = nil
-
-        // `cache: resultStore` (passed into `makeSession`) means a
-        // `.detector`-tier knob change invalidates the playback cache so the
-        // next decode produces fresh detections under the new settings.
-        let newSession = entry.makeSession(resultStore)
-
-        // Self-wired pause-emit hook. A `.detector`-tier change clears the
-        // cache; if the source is paused, no frames flow → overlay reads nil →
-        // detections disappear mid-tuning. Seeking to the current time re-emits
-        // a one-shot frame, giving the pipeline a frame to re-run under the new
-        // settings. A `PassthroughRouter` (non-tunable detector) never fires
-        // this — the wiring is a harmless no-op there.
-        newSession.router.onDetectorTierChange = { [weak controller] in
+        runner.installSession(entry: entry) { [weak controller] in
             guard let controller else { return }
             let source = controller.source
             let target = controller.currentTime
             Task { try? await source.seek(to: target) }
         }
-
-        self.session = newSession
     }
 
-    /// Spawn the single per-source detect loop. Reads the coordinator's current
-    /// router (`session?.router`) on each frame and runs the pipeline against
-    /// it — so an in-place `installSession` swap takes effect on the next
-    /// frame. Cancelled in `teardown`; never respawned (the stream is
-    /// single-iteration).
+    /// Spawn the single per-source detect loop. Hands each frame to
+    /// `runner.run(on:)` (which reads the live router, so an in-place session
+    /// swap takes effect on the next frame) and bridges the source's cumulative
+    /// drop/emit counters into the gauge. Cancelled in `teardown`; never
+    /// respawned (the stream is single-iteration).
     private func spawnDetectionLoop(on controller: PlaybackController) {
-        let store = resultStore
-        let pipeline = DetectorPipeline([])
+        let runner = self.runner
         let source = controller.source
-        let metrics = self.metrics
-        detectionTask = Task { [weak self] in
+        detectionTask = Task {
             for await frame in source.frames {
                 if Task.isCancelled { break }
-                // Read the live router on the main actor so a mid-stream
-                // detector swap (in-place `installSession`) routes the next
-                // frame through the new detector. `nil` before a session
-                // exists (shouldn't happen — the loop is spawned after the
-                // first `installSession`) leaves the pipeline's own (empty)
-                // detector array, which is a safe no-op.
-                let router = await MainActor.run { self?.session?.router }
-                do {
-                    // Time the inference for the best-effort gauge.
-                    // `DetectionMetrics` is `@MainActor`, so record on the main
-                    // actor; the cumulative source counters are bridged in.
-                    let clock = ContinuousClock()
-                    let start = clock.now
-                    _ = try await pipeline.detect(in: frame, cache: store, tuning: router)
-                    let elapsed = clock.now - start
-                    let seconds = Double(elapsed.components.seconds)
-                        + Double(elapsed.components.attoseconds) / 1e18
-                    let dropped = source.droppedFrameCount
-                    let emitted = source.emittedFrameCount
-                    await MainActor.run {
-                        metrics.recordInference(seconds: seconds)
-                        metrics.setDropped(dropped)
-                        metrics.setEmitted(emitted)
-                    }
-                } catch {
-                    self?.logger.error(
-                        "detect failed: \(String(describing: error), privacy: .public)"
-                    )
+
+                // Source-agnostic per-frame inference + timing.
+                await runner.run(on: frame)
+
+                // Bridge the playback-source-specific cumulative counters into
+                // the gauge. `DetectionMetrics` is `@MainActor`, so hop.
+                let dropped = source.droppedFrameCount
+                let emitted = source.emittedFrameCount
+                await MainActor.run {
+                    runner.metrics.setDropped(dropped)
+                    runner.metrics.setEmitted(emitted)
                 }
             }
         }
