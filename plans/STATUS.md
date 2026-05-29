@@ -14,7 +14,7 @@ _Snapshot · 2026-05-28_
 │  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
 │  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
 │  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
-├─ ✅ Demo simulator-runnable  (P1–P4 ✅ · merged to `main` ff `40cf0de` · 👀 hands-on smoke still owed) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
+├─ ✅ Demo simulator-runnable  (P1–P4 ✅ · merged to `main` ff `40cf0de` · smoke ✅) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
 │  ├─ ✅ P1 — Playback-first sidebar-adaptable TabView (iOS demo)  (`3a1388b`)
 │  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
 │  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
@@ -22,14 +22,14 @@ _Snapshot · 2026-05-28_
 └─ 🌱 M7 — Dataset  (BRIEF §6 · playback-context flag→extract loop · branch `m7-dataset`) → [features/M7.md](./features/M7.md)
    ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
    ├─ ✅ P2 — Flagging UI: on-frame bookmark (primary) + aligned timeline markers + flagged panel + jump-to-flag  (230 green · `4a10fb8`)
-   ├─ 📋 P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`; deterministic-naming dedup
-   └─ 📋 P4 — COCO sidecar schema + `COCOExporter` (per-image → merged `annotations.json`)
+   ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (landing this block, suite green)
+   └─ 📋 P4 — `DatasetExporter` protocol **seam only** — no concrete exporter; first one deferred until a training pipeline names its format
 
 penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **build M7·P3 — `DatasetSink` + headless extractor.** P1+P2 landed (`e685f09`, `4a10fb8`): you can flag frames while scrubbing (on-frame bookmark = primary affordance, coarse timeline markers, flagged panel, jump-to-flag) and they persist reload-stably. P3 is the **deferred-extraction** half: a `DatasetSink` protocol + `FolderDatasetSink` writing to `<Documents>/iris-dataset/frames/<fingerprint.id>_<ptsMillis>.png` + COCO sidecar, driven by a **headless `DatasetBuilder`** that walks an asset's flags, `seek`s each PTS on a `PlaybackSource` (default `TaskTickDriver`), decodes the pixel buffer (reuse an Overlay-side CIImage path if one exists — don't add a new converter), and **skips frames the sink already contains** (deterministic-naming dedup → resumable). Also resolve the `// M7·P3:` PTS snap-to-sample tripwire on `FrameRef`. ⚠️ still owed: hands-on smoke of `demo-sim-runnable` on `main` (ff `40cf0de`) — two manual taps (Capture→fallback page, iPad sidebar expand); automatable gates PASS. → [LOG.md](./LOG.md)
+👉 next — **build M7·P4 — `DatasetExporter` protocol seam only.** P1–P3 ✅ green (237 tests): flag frames while scrubbing (on-frame bookmark primary, coarse timeline markers, flagged panel, jump-to-flag), persisted reload-stably; and the **deferred-extraction** half — `DatasetSink` + `FolderDatasetSink` + headless `DatasetBuilder` + a CoreImage-only `PixelBufferPNGEncoder` — writing provenance-bearing PNGs (`<sourceNameHash>_<fingerprintID>_<ptsMillis>.png`, **no sidecar**) with a **suffix-dedup ledger** keyed on the dataset's own filenames (rename-stable, resumable); `AssetFingerprint` reworked name-independent (id = size+duration+head-hash, rename-stable/edit-sensitive) and the `// M7·P3:` PTS snap-to-sample tripwire resolved (no-op — `.zero`-tolerance seek lands the canonical sample). **P4 = a `DatasetExporter` protocol seam only — no COCO, no concrete exporter**; the first one waits until a real training pipeline names its format (a flag is "look again," not an annotation, and multiple models get tried, so committing now is false precision). → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -45,8 +45,9 @@ penciled in — not yet defined (ideas, traceable to you)
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M7 sidecar reframe (user — supersedes the COCO call): **no per-image sidecar, no COCO, no exporter in M7** (a flag = "look again," not an annotation; multiple models tried ⇒ a per-image verdict is false precision). `AssetFingerprint` now **name-independent** (`byteSize`+`durationSeconds`+mandatory head-hash; filename display-only) → rename-stable + edit-sensitive. Provenance rides the export filename (`<sourceNameHash>_<fingerprintID>_<ptsMillis>.png`); **dedup keys on the suffix** — the dataset's own filenames are the ledger (lives WITH the data, can't go stale). P4 → `DatasetExporter` **seam only**, first exporter deferred to when a training pipeline names its format. (2026-05-28)
 - M7·P2 UI call (user): the **primary flag affordance lives ON the frame image** (top-right bookmark puck via `VideoRectAligned`/`VideoGeometry`), not a control-row button; **timeline markers are a coarse secondary overview**, never the source of truth (a thin strip can't resolve adjacent frames; ticks inset by thumb radius to align). (2026-05-28)
-- M7 defined ([features/M7.md](./features/M7.md)): frame address = `(AssetFingerprint, PTS)`; content fingerprint (filename+size+duration+head-hash) not URL; cheap flagging / deferred headless extraction; per-image COCO sidecar + merge-exporter; deterministic-naming dedup; output under `<Documents>/iris-dataset/`. Scope = **playback**; live-capture flagging is a follow-on (can't re-seek). (2026-05-28)
+- M7 defined ([features/M7.md](./features/M7.md)): frame address = `(AssetFingerprint, PTS)`; content fingerprint not URL; cheap flagging / deferred headless extraction; deterministic-naming dedup; output under `<Documents>/iris-dataset/`. Scope = **playback**; live-capture flagging is a follow-on (can't re-seek). *(Sidecar/COCO half superseded by the reframe above.)* (2026-05-28)
 - `demo-sim-runnable` fast-forwarded to `main` (`40cf0de`); hands-on smoke skipped (owed) (2026-05-28)
 - Swap root-cause corrected: the `f4a6284` cancel→drain→respawn fix proved a **no-op** (`PlaybackSource` exposes a single stored `AsyncStream` that dies permanently on consumer cancel — respawned `for await` gets zero frames); coordinator uses **one loop + in-place router swap** instead. P2/P3 fix the demo swap bug for the first time (2026-05-27)
 - PlaybackDetectionCoordinator defined: `@MainActor @Observable` library type in `Playback/`; 4 phases (P1 build+test, P2/P3 rewire demos, P4 deferred) (2026-05-27)

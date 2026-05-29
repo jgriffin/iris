@@ -126,11 +126,14 @@ protocol Detector: Sendable {
 ### 6. `IrisDataset` — capture frames for retraining *(iOS + macOS)*
 
 - `DatasetSink` protocol: folder on disk, iCloud, S3, etc.
-- `capture(frame:detections:label:reason:)` — saves image + JSON sidecar
-  (detections, threshold at time of capture, model ID, timestamp, user notes).
+- Flag frames during playback (cheap, metadata-only), then extract them later as
+  **provenance-bearing images** — the filename carries source + frame identity, so
+  the dataset's own filenames are the dedup ledger. A flag means "look again," not
+  a ground-truth label, so no per-image model-verdict sidecar is written.
 - Built-in "this was wrong" and "this was a near-miss" affordances.
-- Folder layout compatible with common training formats — COCO-style JSON as
-  canonical, exporters convert to YOLO / Pascal VOC.
+- Real annotation happens in an external tool; **training-format export
+  (COCO / YOLO / Pascal VOC) is deferred** behind a `DatasetExporter` seam until a
+  training pipeline names the format it consumes — no format is committed up front.
 
 ## Architecture
 
@@ -163,5 +166,7 @@ and [`../explorations/swift-ecosystem/`](../explorations/swift-ecosystem/)
   each detection returns. See [`features/M5-honest-detectors.md`](./features/M5-honest-detectors.md).
 - **M6 — Custom models + captioning.** Core ML adapter with YOLO-style output
   decoder. Model swap UI. Foundation Models captioning integration.
-- **M7 — Dataset.** `IrisDataset` — one-tap capture of frame + metadata to disk,
-  COCO sidecar. Works from both live and playback contexts.
+- **M7 — Dataset.** `IrisDataset` — flag frames during playback, then extract them
+  as provenance-bearing images on disk (filename carries source + frame identity;
+  no per-image sidecar). Training-format export deferred until a pipeline names it.
+  Playback-context first; live-capture flagging is a follow-on.
