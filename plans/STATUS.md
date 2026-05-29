@@ -19,17 +19,18 @@ _Snapshot · 2026-05-28_
 │  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
 │  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
 │  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
-└─ 🌱 M7 — Dataset  (BRIEF §6 · playback-context flag→extract loop · branch `m7-dataset`) → [features/M7.md](./features/M7.md)
+└─ ✅ M7 — Dataset  (P1–P4 ✅ · branch `m7-dataset`, unmerged) → [features/M7.md](./features/M7.md)
    ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
    ├─ ✅ P2 — Flagging UI: on-frame bookmark (primary) + aligned timeline markers + flagged panel + jump-to-flag  (230 green · `4a10fb8`)
-   ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (landing this block, suite green)
-   └─ 📋 P4 — `DatasetExporter` protocol **seam only** — no concrete exporter; first one deferred until a training pipeline names its format
+   ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (237 green · `e3ce965`)
+   └─ ✅ P4 — Frame export sweep: library `FrameExporter` (resumable/interruptible, drives P3 `DatasetBuilder` over `RecentVideos` URLs) + `FrameExportCoordinator` triggers (`scenePhase` background + "Export now"; **launch trigger dropped** — contends with playback) + `export-status.json`  (244 green; `DatasetExporter` format conversion still deferred)
 
 penciled in — not yet defined (ideas, traceable to you)
+   ✏️ Detector selection MRU / remember-last-selected (not default-to-rectangle) — demo-side (user, 2026-05-28)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **build M7·P4 — `DatasetExporter` protocol seam only.** P1–P3 ✅ green (237 tests): flag frames while scrubbing (on-frame bookmark primary, coarse timeline markers, flagged panel, jump-to-flag), persisted reload-stably; and the **deferred-extraction** half — `DatasetSink` + `FolderDatasetSink` + headless `DatasetBuilder` + a CoreImage-only `PixelBufferPNGEncoder` — writing provenance-bearing PNGs (`<sourceNameHash>_<fingerprintID>_<ptsMillis>.png`, **no sidecar**) with a **suffix-dedup ledger** keyed on the dataset's own filenames (rename-stable, resumable); `AssetFingerprint` reworked name-independent (id = size+duration+head-hash, rename-stable/edit-sensitive) and the `// M7·P3:` PTS snap-to-sample tripwire resolved (no-op — `.zero`-tolerance seek lands the canonical sample). **P4 = a `DatasetExporter` protocol seam only — no COCO, no concrete exporter**; the first one waits until a real training pipeline names its format (a flag is "look again," not an annotation, and multiple models get tried, so committing now is false precision). → [LOG.md](./LOG.md)
+👉 next — **merge `m7-dataset` → `main`** (M7 complete, P1–P4 ✅, 244 green, both demo schemes build, models bundled). M7 ships the full flag→extract loop: flag frames while scrubbing (on-frame bookmark primary, persisted reload-stably) → frames write themselves to `<Documents>/iris-dataset/frames/<sourceNameHash>_<fingerprintID>_<ptsMillis>.png` (**no sidecar**; the dataset's own filenames are the suffix-dedup ledger). P4's `FrameExporter` sweep (resumable + interruptible) is driven by `FrameExportCoordinator` in both demos: triggers on **`scenePhase`→background** (cancelled on foreground) + manual **"Export now"** button — the **launch trigger was dropped** (contended with playback). `export-status.json` records last-run counts + unreachable sources. Parked ideas (not wanted now): a **delayed-after-launch** sweep; loading `export-status.json` into the footer so automatic runs are visible in-UI; the unbounded "flagged sources" ledger (MRU-cap-10 follow-up); the real `DatasetExporter` (training-FORMAT conversion). Possible pre-merge: hands-on demo run (flag → background → confirm `frames/` fills) — manual-button path already user-verified. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -38,13 +39,14 @@ penciled in — not yet defined (ideas, traceable to you)
 - 🗓 RF-DETR Core ML spike — off the M6 critical path (direct PyTorch→Core ML fork, FP32, needs `DETRSetPredictionDecoder`)
 - 🗓 Playback portrait `preferredTransform` + capture front-mirror (`isVideoMirrored`) — M5·P6 carryover
 - 🗓 Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
-- 🗓 `Apps/project.yml` ↔ `.pbxproj` drift — an xcodegen regen would drop the bundled `.mlpackage` Resources entries; the hand-edited `.pbxproj` is authoritative (M6·P3)
+- ✅ `Apps/project.yml` ↔ `.pbxproj` drift — RESOLVED (M7·P4): models declared explicitly in `project.yml`, regen verified to bundle both `.mlmodelc`; **`project.yml` canonical, regenerate freely, never hand-edit `.pbxproj`** → [QUESTIONS.md](./QUESTIONS.md)
 - 🗓 Path-B file-picking — file-picked models accept Path-A only; a Path-B picked model needs a label-supply UI + output-spec auto-detect (M6·P3)
 - ✅ Detector-swap regression test — landed in coordinator [P1](./features/playback-detection-coordinator.md) (commit `51743c7`); building P1 also corrected the root cause (the 2026-05-26 `f4a6284` cancel→drain→respawn is a no-op) → now answered in [QUESTIONS.md](./QUESTIONS.md)
 - 🗓 Revisit bumped SwiftLint thresholds once detector churn settles
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M7·P4 redefined (user — **refines**, doesn't contradict, the same-day "seam only"): P4 now ships a concrete **`FrameExporter` frame-export sweep** (resumable/interruptible; drives P3's `DatasetBuilder` over `RecentVideos`-resolved URLs; app-side launch/`scenePhase`-background/"Export now" triggers; `export-status.json` operational telemetry incl. unreachable sources). `DatasetExporter` training-FORMAT conversion stays deferred. `RecentVideos` MRU-10 caveat noted (ledger approach (b) = follow-up). (2026-05-28)
 - M7 sidecar reframe (user — supersedes the COCO call): **no per-image sidecar, no COCO, no exporter in M7** (a flag = "look again," not an annotation; multiple models tried ⇒ a per-image verdict is false precision). `AssetFingerprint` now **name-independent** (`byteSize`+`durationSeconds`+mandatory head-hash; filename display-only) → rename-stable + edit-sensitive. Provenance rides the export filename (`<sourceNameHash>_<fingerprintID>_<ptsMillis>.png`); **dedup keys on the suffix** — the dataset's own filenames are the ledger (lives WITH the data, can't go stale). P4 → `DatasetExporter` **seam only**, first exporter deferred to when a training pipeline names its format. (2026-05-28)
 - M7·P2 UI call (user): the **primary flag affordance lives ON the frame image** (top-right bookmark puck via `VideoRectAligned`/`VideoGeometry`), not a control-row button; **timeline markers are a coarse secondary overview**, never the source of truth (a thin strip can't resolve adjacent frames; ticks inset by thumb radius to align). (2026-05-28)
 - M7 defined ([features/M7.md](./features/M7.md)): frame address = `(AssetFingerprint, PTS)`; content fingerprint not URL; cheap flagging / deferred headless extraction; deterministic-naming dedup; output under `<Documents>/iris-dataset/`. Scope = **playback**; live-capture flagging is a follow-on (can't re-seek). *(Sidecar/COCO half superseded by the reframe above.)* (2026-05-28)
