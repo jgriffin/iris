@@ -49,7 +49,7 @@ private func sampleDetection() -> Detection {
 @Suite("AssetFingerprint")
 struct AssetFingerprintTests {
 
-    @Test("same content at a different filename yields the same id")
+    @Test("id survives a rename (filename is not part of identity)")
     func contentIdentitySurvivesRename() async throws {
         let original = try fixtureURL("dancer-full-body")
         let renamed = try copyToTemp(original, named: "renamed-clip.mp4")
@@ -59,8 +59,49 @@ struct AssetFingerprintTests {
         let fpB = try await AssetFingerprint.compute(url: renamed)
 
         #expect(fpA.id == fpB.id, "Content identity must survive a rename")
-        #expect(fpA.filename != fpB.filename, "Filenames differ (metadata only)")
-        #expect(fpA.headHash != nil, "Head-hash is computed by default")
+        #expect(fpA.filename != fpB.filename, "Filenames differ (display metadata only)")
+        #expect(fpA.headHash == fpB.headHash, "Head-hash is content-derived, so identical")
+        #expect(!fpA.headHash.isEmpty, "Head-hash is mandatory and computed by default")
+    }
+
+    @Test("id survives a move (no path in identity)")
+    func contentIdentitySurvivesMove() async throws {
+        let original = try fixtureURL("dancer-full-body")
+        // Same filename, different directory ⇒ different absolute path.
+        let moved = try copyToTemp(original, named: original.lastPathComponent)
+        defer { try? FileManager.default.removeItem(at: moved.deletingLastPathComponent()) }
+
+        let fpA = try await AssetFingerprint.compute(url: original)
+        let fpB = try await AssetFingerprint.compute(url: moved)
+
+        #expect(fpA.id == fpB.id, "Content identity must survive a move (path is not in id)")
+    }
+
+    @Test("id is edit-sensitive: trimming the head changes the id")
+    func idIsEditSensitive() async throws {
+        let original = try fixtureURL("dancer-full-body")
+        let fpFull = try await AssetFingerprint.compute(url: original)
+
+        // Simulate a content edit cheaply at the fingerprint level: same shape,
+        // but different head bytes (a head-trim shifts the head-hash) — the id
+        // must change. We build the edited fingerprint directly rather than
+        // re-encoding video, since the recipe folds head-hash into `id`.
+        let edited = AssetFingerprint(
+            filename: fpFull.filename,
+            byteSize: fpFull.byteSize,
+            durationSeconds: fpFull.durationSeconds,
+            headHash: String(fpFull.headHash.reversed())  // different head bytes
+        )
+        #expect(fpFull.id != edited.id, "Different head-hash must produce a different id")
+
+        // Duration shift (a middle/tail trim) must also change the id.
+        let shorter = AssetFingerprint(
+            filename: fpFull.filename,
+            byteSize: fpFull.byteSize,
+            durationSeconds: fpFull.durationSeconds - 1.0,
+            headHash: fpFull.headHash
+        )
+        #expect(fpFull.id != shorter.id, "Different duration must produce a different id")
     }
 
     @Test("two different clips get different ids")
@@ -74,11 +115,12 @@ struct AssetFingerprintTests {
         #expect(fpA.id != fpB.id, "Distinct clips must produce distinct ids")
     }
 
-    @Test("id is filesystem-safe")
+    @Test("id is filesystem-safe and short hex")
     func idIsFilesystemSafe() async throws {
         let fp = try await AssetFingerprint.compute(url: try fixtureURL("dancer-full-body"))
-        let allowed = CharacterSet(charactersIn: "0123456789abcdef-")
+        let allowed = CharacterSet(charactersIn: "0123456789abcdef")
         #expect(fp.id.unicodeScalars.allSatisfy { allowed.contains($0) })
+        #expect(fp.id.count == 16, "id is the first 16 hex chars of the canonical-string SHA-256")
     }
 }
 
@@ -110,7 +152,7 @@ struct FrameRefTests {
 
     @Test("ptsMillis is deterministic")
     func ptsMillisDeterministic() {
-        let fp = AssetFingerprint(filename: "x.mp4", byteSize: 1, durationSeconds: 1)
+        let fp = AssetFingerprint(filename: "x.mp4", byteSize: 1, durationSeconds: 1, headHash: "ab")
         let ref = FrameRef(asset: fp, pts: CMTime(value: 1500, timescale: 1000))
         #expect(ref.ptsMillis == 1500)
     }

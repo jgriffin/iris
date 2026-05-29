@@ -24,13 +24,14 @@ import Foundation
 /// in P3. Doing it here in P1 would either duplicate that path or fake it.
 /// Re-seek with `.zero` tolerance already lands on the frame whose PTS is the
 /// largest ≤ the requested time, so a raw `currentTime()` that sits between
-/// samples still resolves deterministically to *a* concrete frame. P3 will
-/// validate snapping against a fixture and, if the adjacent-frame risk is
-/// real, introduce a `snapped(in:)` constructor on the extraction side.
+/// samples still resolves deterministically to *a* concrete frame.
 ///
-/// // M7·P3: validate raw-vs-snap against a fixture; add `FrameRef.snapped(in:)`
-/// // on the extraction path if `.zero`-tolerance re-seek can land on an
-/// // adjacent frame for a mid-sample `currentTime()`.
+/// **Tripwire resolved in P3.** ``DatasetBuilder`` validated raw-vs-snap
+/// against a fixture and confirmed no separate snap pass is needed:
+/// `seek(to:)` already resolves the raw `pts` to the canonical sample via
+/// `.zero` tolerance, and the emitted `Frame.timestamp` is that sample's exact
+/// PTS — so re-seek is deterministic without a `FrameRef.snapped(in:)`
+/// constructor. See ``DatasetBuilder`` "PTS snap decision".
 public struct FrameRef: Sendable, Hashable, Codable {
 
     /// Content identity of the asset this frame belongs to.
