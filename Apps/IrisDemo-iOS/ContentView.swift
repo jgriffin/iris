@@ -247,6 +247,18 @@ struct PlaybackContentView: View {
     @State private var coordinator = PlaybackDetectionCoordinator()
     @State private var errorText: String?
 
+    /// M7·P2: flagging. One `FlaggingModel` wired to the coordinator (which
+    /// conforms to `FlaggingSource`) over a `FlagStore` rooted at the app's
+    /// Documents dir (browsable in Files.app via the file-sharing work).
+    /// Built lazily in `.task` because the model holds its source `unowned`
+    /// and `@State` defaults can't reference the sibling `coordinator`.
+    /// `setAsset` runs after every source swap; the flagged-frames list shows
+    /// in a sheet (`showFlags`).
+    @State private var flaggingModel: FlaggingModel?
+
+    /// Whether the flagged-frames sheet is presented.
+    @State private var showFlags = false
+
     /// M5·P4: the general detector-selection layer. `catalog` lists the
     /// selectable detectors (built-in Vision rectangles + body pose);
     /// `selectedDetectorID` is the picker binding. The active session
@@ -309,9 +321,38 @@ struct PlaybackContentView: View {
     @State private var activeLabel: String = ""
 
     var body: some View {
+        NavigationStack {
+            playbackBody
+                .toolbar {
+                    // M7·P2: open the flagged-frames list. Disabled until a
+                    // source is loaded (no asset → nothing to list).
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showFlags = true
+                        } label: {
+                            Label("Flagged frames", systemImage: "bookmark.circle")
+                        }
+                        .disabled(flaggingModel?.asset == nil)
+                        .accessibilityLabel("Flagged frames")
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var playbackBody: some View {
         VStack(spacing: 0) {
             if let controller = coordinator.controller {
                 playbackArea(controller: controller)
+
+                // M7·P2: flag marker rail directly above the stock scrubber,
+                // padded to roughly line up with the slider track. Maps each
+                // flag's PTS to an x-fraction of the controller's duration.
+                if let flaggingModel {
+                    FlagMarkerStrip(model: flaggingModel, duration: controller.duration)
+                        .padding(.horizontal, 16)
+                        .background(Color(.systemBackground))
+                }
 
                 Scrubber(model: controller)
                     .background(Color(.systemBackground))
@@ -323,6 +364,21 @@ struct PlaybackContentView: View {
             } else {
                 ProgressView("Loading fixture…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        // M7·P2: flagged-frames list sheet — tap to jump, swipe to delete.
+        .sheet(isPresented: $showFlags) {
+            if let flaggingModel {
+                NavigationStack {
+                    FlaggedFramesList(model: flaggingModel)
+                        .navigationTitle("Flagged frames")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showFlags = false }
+                            }
+                        }
+                }
             }
         }
         .sheet(isPresented: $showPicker) {
@@ -413,6 +469,18 @@ struct PlaybackContentView: View {
             }
         }
         .task {
+            // M7·P2: build the flagging model once, wired to the coordinator
+            // (which conforms to `FlaggingSource`) over a Documents-dir store.
+            // The model holds the coordinator `unowned`; both are `@State` on
+            // this view, so the coordinator outlives the model.
+            if flaggingModel == nil {
+                let documents = FileManager.default
+                    .urls(for: .documentDirectory, in: .userDomainMask).first!
+                flaggingModel = FlaggingModel(
+                    store: FlagStore(baseDir: documents),
+                    source: coordinator
+                )
+            }
             // First-launch / first-appear behavior: if the user hasn't
             // picked anything yet AND the MRU is empty, fall back to the
             // bundled fixture. `coordinator.controller` being non-nil means
@@ -644,6 +712,23 @@ struct PlaybackContentView: View {
             // it doesn't obstruct the video. Always-on dev/eval readout.
             metricsHUD
         }
+        // M7·P2: on-frame bookmark affordance, pinned to the top-right corner
+        // of the actual video IMAGE (via `VideoRectAligned` through the same
+        // `VideoGeometry` authority the overlay draws boxes with) — so it rides
+        // the frame, clear of the letterbox/pillarbox bars and the metrics HUD.
+        // Primary flag control after the P2-revision; the marker rail is a
+        // secondary overview and the toolbar `bookmark.circle` opens the list.
+        .overlay {
+            if let flaggingModel {
+                VideoRectAligned(
+                    contentSize: controller.presentationSize,
+                    alignment: .topTrailing
+                ) {
+                    FlagButton(model: flaggingModel)
+                        .padding(12)
+                }
+            }
+        }
     }
 
     /// Top-trailing HUD pill showing the best-effort pipeline gauge.
@@ -716,6 +801,9 @@ struct PlaybackContentView: View {
             // builds the controller + session, and spawns the one detect loop.
             // It does NOT start playback.
             await coordinator.setSource(source, detector: entry)
+            // M7·P2: point the flagging model at the same URL the source was
+            // built from so its asset fingerprint matches the active clip.
+            await flaggingModel?.setAsset(url: url)
             // Kick off playback. `togglePlay()` transitions `.idle` → `.running`.
             coordinator.controller?.togglePlay()
         }
@@ -785,6 +873,9 @@ struct PlaybackContentView: View {
                 priorScopedURL.stopAccessingSecurityScopedResource()
             }
 
+            // M7·P2: re-point the flagging model at the new URL.
+            await flaggingModel?.setAsset(url: url)
+
             // Kick off playback through the controller so its state mirror
             // refreshes alongside the source. From `.idle`, `togglePlay()`
             // transitions to `.running`; the controller surfaces AVF errors
@@ -820,6 +911,9 @@ struct PlaybackContentView: View {
         scopedURL = nil
         activeLabel = ""
         showTuning = false
+        showFlags = false
+        // M7·P2: no active source → no asset to flag against.
+        flaggingModel?.clearAsset()
 
         Task { @MainActor in
             await coordinator.teardown()

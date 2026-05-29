@@ -57,6 +57,14 @@ struct ContentView: View {
     @State private var showFilePicker = false
     @State private var errorText: String?
 
+    /// M7·P2: flagging. One `FlaggingModel` wired to the coordinator (which
+    /// conforms to `FlaggingSource`) over a `FlagStore` rooted at the app's
+    /// Documents dir. Built lazily in `.task` because the model holds its
+    /// source `unowned` and `@State` defaults can't reference the sibling
+    /// `coordinator`. `setAsset` runs after every source swap; the
+    /// flagged-frames list lives in a "Flagged frames" inspector section.
+    @State private var flaggingModel: FlaggingModel?
+
     /// M6·P3: holds the bundled-model warm-up cache + the file-picked detector.
     /// `@Observable` so the picker re-renders when the custom slot loads.
     @State private var modelStore = DemoModelStore()
@@ -194,6 +202,21 @@ struct ContentView: View {
                     inspectorSection("Metrics") {
                         DetectionMetricsView(metrics: coordinator.metrics)
                     }
+
+                    Divider()
+
+                    // 4. M7·P2: Flagged frames — the current asset's flags.
+                    //    Tap a row to jump; swipe / context-menu to delete.
+                    inspectorSection("Flagged frames") {
+                        if let flaggingModel {
+                            FlaggedFramesList(model: flaggingModel)
+                                .frame(minHeight: 200)
+                        } else {
+                            Text("Open a video to flag frames.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 16)
@@ -257,6 +280,18 @@ struct ContentView: View {
         // M6·P3: warm the bundled Core ML models off the main actor at launch
         // so the first selection isn't a cold compile/load stall. Idempotent.
         .task {
+            // M7·P2: build the flagging model once, wired to the coordinator
+            // (which conforms to `FlaggingSource`) over a Documents-dir store.
+            // The model holds the coordinator `unowned`; both are `@State` on
+            // this view, so the coordinator outlives the model.
+            if flaggingModel == nil {
+                let documents = FileManager.default
+                    .urls(for: .documentDirectory, in: .userDomainMask).first!
+                flaggingModel = FlaggingModel(
+                    store: FlagStore(baseDir: documents),
+                    source: coordinator
+                )
+            }
             await modelStore.prewarmBundledModels()
         }
         .fileImporter(
@@ -423,6 +458,14 @@ struct ContentView: View {
             if let controller = coordinator.controller {
                 playbackArea(controller: controller)
 
+                // M7·P2: flag marker rail directly above the stock scrubber,
+                // padded to roughly line up with the slider track.
+                if let flaggingModel {
+                    FlagMarkerStrip(model: flaggingModel, duration: controller.duration)
+                        .padding(.horizontal, 16)
+                        .background(Color(.windowBackgroundColor))
+                }
+
                 Scrubber(model: controller)
                     .background(Color(.windowBackgroundColor))
 
@@ -482,6 +525,23 @@ struct ContentView: View {
                 }
             )
             .allowsHitTesting(false)
+        }
+        // M7·P2: on-frame bookmark affordance, pinned to the top-right corner
+        // of the actual video IMAGE (via `VideoRectAligned` through the same
+        // `VideoGeometry` authority the overlay draws boxes with) — so it rides
+        // the frame, clear of the letterbox/pillarbox bars. Primary flag
+        // control after the P2-revision; the marker rail is a secondary
+        // overview and the inspector's "Flagged frames" section lists them.
+        .overlay {
+            if let flaggingModel {
+                VideoRectAligned(
+                    contentSize: controller.presentationSize,
+                    alignment: .topTrailing
+                ) {
+                    FlagButton(model: flaggingModel)
+                        .padding(12)
+                }
+            }
         }
     }
 
@@ -650,6 +710,10 @@ struct ContentView: View {
                 priorScopedURL.stopAccessingSecurityScopedResource()
             }
 
+            // M7·P2: point the flagging model at the same URL the source was
+            // built from so its asset fingerprint matches the active clip.
+            await flaggingModel?.setAsset(url: url)
+
             // Kick off playback through the controller so its state mirror
             // refreshes alongside the source. From `.idle`, `togglePlay()`
             // transitions to `.running`; the controller surfaces AVF errors
@@ -685,6 +749,8 @@ struct ContentView: View {
         scopedURL = nil
         highlightedURL = nil
         activeLabel = ""
+        // M7·P2: no active source → no asset to flag against.
+        flaggingModel?.clearAsset()
 
         Task { @MainActor in
             await coordinator.teardown()
