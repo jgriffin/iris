@@ -59,6 +59,13 @@ tools/model-export/*.mlpackage
 data/models/weights/
 data/models/coreml/
 
+# Icon generator outputs (tools/icongen/ — see Sources/). Tracked: the Swift
+# generator (Package.swift, Sources/). Ignored: the regenerable preview renders
+# (contact sheet + per-variant size ramps). The SHIPPED icon lives in the app's
+# Apps/Shared/Assets.xcassets/ and IS tracked.
+tools/icongen/preview/
+tools/icongen/.build/
+
 # Datasets and captured frames (project-specific outputs)
 datasets/
 captures/

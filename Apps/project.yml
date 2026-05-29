@@ -70,6 +70,12 @@ targets:
             # the `.fileImporter` flow and does NOT need this resource.
             - path: ../Tests/IrisTests/Fixtures/clipboard-blank-page.mp4
               buildPhase: resources
+        # App icon. The shared Assets.xcassets (under Shared/, swept by the
+        # glob above into the Resources phase) carries a single combined
+        # AppIcon.appiconset with both the macOS ramp and the iOS universal
+        # 1024 icon. Point the asset-catalog compiler at it.
+        settings:
+            ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # All build settings live in Shared.xcconfig (committed).
         # DEVELOPMENT_TEAM is layered in from Local.xcconfig (gitignored)
         # via `#include?` inside Shared.xcconfig.
@@ -108,6 +114,9 @@ targets:
             # the raw `.mlpackage` and skips the `.mlmodelc` the loader wants.
             - path: Shared/yolo12n.mlpackage
             - path: Shared/yolo26n.mlpackage
+        # App icon — see iOS target above. Same shared AppIcon.appiconset.
+        settings:
+            ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         configFiles:
             Debug: IrisDemo-macOS/Shared.xcconfig
             Release: IrisDemo-macOS/Shared.xcconfig
