@@ -21,7 +21,7 @@ _Snapshot · 2026-05-28_
 │  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
 └─ 🌱 M7 — Dataset  (BRIEF §6 · playback-context flag→extract loop · branch `m7-dataset`) → [features/M7.md](./features/M7.md)
    ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
-   ├─ 📋 P2 — Flagging UI: bookmark toggle, timeline markers, flagged-frames panel, jump-to-flag
+   ├─ ✅ P2 — Flagging UI: on-frame bookmark (primary) + aligned timeline markers + flagged panel + jump-to-flag  (230 green · `4a10fb8`)
    ├─ 📋 P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`; deterministic-naming dedup
    └─ 📋 P4 — COCO sidecar schema + `COCOExporter` (per-image → merged `annotations.json`)
 
@@ -29,7 +29,7 @@ penciled in — not yet defined (ideas, traceable to you)
    ✏️ Source orientation correctness — playback preferredTransform + capture front-mirror (M5·P6)
    ✏️ Offline file-reader pre-pass → pre-computed detection tracks for smooth playback (backlog)
 
-👉 next — **build M7·P2 — flagging UI.** P1 landed (`e685f09`): library core green — `FrameRef = (content-fingerprint, exact CMTime)`, `FlagStore` (`@MainActor @Observable`, injected `baseDir`, per-asset `.v1` JSON, reload-stable), `Detection` Codable (direct synthesis + `Mask` tripwire). P2 wires the demo-visible UX: a **bookmark toggle** on the scrubber (flag/unflag current frame), **flag markers** along the timeline, a **flagged-frames side panel** (mirror macOS `NavigationSplitView`+`List`), and **jump-to-flag** (`seek(to: pts)`). Thin built-in views per the M4 UI doctrine; wire the current `FrameRef` from coordinator asset-fingerprint + live `Frame.timestamp`. ⚠️ still owed: hands-on smoke of `demo-sim-runnable` on `main` (ff `40cf0de`) — two manual taps left (Capture→fallback page, iPad sidebar expand); automatable gates already PASS. → [LOG.md](./LOG.md)
+👉 next — **build M7·P3 — `DatasetSink` + headless extractor.** P1+P2 landed (`e685f09`, `4a10fb8`): you can flag frames while scrubbing (on-frame bookmark = primary affordance, coarse timeline markers, flagged panel, jump-to-flag) and they persist reload-stably. P3 is the **deferred-extraction** half: a `DatasetSink` protocol + `FolderDatasetSink` writing to `<Documents>/iris-dataset/frames/<fingerprint.id>_<ptsMillis>.png` + COCO sidecar, driven by a **headless `DatasetBuilder`** that walks an asset's flags, `seek`s each PTS on a `PlaybackSource` (default `TaskTickDriver`), decodes the pixel buffer (reuse an Overlay-side CIImage path if one exists — don't add a new converter), and **skips frames the sink already contains** (deterministic-naming dedup → resumable). Also resolve the `// M7·P3:` PTS snap-to-sample tripwire on `FrameRef`. ⚠️ still owed: hands-on smoke of `demo-sim-runnable` on `main` (ff `40cf0de`) — two manual taps (Capture→fallback page, iPad sidebar expand); automatable gates PASS. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -45,6 +45,7 @@ penciled in — not yet defined (ideas, traceable to you)
 - ℹ️ Pre-existing DetectionInspector Swift 6 warning in both demos (M5·P6)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M7·P2 UI call (user): the **primary flag affordance lives ON the frame image** (top-right bookmark puck via `VideoRectAligned`/`VideoGeometry`), not a control-row button; **timeline markers are a coarse secondary overview**, never the source of truth (a thin strip can't resolve adjacent frames; ticks inset by thumb radius to align). (2026-05-28)
 - M7 defined ([features/M7.md](./features/M7.md)): frame address = `(AssetFingerprint, PTS)`; content fingerprint (filename+size+duration+head-hash) not URL; cheap flagging / deferred headless extraction; per-image COCO sidecar + merge-exporter; deterministic-naming dedup; output under `<Documents>/iris-dataset/`. Scope = **playback**; live-capture flagging is a follow-on (can't re-seek). (2026-05-28)
 - `demo-sim-runnable` fast-forwarded to `main` (`40cf0de`); hands-on smoke skipped (owed) (2026-05-28)
 - Swap root-cause corrected: the `f4a6284` cancel→drain→respawn fix proved a **no-op** (`PlaybackSource` exposes a single stored `AsyncStream` that dies permanently on consumer cancel — respawned `for await` gets zero frames); coordinator uses **one loop + in-place router swap** instead. P2/P3 fix the demo swap bug for the first time (2026-05-27)
