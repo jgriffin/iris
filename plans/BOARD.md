@@ -10,13 +10,13 @@ done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tunin
 
 🌱 **M8 — Image** (static-image detection; the source-agnostic decomposition's second consumer) → [features/M8.md](./features/M8.md)
 ├─ ✅ P1 — `DetectionRunner` (loop-free core: cache+metrics+session-swap+per-frame `run`) in `Detection/`; playback coordinator composes it  (244 green · demos build · branch `m8-p1-detection-runner`)
-├─ 🗓 P2 — image → upright `Frame` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF/orientation upstream)  ← here
-├─ 🗓 P3 — `ImageDetectionCoordinator` (one-shot detect; model-swap re-runs once; composes `DetectionRunner`)
+├─ ✅ P2 — image → upright `Frame`: `ImageFrameDecoder` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF baked in via CoreImage `.oriented`)  (250 green · +6 tests)
+├─ 🗓 P3 — `ImageDetectionCoordinator` (one-shot detect; model-swap re-runs once; composes `DetectionRunner`)  ← here
 ├─ 🗓 P4 — demo Image page (iOS+macOS): image picker + `RecentImages` MRU + detector picker + tuning sheet, no scrubber
 ├─ 🗓 P5 — freeze-from-live: "Inspect frame" from playback/capture → Image page
 └─ 🗓 P6 — dataset tie-in: image-shaped `AssetFingerprint` (no `durationSeconds`) + PTS/seek-free `FlaggingSource` + flag→PNG export
 
-👉 next — **M8·P2 — image → upright `Frame`.** Add `SourceKind.image` + a `CGImage`/`CVPixelBuffer`→`Frame` helper that bakes EXIF orientation upstream (keeps `VideoGeometry` rotation-free), with fixture-image unit tests. New `Sources/Iris/Image/` folder. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
+👉 next — **M8·P3 — `ImageDetectionCoordinator`.** A `@MainActor @Observable` library type (`Sources/Iris/Image/`) holding the decoded image's `Frame` + a `DetectionRunner`; one-shot detect on load; a model-swap re-runs detection once (the runner's `onTierChange` re-detects the held frame, the image analogue of playback's seek). Composes P1's runner. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)

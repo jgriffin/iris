@@ -12,4 +12,11 @@ public enum SourceKind: Sendable, Hashable {
 
     /// Test / preview source, labelled with a freeform tag.
     case mock(String)
+
+    /// A single static image — a captured/playback frame frozen for re-analysis,
+    /// a screenshot, or any still loaded from disk (M8). The associated `String`
+    /// identifies the image (a file name or a synthesized handle); unlike
+    /// playback there is no time axis, so the carrying `Frame` uses a frozen
+    /// timestamp.
+    case image(String)
 }
