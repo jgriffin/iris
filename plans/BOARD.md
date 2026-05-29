@@ -2,40 +2,28 @@
      Status rewritten each block; Milestones/Backlog edited as they change. Best viewed monospace. -->
 
 # Iris — Board
-_Snapshot · 2026-05-28_
+_Snapshot · 2026-05-29_
 
 ## Status
 
-├─ ✅ M1 — Capture core
-├─ ✅ M2 — Detection + overlay
-├─ ✅ M3 — Playback
-├─ ✅ M4 — Tuning            (P1–P3 ✅ · P4 🚫)
-├─ ✅ M5 — Honest detectors  (P1–P6 ✅)
-├─ ✅ M6 — Custom models     (P1–P3 ✅ · P4 🚫)
-├─ ✅ PlaybackDetectionCoordinator  (P1–P3 ✅ · P4 🗓 · smoked + merged to `main`) → [features/playback-detection-coordinator.md](./features/playback-detection-coordinator.md)
-│  ├─ ✅ P1 — coordinator in `Playback/` + swap regression test  (`51743c7`)
-│  ├─ ✅ P2 — rewire macOS demo (−94 lines, xcodebuild green)     (`1ea2cd1`)
-│  ├─ ✅ P3 — rewire iOS demo (−102 lines, xcodebuild green)      (`ad7428d`)
-│  └─ 🗓 P4 — external-controls polish + source-agnostic `DetectionRunner` (deferred)
-├─ ✅ Demo simulator-runnable  (P1–P4 ✅ · merged to `main` ff `40cf0de` · smoke ✅) → [features/demo-sim-runnable.md](./features/demo-sim-runnable.md)
-│  ├─ ✅ P1 — Playback-first sidebar-adaptable TabView (iOS demo)  (`3a1388b`)
-│  ├─ ✅ P2 — Camera fallback page when no camera (sim / Mac Designed-for-iPad)  (`1319501`)
-│  ├─ ✅ P3 — file sharing: expose Documents in Files.app  (`8a9e9c1`)
-│  └─ ✅ P4 — `just sim-add-video` helper  (`213e149`)
-└─ ✅ M7 — Dataset  (P1–P4 ✅ · on `main` `0835d48`) → [features/M7.md](./features/M7.md)
-   ├─ ✅ P1 — `FrameRef`+`AssetFingerprint`+`FlagStore`+`Detection` Codable + tests  (225 green · `e685f09`)
-   ├─ ✅ P2 — Flagging UI: on-frame bookmark (primary) + aligned timeline markers + flagged panel + jump-to-flag  (230 green · `4a10fb8`)
-   ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (237 green · `e3ce965`)
-   └─ ✅ P4 — Frame export sweep: library `FrameExporter` (resumable/interruptible, drives P3 `DatasetBuilder` over `RecentVideos` URLs) + `FrameExportCoordinator` triggers (`scenePhase` background + "Export now"; **launch trigger dropped** — contends with playback) + `export-status.json`  (244 green; `DatasetExporter` format conversion still deferred)
+done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tuning (P4 🚫) · M5 Honest detectors · M6 Custom models (P4 🚫) · PlaybackDetectionCoordinator (P1–P3 ✅ · P4 🗓) · Demo simulator-runnable · M7 Dataset (P1–P4 ✅)
 
-👉 next — **clean boundary: M7 shipped + demo polish landed** (every milestone ✅; 244 green). The owed M7 background-sweep smoke is now **confirmed green** — `frames/*.png` present in the macOS container, written by the `scenePhase` trigger. Pick the next thrust — define a new milestone, or pull from §Backlog. → [LOG.md](./LOG.md)
+🌱 **M8 — Image** (static-image detection; the source-agnostic decomposition's second consumer) → [features/M8.md](./features/M8.md)
+├─ 🗓 P1 — extract `DetectionRunner` (loop+cache+metrics+session-swap) into `Detection/`; recompose playback coordinator  ← here
+├─ 🗓 P2 — image → upright `Frame` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF/orientation upstream)
+├─ 🗓 P3 — `ImageDetectionCoordinator` (one-shot detect; model-swap re-runs once; composes `DetectionRunner`)
+├─ 🗓 P4 — demo Image page (iOS+macOS): image picker + `RecentImages` MRU + detector picker + tuning sheet, no scrubber
+├─ 🗓 P5 — freeze-from-live: "Inspect frame" from playback/capture → Image page
+└─ 🗓 P6 — dataset tie-in: image-shaped `AssetFingerprint` (no `durationSeconds`) + PTS/seek-free `FlaggingSource` + flag→PNG export
+
+👉 next — **M8·P1 — extract `DetectionRunner`** (the source-agnostic core: loop+cache+metrics+detector-session-swap out of `PlaybackDetectionCoordinator` into `Detection/`, recompose playback to use it). **Pure refactor — keep 244 green**, no behavior change; closes the source-agnostic-decomposition open question. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
-- ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- M8 defined ([features/M8.md](./features/M8.md)): run detectors on a single static image, swap/compare models in that one world. Pipeline+overlay already source-agnostic (`Frame`/`DetectorPipeline`/`VideoGeometry`/`ResultStore` have no video coupling); only `PlaybackDetectionCoordinator`+`Scrubber`+`FlaggingSource` are PTS-coupled. 5 settled forks: image detection is **one-shot** (reuse `DetectorPipeline` w/ frozen timestamp, **no** 1-frame stream); **P1 = full `DetectionRunner` extraction** (resolves the source-agnostic-decomposition question — the image inspector is the second consumer); new `Sources/Iris/Image/` folder; freeze-from-live in scope; dataset tie-in in scope (image-shaped `AssetFingerprint` minus `durationSeconds` + PTS/seek-free `FlaggingSource`). → [DECISIONS.md](./DECISIONS.md) (2026-05-29)
 - M7·P4 redefined (user — **refines**, doesn't contradict, the same-day "seam only"): P4 now ships a concrete **`FrameExporter` frame-export sweep** (resumable/interruptible; drives P3's `DatasetBuilder` over `RecentVideos`-resolved URLs; app-side launch/`scenePhase`-background/"Export now" triggers; `export-status.json` operational telemetry incl. unreachable sources). `DatasetExporter` training-FORMAT conversion stays deferred. `RecentVideos` MRU-10 caveat noted (ledger approach (b) = follow-up). (2026-05-28)
 - M7 sidecar reframe (user — supersedes the COCO call): **no per-image sidecar, no COCO, no exporter in M7** (a flag = "look again," not an annotation; multiple models tried ⇒ a per-image verdict is false precision). `AssetFingerprint` now **name-independent** (`byteSize`+`durationSeconds`+mandatory head-hash; filename display-only) → rename-stable + edit-sensitive. Provenance rides the export filename (`<sourceNameHash>_<fingerprintID>_<ptsMillis>.png`); **dedup keys on the suffix** — the dataset's own filenames are the ledger (lives WITH the data, can't go stale). P4 → `DatasetExporter` **seam only**, first exporter deferred to when a training pipeline names its format. (2026-05-28)
 - M7·P2 UI call (user): the **primary flag affordance lives ON the frame image** (top-right bookmark puck via `VideoRectAligned`/`VideoGeometry`), not a control-row button; **timeline markers are a coarse secondary overview**, never the source of truth (a thin strip can't resolve adjacent frames; ticks inset by thumb radius to align). (2026-05-28)
@@ -64,6 +52,7 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 - **M5 — Honest detectors** — per-detector capability model driving derived tuning UI + capability-honest overlays + a raw-data inspector. → [features/M5-honest-detectors.md](./features/M5-honest-detectors.md)
 - **M6 — Custom models** — Core ML adapter with a pluggable YOLO-style `OutputDecoder`; model-swap UI. (Captioning dropped — Foundation Models is text-only.) → [features/M6.md](./features/M6.md)
 - **M7 — Dataset** — `IrisDataset`: flag frames during playback → extract as provenance-bearing images (filenames are the dedup ledger; no sidecar); training-format export deferred. → [features/M7.md](./features/M7.md)
+- **M8 — Image** — run detectors on a single static image (captured/playback frame, screenshot, any still) + swap/compare models on that one image; `Sources/Iris/Image/` + a demo Image page; triggers the source-agnostic `DetectionRunner` extraction. → [features/M8.md](./features/M8.md)
 
 ## Backlog
 

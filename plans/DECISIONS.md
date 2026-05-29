@@ -10,6 +10,38 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-05-29 — M8 — Image defined: run detectors on a single static image, swap/compare models in that one world
+
+M8 adds a **static-image** detection path: load an interesting captured/playback frame, a screen capture, or any still on disk, run Iris's detectors on it, and **swap/compare models on that one image** (defined in [`features/M8.md`](./features/M8.md)). The recurring want is the model-swap loop *over the same pixels* — a still is a fixed canvas with no time axis. **Architectural finding (up front):** the detection + overlay halves of Iris are already source-agnostic — `Frame` ([`Frame.swift`](../Sources/Iris/Frame.swift)) is pixelBuffer+timestamp+orientation+source+format+dimensions; `Detector.detect(in:)` and `DetectorPipeline.detect(in:cache:tuning:)` take one `Frame` (already one-shot-shaped); the whole overlay stack (`VideoGeometry`, `DetectionLayer`, `VideoRectAligned`, `ResultStore`) is image-agnostic via `contentSize = imageSize` + a frozen `displayTimeSource`; the model-swap machinery (`DetectorCatalog`, `DemoModelStore`, `ActiveDetectorSession`, tuning sheet, `RecentDetectors`) is fully reusable. The **only** video-coupled cluster is `PlaybackDetectionCoordinator` + `PlaybackController` + `PlaybackSource` + `Scrubber` + the `FlaggingSource` protocol (PTS/seek). So M8 is not fighting the architecture — it sidesteps that cluster and triggers the deferred source-agnostic decomposition (the image inspector is the second consumer). Six phases: **P1** extract `DetectionRunner` · **P2** image→`Frame` · **P3** `ImageDetectionCoordinator` · **P4** demo Image page (iOS+macOS) · **P5** freeze-from-live · **P6** dataset tie-in.
+
+→ [`features/M8.md`](./features/M8.md)
+
+### 2026-05-29 — Image detection is one-shot, not stream-driven
+
+A still has no time axis, so M8 reuses [`DetectorPipeline`](../Sources/Iris/Detection/DetectorPipeline.swift) directly with a **frozen timestamp** — detect once on load, re-detect once on a model swap. We do **not** route a 1-frame `AsyncStream<Frame>` through the playback streaming loop: that would fork the API shape to fit both contexts (stream-shaped playback + one-shot image through one path), the anti-pattern CLAUDE.md forbids. Composition over forking — the image coordinator and the playback coordinator share a core (see the `DetectionRunner` decision) but keep their own source-appropriate driving shapes (one-shot vs. tick-driven stream).
+
+### 2026-05-29 — Full `DetectionRunner` extraction (M8·P1) — resolves the source-agnostic decomposition question
+
+Q: When a second (non-playback) detection consumer lands, lift the detect-loop + `ResultStore` cache + `DetectionMetrics` + detector-session-swap core out of `PlaybackDetectionCoordinator` into a `Detection/`-side `DetectionRunner` the coordinator composes? (Was the coordinator's deferred P4 / the standing open question — "don't pre-split until a second consumer lands.")
+
+**The image inspector is that second consumer**, so M8·P1 does the extraction now. The source-agnostic core moves into a `DetectionRunner` in [`Sources/Iris/Detection/`](../Sources/Iris/Detection/); [`PlaybackDetectionCoordinator`](../Sources/Iris/Playback/PlaybackDetectionCoordinator.swift) is recomposed to **compose** it while keeping its playback-coupled parts (the `PlaybackController` + the `onDetectorTierChange → seek` pause-emit hook), and the new `ImageDetectionCoordinator` composes the same runner. P1 is a **pure refactor** — the full suite (**244**) stays green, no behavior change. This closes the [`QUESTIONS.md`](./QUESTIONS.md) "source-agnostic decomposition" entry; per the single-target "splitting later is non-breaking" doctrine, the split was deliberately deferred until exactly this moment.
+
+→ [`features/M8.md`](./features/M8.md) (P1)
+
+### 2026-05-29 — New `Sources/Iris/Image/` folder; the feature is "Image", not "Stills"
+
+M8's image-specific code lives in a new `Sources/Iris/Image/` folder (image→`Frame` helper, `SourceKind.image`, `ImageDetectionCoordinator`) — a sibling to `Capture/`, `Playback/`, `Detection/`, `Overlay/`, `Tuning/`, `Dataset/` under the single target (per the 2026-05-20 single-target/folder-organized decision). The feature and its types are named **Image** (`SourceKind.image`, `ImageDetectionCoordinator`, `RecentImages`), **not "Stills"/"Still"** — a loaded image may be described as "a still image," but the noun is Image.
+
+### 2026-05-29 — Freeze-from-live handoff is in M8 scope (P5)
+
+M8 includes an **"Inspect frame"** affordance on the playback overlay (and the capture overlay on iOS) that freezes the currently-visible `Frame` and opens it in the Image page for model-play. This is the bridge that makes the image inspector useful for the recurring want — grab an interesting moment out of a video and try other detectors on that exact still — rather than only loading stills from disk.
+
+### 2026-05-29 — Dataset tie-in is in M8 scope (P6): image-shaped `AssetFingerprint` + PTS/seek-free `FlaggingSource`
+
+M8·P6 lets you flag an analyzed image and export it into the dataset, consistent with M7's "filenames are the ledger" doctrine ([`features/M7.md`](./M7.md) P3). It requires two image-shaped variants of M7 machinery: (1) an **image-shaped `AssetFingerprint`** that **drops `durationSeconds`** (a still has no duration) and keeps `byteSize` + head-hash — open whether it shares the video type or is a sibling, decided in P6; and (2) a **PTS/seek-free `FlaggingSource` path** for a single still (the existing protocol assumes `currentPTS` + `seek`, which an image has neither of). Flagging an analyzed image exports a provenance-named PNG into the dataset, deduped by filename.
+
+→ [`features/M8.md`](./features/M8.md) (P6)
+
 ### 2026-05-28 — Demo project: `project.yml` is canonical; regenerate freely; never hand-edit the `.pbxproj` (reverses the M6·P3 "pbxproj authoritative" stance)
 
 Q: Does `Apps/project.yml` ↔ `.pbxproj` drift break model bundling — is the hand-edited `.pbxproj` authoritative?
