@@ -59,6 +59,8 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 <!-- Stub = one line (`🗓 headline — hook`). Add a ≤4-line indented body only when needed.
      Link out (→ features/ or exploration) when the item has a real home. -->
 
+- 🗓 Adopt git workflow policy — branching + auto-commit + merge cadence into `WORKFLOW.md` (the portable lead doc), CLAUDE.md pointer, branch rename.
+      The assistant's "commit only when asked" is a **harness default** (+ the intent-guard hook), opposite the user's want: proactive commits, milestone (`mN-<slug>`) + phase (`mN-pX-<slug>`) branches, readiness-gated merges, human out of the loop; `main` the one deliberate gate. Single home = `WORKFLOW.md §Branching & commits`; one open fork (main-merge autonomy). → [features/workflow-git-policy.md](./features/workflow-git-policy.md) (user, 2026-05-29)
 - 🗓 Per-category tuning — per-class confidence thresholds + per-class hide/show, independent of the global confidence knob.
       e.g. turn `person` off entirely while tuning `sports ball` confidence on its own. Bigger effort: extends `IrisTuning`'s settings from a single global confidence to a per-label map; needs the derived-tuning UI (M4 surface) to expose per-class rows + the overlay/filter to honor per-class threshold **and** visibility. Likely an M4-family follow-on / candidate milestone. → [features/M4.md](./features/M4.md) (user, 2026-05-29)
 - 🗓 Offline file-reader pre-pass — pre-computed detection tracks for smooth playback; an `AVAssetReader`-backed offline pass that decodes a file frame-by-frame, runs the detector over every frame, and caches the full `[Detection]` track.
