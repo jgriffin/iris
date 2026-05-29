@@ -1,3 +1,4 @@
+import AppKit
 import Iris
 import SwiftUI
 import UniformTypeIdentifiers
@@ -104,6 +105,18 @@ struct ContentView: View {
     /// blobs carry security-scope information so re-opening a sidebar
     /// entry on next launch still gets a usable URL.
     @State private var recentVideos = RecentVideos()
+
+    /// MRU of recently-selected detectors. Drives the launch selection (most
+    /// recent that still exists in the catalog) and the picker's order (recent
+    /// floats to top). Persists across launches via `UserDefaults`.
+    @State private var recentDetectors = RecentDetectors()
+
+    /// FIX 3 (macOS only): count of exported frames in
+    /// `<Documents>/iris-dataset/frames/`, refreshed when the sidebar appears.
+    /// `nil` until first computed. Source of truth is the `*.png` file count,
+    /// which is the real "how many frames are there" answer regardless of the
+    /// telemetry sidecar.
+    @State private var exportedFrameCount: Int?
 
     /// Display-only: human-readable label of the active source. The URL's
     /// last path component when one is loaded; empty otherwise.
@@ -250,7 +263,7 @@ struct ContentView: View {
             // gear "Tune" toggle in `.primaryAction` opens it.
             ToolbarItem(placement: .navigation) {
                 Picker("Detector", selection: $selectedDetectorID) {
-                    ForEach(catalog.entries) { entry in
+                    ForEach(recentDetectors.sortedEntries(catalog)) { entry in
                         detectorRow(for: entry).tag(entry.id)
                     }
                 }
@@ -294,6 +307,9 @@ struct ContentView: View {
             {
                 showModelPicker = true
             }
+            // Remember + float the selection so it leads the picker next time
+            // and becomes the launch default.
+            recentDetectors.addOrPromote(id: selectedDetectorID)
             swapDetector()
         }
         // M6·P3: warm the bundled Core ML models off the main actor at launch
@@ -320,6 +336,17 @@ struct ContentView: View {
                 // No launch-trigger sweep: it contends with the user
                 // immediately opening/playing a video (the sweep opens headless
                 // PlaybackSources). Background (scenePhase) + manual button only.
+
+                // CHANGE 2: launch selection from the detector MRU — the most
+                // recent detector that still exists in the catalog. Falls back
+                // to the catalog's first entry (preserving the prior default)
+                // when the MRU is empty or all-stale. Done once, here, so it
+                // doesn't clobber a selection the user makes mid-session.
+                if let mru = recentDetectors.firstAvailable(in: catalog) {
+                    selectedDetectorID = mru
+                } else if let first = catalog.entries.first {
+                    selectedDetectorID = first.id
+                }
             }
             await modelStore.prewarmBundledModels()
         }
@@ -445,21 +472,27 @@ struct ContentView: View {
     private var sidebar: some View {
         let recents = recentVideos.resolve()
         VStack(alignment: .leading, spacing: 0) {
+            // CHANGE 1: the single, prominent open entry point. Full-width,
+            // bordered-prominent, at the very top of the sidebar — replacing
+            // both the old icon-only header button and the bottom-bar button.
+            Button {
+                showFilePicker = true
+            } label: {
+                Label("Open Video…", systemImage: "folder.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
             HStack {
                 Text("Recent videos")
                     .font(.headline)
                 Spacer()
-                Button {
-                    showFilePicker = true
-                } label: {
-                    Label("Open", systemImage: "folder.badge.plus")
-                        .labelStyle(.iconOnly)
-                }
-                .help("Open Video…")
-                .controlSize(.small)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 12)
             .padding(.bottom, 8)
 
             if recents.isEmpty {
@@ -502,7 +535,92 @@ struct ContentView: View {
                     return .handled
                 }
             }
+
+            // CHANGE 3: dataset section pinned to the bottom of the sidebar.
+            datasetSection
         }
+        .onAppear { refreshExportedFrameCount() }
+    }
+
+    /// CHANGE 3 (macOS only): a small "Dataset" footer at the bottom of the
+    /// sidebar — exported-frame count + a "Reveal in Finder" button pointing at
+    /// the real export location (`<Documents>/iris-dataset/frames/`, the same
+    /// base dir the `FrameExportCoordinator` writes to). iOS exposes Documents
+    /// via Files.app, so this is macOS-only.
+    @ViewBuilder
+    private var datasetSection: some View {
+        Divider()
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Dataset")
+                .font(.headline)
+
+            Text(exportedFrameStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button {
+                revealFramesInFinder()
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+            .help("Open the exported frames folder in Finder")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Human-readable exported-frame status line, with a sensible empty state.
+    private var exportedFrameStatus: String {
+        switch exportedFrameCount {
+        case .none, .some(0):
+            return "No frames yet"
+        case .some(1):
+            return "1 frame exported"
+        case .some(let n):
+            return "\(n) frames exported"
+        }
+    }
+
+    /// Resolve the frames dir the same way `FrameExportCoordinator` does:
+    /// `<Documents>/iris-dataset/frames/`. The coordinator hands the Documents
+    /// dir as `baseDir`; `FolderDatasetSink` roots `iris-dataset/frames/` under
+    /// it. Resolving the same path here keeps the UI pointed at the real
+    /// export location rather than inventing a second one.
+    private static var framesDir: URL {
+        let documents = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask).first!
+        return documents
+            .appendingPathComponent("iris-dataset", isDirectory: true)
+            .appendingPathComponent("frames", isDirectory: true)
+    }
+
+    /// Count `*.png` files in the frames dir. The file count is the source of
+    /// truth for "how many frames are there" (vs. the telemetry sidecar).
+    /// Missing dir → 0.
+    private func refreshExportedFrameCount() {
+        let dir = Self.framesDir
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: nil
+        )) ?? []
+        exportedFrameCount = urls.filter { $0.pathExtension.lowercased() == "png" }.count
+    }
+
+    /// Reveal the frames dir in Finder. Creates it first if it doesn't exist
+    /// yet (so the button always lands somewhere sensible rather than no-oping
+    /// before the first export), then opens it via `NSWorkspace`.
+    private func revealFramesInFinder() {
+        let dir = Self.framesDir
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(
+                at: dir,
+                withIntermediateDirectories: true
+            )
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([dir])
     }
 
     @ViewBuilder
@@ -636,8 +754,6 @@ struct ContentView: View {
                     .monospacedDigit()
             }
             Spacer()
-            Button("Open Video…") { showFilePicker = true }
-                .controlSize(.small)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

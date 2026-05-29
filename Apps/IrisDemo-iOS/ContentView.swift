@@ -329,6 +329,11 @@ struct PlaybackContentView: View {
     /// MRU model. Persists across tab disappears via `UserDefaults`.
     @State private var recentVideos = RecentVideos()
 
+    /// MRU of recently-selected detectors. Drives the launch selection (most
+    /// recent that still exists in the catalog) and the picker's order (recent
+    /// floats to top). Persists across launches via `UserDefaults`.
+    @State private var recentDetectors = RecentDetectors()
+
     /// Document-picker sheet binding.
     @State private var showPicker = false
 
@@ -514,6 +519,18 @@ struct PlaybackContentView: View {
                 // No launch-trigger sweep: it contends with the user
                 // immediately opening/playing a video (the sweep opens headless
                 // PlaybackSources). Background (scenePhase) + manual button only.
+
+                // CHANGE 2: launch selection from the detector MRU — the most
+                // recent detector that still exists in the catalog. Falls back
+                // to the catalog's first entry (preserving the prior default)
+                // when the MRU is empty or all-stale. Gated on the same
+                // first-build guard so it runs once and doesn't clobber a
+                // mid-session selection.
+                if let mru = recentDetectors.firstAvailable(in: catalog) {
+                    selectedDetectorID = mru
+                } else if let first = catalog.entries.first {
+                    selectedDetectorID = first.id
+                }
             }
             // First-launch / first-appear behavior: if the user hasn't
             // picked anything yet AND the MRU is empty, fall back to the
@@ -536,6 +553,9 @@ struct PlaybackContentView: View {
             {
                 showModelPicker = true
             }
+            // Remember + float the selection so it leads the picker next time
+            // and becomes the launch default.
+            recentDetectors.addOrPromote(id: selectedDetectorID)
             swapDetector()
         }
         .onDisappear {
@@ -571,7 +591,7 @@ struct PlaybackContentView: View {
             HStack {
                 // Always-visible detector picker — leads the row.
                 Picker("Detector", selection: $selectedDetectorID) {
-                    ForEach(catalog.entries) { entry in
+                    ForEach(recentDetectors.sortedEntries(catalog)) { entry in
                         detectorRow(for: entry).tag(entry.id)
                     }
                 }

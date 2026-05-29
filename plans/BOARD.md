@@ -28,7 +28,7 @@ _Snapshot · 2026-05-28_
    ├─ ✅ P3 — `DatasetSink`+`FolderDatasetSink`+headless `DatasetBuilder`+`PixelBufferPNGEncoder`; suffix-dedup ledger, no sidecar  (237 green · `e3ce965`)
    └─ ✅ P4 — Frame export sweep: library `FrameExporter` (resumable/interruptible, drives P3 `DatasetBuilder` over `RecentVideos` URLs) + `FrameExportCoordinator` triggers (`scenePhase` background + "Export now"; **launch trigger dropped** — contends with playback) + `export-status.json`  (244 green; `DatasetExporter` format conversion still deferred)
 
-👉 next — **clean boundary: M7 shipped and on `main`** (every milestone ✅; 244 green). Pick the next thrust — define a new milestone, or pull from §Backlog. (Owed, optional: a hands-on M7 demo run — flag → background → confirm `frames/` fills; the manual "Export now" path is already user-verified.) → [LOG.md](./LOG.md)
+👉 next — **clean boundary: M7 shipped + demo polish landed** (every milestone ✅; 244 green). The owed M7 background-sweep smoke is now **confirmed green** — `frames/*.png` present in the macOS container, written by the `scenePhase` trigger. Pick the next thrust — define a new milestone, or pull from §Backlog. → [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Source-agnostic decomposition — lift loop+cache+metrics into a `Detection/`-side `DetectionRunner` (coordinator P4); don't pre-split until a capture-side consumer lands
@@ -70,8 +70,6 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 <!-- Stub = one line (`🗓 headline — hook`). Add a ≤4-line indented body only when needed.
      Link out (→ features/ or exploration) when the item has a real home. -->
 
-- 🗓 Detector selection MRU / remember-last-selected — demo-side; default-to-rectangle is wrong (the common workflow is object models, switching among several).
-      Minimum: remember the last-selected detector across launches per demo; better: an MRU of detector order. Catalog + picker live in `Apps/Shared/DemoCatalog.swift` + the demo `ContentView`s; could reuse the `RecentVideos` MRU/`UserDefaults` pattern. (user, 2026-05-28)
 - 🗓 Offline file-reader pre-pass — pre-computed detection tracks for smooth playback; an `AVAssetReader`-backed offline pass that decodes a file frame-by-frame, runs the detector over every frame, and caches the full `[Detection]` track.
       The natural shape for the Mac eval/curation target (the live pipeline stays best-effort + strobes on purpose). Opens when it lands: reuse `ResultStore` or a dedicated dense track? progress/cancel UI? sibling `Frame` source vs. pre-fill step. Likely M6/M7-adjacent. (user, 2026-05-25)
 - 🗓 Revisit bumped SwiftLint thresholds — `file_length`(→1000), `type_body_length`(→600), `nesting`(→2), `cyclomatic_complexity`(→15) were raised in block 8 to silence warnings during detector churn.
