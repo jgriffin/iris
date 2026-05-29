@@ -25,15 +25,32 @@ import SwiftUI
 /// clamps `step(by:)` to `[0, duration]` internally — pressing `<` at
 /// `.zero` or `>` at EOF is a silent no-op. The buttons stay enabled so
 /// they don't appear broken mid-clip; only `.failed` disables them.
-public struct Scrubber<Model: ScrubberModel>: View {
+///
+/// **Track underlay slot.** A `@ViewBuilder` `trackUnderlay` renders
+/// *behind the `Slider` specifically* (not behind the whole control stack),
+/// so it receives the Slider's exact track frame — same width, same
+/// horizontal extent. This is the seam a timeline overlay such as
+/// [`FlagMarkerStrip`](../Dataset/FlagMarkerStrip.swift) plugs into: the
+/// underlay's `GeometryReader` reads the real track width, so the strip's
+/// own `thumbInset` is the only variable in lining ticks up under the
+/// thumb — callers no longer guess the track geometry with manual padding.
+/// The underlay is allowed to overflow the thin track vertically (tall
+/// ticks peek above/below) — it is not clipped. Callers that want no
+/// underlay use the `Underlay == EmptyView` convenience init and pass no
+/// closure, keeping `Scrubber(model:)` source-compatible.
+public struct Scrubber<Model: ScrubberModel, Underlay: View>: View {
 
     /// The observable playback model. Marked `@Bindable` so SwiftUI tracks
     /// the macro-generated observation channels on the concrete conformer
     /// (`PlaybackController` or a mock).
     @Bindable public var model: Model
 
-    public init(model: Model) {
+    /// View drawn behind the `Slider` track, sized to the Slider's frame.
+    private let trackUnderlay: Underlay
+
+    public init(model: Model, @ViewBuilder trackUnderlay: () -> Underlay) {
         self.model = model
+        self.trackUnderlay = trackUnderlay()
     }
 
     public var body: some View {
@@ -51,6 +68,11 @@ public struct Scrubber<Model: ScrubberModel>: View {
     /// `Double` (seconds) because SwiftUI's `Slider` is `BinaryFloatingPoint`-
     /// constrained — `CMTime` doesn't fit. Conversions happen at the
     /// binding boundary.
+    ///
+    /// `trackUnderlay` renders behind the Slider via `.background`, so it
+    /// inherits the Slider's exact frame (width = the real track width). The
+    /// background is *not* clipped, letting tall underlay content (e.g.
+    /// flag ticks) peek above and below the thin track.
     private var track: some View {
         Slider(
             value: Binding(
@@ -66,6 +88,7 @@ public struct Scrubber<Model: ScrubberModel>: View {
             in: 0...sliderUpperBound
         )
         .disabled(!isTrackEnabled)
+        .background { trackUnderlay }
     }
 
     /// Seconds value the slider renders. Clamps to the slider's domain
@@ -154,6 +177,17 @@ public struct Scrubber<Model: ScrubberModel>: View {
     private var isFailed: Bool {
         if case .failed = model.state { return true }
         return false
+    }
+}
+
+// MARK: - No-underlay convenience
+
+extension Scrubber where Underlay == EmptyView {
+    /// Source-compatible init for callers that want no track underlay.
+    /// Existing `Scrubber(model:)` sites (tests, plain players) keep
+    /// compiling unchanged; the underlay slot resolves to `EmptyView`.
+    public init(model: Model) {
+        self.init(model: model) { EmptyView() }
     }
 }
 
@@ -285,6 +319,28 @@ public final class MockScrubberModel: ScrubberModel {
             state: .failed(.assetLoadFailed(URL(fileURLWithPath: "/dev/null")))
         )
     )
+    .frame(width: 360)
+    .padding()
+}
+
+/// Exercises the `trackUnderlay` slot with a `FlagMarkerStrip`. The model is
+/// parked on the first preview flag's fraction (1.2 s / 10 s = 0.12), so the
+/// first tick should sit dead-center under the slider thumb — the strip is
+/// sized to the Slider's real track width, no manual padding.
+#Preview("Scrubber · with flag underlay") {
+    let (flagging, _) = FlaggingModel.previewModel()
+    return Scrubber(
+        model: MockScrubberModel(
+            currentTime: CMTime(seconds: 1.2, preferredTimescale: 600),
+            duration: CMTime(value: 10, timescale: 1),
+            state: .idle
+        )
+    ) {
+        FlagMarkerStrip(
+            model: flagging,
+            duration: CMTime(seconds: 10, preferredTimescale: 600)
+        )
+    }
     .frame(width: 360)
     .padding()
 }

@@ -1,9 +1,9 @@
 import CoreMedia
 import SwiftUI
 
-/// Thin built-in list of the current asset's flags. Each row shows the
-/// timestamp (`mm:ss.SSS`), a reason badge, the captured detection count, and
-/// the note when present. Tapping a row jumps the playhead to that flag
+/// Thin built-in list of the current asset's flags. Each row shows a leading
+/// bookmark accent, the timestamp (`mm:ss.SSS`), the captured detection count,
+/// and the note when present. Tapping a row jumps the playhead to that flag
 /// (``FlaggingModel/jump(to:)``); swipe-to-delete and a context-menu delete
 /// remove it (``FlaggingModel/remove(_:)``). Empty state when no flags.
 ///
@@ -52,54 +52,35 @@ public struct FlaggedFramesList: View {
 
     @ViewBuilder
     private func row(_ flag: FrameFlag) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(Self.timestamp(millis: flag.ref.ptsMillis))
-                    .font(.body.monospacedDigit())
-                reasonBadge(flag.reason)
-                Spacer()
-                Text("\(flag.detections.count) det")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let note = flag.note, !note.isEmpty {
-                Text(note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+        // No reason badge: a flag means "look again," not a verdict — showing
+        // a "wrong"/"near-miss" label here would be false precision (M7·P3
+        // reframe). The leading bookmark is a subtle accent echoing the
+        // on-frame flag affordance; the reason still lives on the data model.
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "bookmark.fill")
+                .font(.caption)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(Self.timestamp(millis: flag.ref.ptsMillis))
+                        .font(.body.monospacedDigit())
+                    Spacer()
+                    Text("\(flag.detections.count) det")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let note = flag.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
         }
         .padding(.vertical, 2)
     }
 
-    /// Small capsule badge for the flag reason.
-    @ViewBuilder
-    private func reasonBadge(_ reason: FlagReason) -> some View {
-        Text(Self.reasonLabel(reason))
-            .font(.caption2.weight(.medium))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Self.reasonTint(reason).opacity(0.18), in: Capsule())
-            .foregroundStyle(Self.reasonTint(reason))
-    }
-
     // MARK: - Formatting
-
-    private static func reasonLabel(_ reason: FlagReason) -> String {
-        switch reason {
-        case .wrong: return "wrong"
-        case .nearMiss: return "near-miss"
-        case .other: return "other"
-        }
-    }
-
-    private static func reasonTint(_ reason: FlagReason) -> Color {
-        switch reason {
-        case .wrong: return .red
-        case .nearMiss: return .orange
-        case .other: return .secondary
-        }
-    }
 
     /// Render integer milliseconds as `mm:ss.SSS`.
     static func timestamp(millis: Int64) -> String {

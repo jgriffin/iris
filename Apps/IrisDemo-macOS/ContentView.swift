@@ -239,10 +239,6 @@ struct ContentView: View {
                         if let flaggingModel {
                             FlaggedFramesList(model: flaggingModel)
                                 .frame(minHeight: 200)
-                            // M7·P4: manual export trigger + last-run status,
-                            // through the SAME sweep path as the launch /
-                            // background triggers.
-                            exportFooter
                         } else {
                             Text("Open a video to flag frames.")
                                 .font(.callout)
@@ -427,37 +423,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// M7·P4: "Export now" button + last-run status line, shown below the
-    /// flagged-frames list in the inspector. Forces a sweep through the
-    /// coordinator (the same code path the launch / background triggers use);
-    /// the resulting `Summary` is surfaced as a one-line status.
-    @ViewBuilder
-    private var exportFooter: some View {
-        if let exportCoordinator {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Button {
-                        Task { await exportCoordinator.exportNow() }
-                    } label: {
-                        Label("Export now", systemImage: "square.and.arrow.down.on.square")
-                    }
-                    .controlSize(.small)
-                    .disabled(exportCoordinator.isSweeping)
-
-                    if exportCoordinator.isSweeping {
-                        ProgressView().controlSize(.small)
-                    }
-                }
-                if let summary = exportCoordinator.lastSummary {
-                    Text(summary.demoStatusLine)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
     /// Sidebar: "Open Video…" button + recent picks list. Empty MRU state
     /// surfaces a hint pointing at the picker button — macOS demo has
     /// always required a picked file (no bundled fixture fallback), so
@@ -551,12 +516,40 @@ struct ContentView: View {
     private var datasetSection: some View {
         Divider()
         VStack(alignment: .leading, spacing: 8) {
-            Text("Dataset")
-                .font(.headline)
+            // Title row hosts "Export now" right-aligned (Change 1, moved here
+            // from the right-hand flagged-frames panel). Forces a sweep through
+            // the SAME path as the launch / background triggers.
+            HStack {
+                Text("Dataset")
+                    .font(.headline)
+                Spacer()
+                if let exportCoordinator {
+                    if exportCoordinator.isSweeping {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button {
+                        Task { await exportCoordinator.exportNow() }
+                    } label: {
+                        Label("Export now", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    .controlSize(.small)
+                    .disabled(exportCoordinator.isSweeping)
+                    .help("Export all flagged frames to the dataset folder")
+                }
+            }
 
+            // Frame count is the standing total; the last-run summary (what the
+            // most recent sweep added/skipped) complements it without dup'ing.
             Text(exportedFrameStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if let summary = exportCoordinator?.lastSummary {
+                Text(summary.demoStatusLine)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
+            }
 
             Button {
                 revealFramesInFinder()
@@ -632,11 +625,30 @@ struct ContentView: View {
                 Text(url.lastPathComponent)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                // CHANGE 4: truncate the parent path from the BEGINNING so the
+                // meaningful tail (the enclosing folder) stays visible rather
+                // than the redundant "/Users/griff/…" head.
                 Text(url.deletingLastPathComponent().path)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.head)
+            }
+        }
+        // CHANGE 4: hover tooltip surfaces the full path; right-click menu
+        // copies the path or reveals the file in Finder.
+        .help(url.path)
+        .contextMenu {
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.path, forType: .string)
+            } label: {
+                Label("Copy Path", systemImage: "doc.on.clipboard")
+            }
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
             }
         }
     }
@@ -649,16 +661,20 @@ struct ContentView: View {
             if let controller = coordinator.controller {
                 playbackArea(controller: controller)
 
-                // M7·P2: flag marker rail directly above the stock scrubber,
-                // padded to roughly line up with the slider track.
-                if let flaggingModel {
-                    FlagMarkerStrip(model: flaggingModel, duration: controller.duration)
-                        .padding(.horizontal, 16)
-                        .background(Color(.windowBackgroundColor))
+                // M7·P2: flag markers drawn BEHIND the stock scrubber's
+                // Slider via the Scrubber `trackUnderlay` slot (no separate
+                // row). The strip inherits the Slider's exact track width, so
+                // its per-platform thumbInset is the only variable keeping
+                // ticks under the thumb — no manual padding to guess geometry.
+                Scrubber(model: controller) {
+                    if let flaggingModel {
+                        FlagMarkerStrip(
+                            model: flaggingModel,
+                            duration: controller.duration
+                        )
+                    }
                 }
-
-                Scrubber(model: controller)
-                    .background(Color(.windowBackgroundColor))
+                .background(Color(.windowBackgroundColor))
 
                 bottomBar
             } else {

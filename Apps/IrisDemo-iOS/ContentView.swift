@@ -366,17 +366,20 @@ struct PlaybackContentView: View {
             if let controller = coordinator.controller {
                 playbackArea(controller: controller)
 
-                // M7·P2: flag marker rail directly above the stock scrubber,
-                // padded to roughly line up with the slider track. Maps each
-                // flag's PTS to an x-fraction of the controller's duration.
-                if let flaggingModel {
-                    FlagMarkerStrip(model: flaggingModel, duration: controller.duration)
-                        .padding(.horizontal, 16)
-                        .background(Color(.systemBackground))
+                // M7·P2: flag markers drawn BEHIND the stock scrubber's
+                // Slider via the Scrubber `trackUnderlay` slot (no separate
+                // row). The strip inherits the Slider's exact track width, so
+                // its per-platform thumbInset is the only variable keeping
+                // ticks under the thumb — no manual padding to guess geometry.
+                Scrubber(model: controller) {
+                    if let flaggingModel {
+                        FlagMarkerStrip(
+                            model: flaggingModel,
+                            duration: controller.duration
+                        )
+                    }
                 }
-
-                Scrubber(model: controller)
-                    .background(Color(.systemBackground))
+                .background(Color(.systemBackground))
 
                 controlBar
                 mruSection
