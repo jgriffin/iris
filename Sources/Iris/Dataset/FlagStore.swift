@@ -85,6 +85,41 @@ public final class FlagStore {
         loaded(ref.asset.id).contains { $0.ref == ref }
     }
 
+    /// Every flagged asset on disk, paired with its flags.
+    ///
+    /// Where ``flags(for:)`` resolves one *known* asset, this scans the entire
+    /// `<baseDir>/iris-dataset/flags/` directory so callers (the export sweep)
+    /// can reason about "everything that was ever flagged" without first
+    /// knowing which assets exist. Each `FrameFlag.ref.asset` carries the full
+    /// `AssetFingerprint`, so the asset is reconstructed from the flag records
+    /// themselves — no external input needed.
+    ///
+    /// Respects the load/cache discipline: a flag file that has already been
+    /// loaded is served from `cache`; un-cached files are loaded (and cached)
+    /// here. Files that fail to decode are skipped (logged in ``load(id:)``).
+    /// Assets whose stored flag list is empty are omitted — there is nothing
+    /// to sweep for them.
+    public func allFlaggedAssets() -> [(asset: AssetFingerprint, flags: [FrameFlag])] {
+        let ids: [String]
+        do {
+            ids = try FileManager.default
+                .contentsOfDirectory(atPath: flagsDir.path)
+                .filter { $0.hasSuffix(".json") }
+                .map { String($0.dropLast(".json".count)) }
+        } catch {
+            // No flags/ dir yet ⇒ nothing flagged.
+            return []
+        }
+
+        var result: [(asset: AssetFingerprint, flags: [FrameFlag])] = []
+        for id in ids {
+            let flags = loaded(id)
+            guard let asset = flags.first?.ref.asset else { continue }
+            result.append((asset: asset, flags: flags))
+        }
+        return result
+    }
+
     /// Toggle a flag at `flag.ref`: remove the existing flag at that address
     /// if present, otherwise add this one. The unit of identity is the
     /// `FrameRef`, so re-flagging the same frame with different metadata

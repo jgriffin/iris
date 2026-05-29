@@ -256,6 +256,22 @@ struct PlaybackContentView: View {
     /// in a sheet (`showFlags`).
     @State private var flaggingModel: FlaggingModel?
 
+    /// M7·P4: the `FlagStore` shared by `flaggingModel` (writes flags) and
+    /// `exportCoordinator` (reads them to export frames). Held at this level —
+    /// instead of inline inside the `FlaggingModel` init — so the exporter can
+    /// be handed the SAME instance. Built lazily in `.task` alongside the model.
+    @State private var flagStore: FlagStore?
+
+    /// M7·P4: owns the `FrameExporter` + sink and runs the export sweep
+    /// (resolve `RecentVideos` → hold security scope → sweep). Shared wiring
+    /// lives in `Apps/Shared/FrameExportCoordinator`. Built lazily once the
+    /// store + MRU exist.
+    @State private var exportCoordinator: FrameExportCoordinator?
+
+    /// M7·P4: observe scene transitions to trigger sweeps at idle (background /
+    /// inactive) and cancel any in-flight sweep on returning to the foreground.
+    @Environment(\.scenePhase) private var scenePhase
+
     /// Whether the flagged-frames sheet is presented.
     @State private var showFlags = false
 
@@ -370,14 +386,21 @@ struct PlaybackContentView: View {
         .sheet(isPresented: $showFlags) {
             if let flaggingModel {
                 NavigationStack {
-                    FlaggedFramesList(model: flaggingModel)
-                        .navigationTitle("Flagged frames")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button("Done") { showFlags = false }
-                            }
+                    VStack(spacing: 0) {
+                        FlaggedFramesList(model: flaggingModel)
+                        // M7·P4: manual export trigger + last-run status. Forces
+                        // a sweep through the SAME path the launch / background
+                        // triggers use — the easiest way to confirm `frames/`
+                        // fills up.
+                        exportFooter
+                    }
+                    .navigationTitle("Flagged frames")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showFlags = false }
                         }
+                    }
                 }
             }
         }
@@ -476,10 +499,21 @@ struct PlaybackContentView: View {
             if flaggingModel == nil {
                 let documents = FileManager.default
                     .urls(for: .documentDirectory, in: .userDomainMask).first!
-                flaggingModel = FlaggingModel(
-                    store: FlagStore(baseDir: documents),
-                    source: coordinator
+                // M7·P4: build the store ONCE and share it between the flagging
+                // model (writer) and the export coordinator (reader) so the
+                // sweep exports exactly the flags the UI sets.
+                let store = FlagStore(baseDir: documents)
+                flagStore = store
+                flaggingModel = FlaggingModel(store: store, source: coordinator)
+                let exporter = FrameExportCoordinator(
+                    store: store,
+                    baseDir: documents,
+                    recentVideos: recentVideos
                 )
+                exportCoordinator = exporter
+                // No launch-trigger sweep: it contends with the user
+                // immediately opening/playing a video (the sweep opens headless
+                // PlaybackSources). Background (scenePhase) + manual button only.
             }
             // First-launch / first-appear behavior: if the user hasn't
             // picked anything yet AND the MRU is empty, fall back to the
@@ -506,6 +540,19 @@ struct PlaybackContentView: View {
         }
         .onDisappear {
             teardown()
+        }
+        // M7·P4: dataset-export triggers. Background / inactive → kick a sweep
+        // (the "runs dependably at idle/close" requirement); returning to active
+        // → cancel any in-flight sweep (cheap; resumes via the sink's dedup).
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background, .inactive:
+                exportCoordinator?.triggerSweep()
+            case .active:
+                exportCoordinator?.cancelInFlight()
+            @unknown default:
+                break
+            }
         }
     }
 
@@ -636,6 +683,41 @@ struct PlaybackContentView: View {
             }
             .listStyle(.insetGrouped)
             .frame(maxHeight: 240)
+        }
+    }
+
+    /// M7·P4: "Export now" button + last-run status line, shown below the
+    /// flagged-frames list. Forces a sweep through the coordinator (the same
+    /// code path the launch / background triggers use); the resulting `Summary`
+    /// is surfaced as a one-line `written · skipped · unreachable` status.
+    @ViewBuilder
+    private var exportFooter: some View {
+        if let exportCoordinator {
+            VStack(spacing: 6) {
+                Divider()
+                HStack {
+                    Button {
+                        Task { await exportCoordinator.exportNow() }
+                    } label: {
+                        Label("Export now", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    .disabled(exportCoordinator.isSweeping)
+
+                    if exportCoordinator.isSweeping {
+                        ProgressView().controlSize(.small)
+                    }
+                    Spacer()
+                }
+                if let summary = exportCoordinator.lastSummary {
+                    Text(summary.demoStatusLine)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(.secondarySystemBackground))
         }
     }
 

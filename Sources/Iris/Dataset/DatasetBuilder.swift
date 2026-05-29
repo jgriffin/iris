@@ -104,6 +104,10 @@ public struct DatasetBuilder: Sendable {
         var iterator = source.frames.makeAsyncIterator()
 
         for flag in pending {
+            // Interruptible: a cancelled sweep stops within ~one frame, leaving
+            // already-written PNGs in place (resumable). The next run picks up
+            // the remaining pending frames via the `contains` dedup gate.
+            try Task.checkCancellation()
             switch try await extractOne(flag: flag, source: source, iterator: &iterator, sink: sink) {
             case .written: summary.written += 1
             case .skipped: summary.skipped += 1

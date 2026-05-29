@@ -65,6 +65,21 @@ struct ContentView: View {
     /// flagged-frames list lives in a "Flagged frames" inspector section.
     @State private var flaggingModel: FlaggingModel?
 
+    /// M7·P4: the `FlagStore` shared by `flaggingModel` (writes flags) and
+    /// `exportCoordinator` (reads them to export frames). Held at this level so
+    /// the exporter gets the SAME instance. Built lazily in `.task`.
+    @State private var flagStore: FlagStore?
+
+    /// M7·P4: owns the `FrameExporter` + sink and runs the export sweep
+    /// (resolve `RecentVideos` → hold security scope → sweep). Shared wiring
+    /// lives in `Apps/Shared/FrameExportCoordinator`.
+    @State private var exportCoordinator: FrameExportCoordinator?
+
+    /// M7·P4: observe scene transitions to trigger sweeps at idle (background —
+    /// on macOS that's all-windows-closed / hidden) and cancel any in-flight
+    /// sweep on returning to the foreground.
+    @Environment(\.scenePhase) private var scenePhase
+
     /// M6·P3: holds the bundled-model warm-up cache + the file-picked detector.
     /// `@Observable` so the picker re-renders when the custom slot loads.
     @State private var modelStore = DemoModelStore()
@@ -211,6 +226,10 @@ struct ContentView: View {
                         if let flaggingModel {
                             FlaggedFramesList(model: flaggingModel)
                                 .frame(minHeight: 200)
+                            // M7·P4: manual export trigger + last-run status,
+                            // through the SAME sweep path as the launch /
+                            // background triggers.
+                            exportFooter
                         } else {
                             Text("Open a video to flag frames.")
                                 .font(.callout)
@@ -287,10 +306,20 @@ struct ContentView: View {
             if flaggingModel == nil {
                 let documents = FileManager.default
                     .urls(for: .documentDirectory, in: .userDomainMask).first!
-                flaggingModel = FlaggingModel(
-                    store: FlagStore(baseDir: documents),
-                    source: coordinator
+                // M7·P4: build the store ONCE and share it between the flagging
+                // model (writer) and the export coordinator (reader).
+                let store = FlagStore(baseDir: documents)
+                flagStore = store
+                flaggingModel = FlaggingModel(store: store, source: coordinator)
+                let exporter = FrameExportCoordinator(
+                    store: store,
+                    baseDir: documents,
+                    recentVideos: recentVideos
                 )
+                exportCoordinator = exporter
+                // No launch-trigger sweep: it contends with the user
+                // immediately opening/playing a video (the sweep opens headless
+                // PlaybackSources). Background (scenePhase) + manual button only.
             }
             await modelStore.prewarmBundledModels()
         }
@@ -338,6 +367,19 @@ struct ContentView: View {
         .onDisappear {
             teardown()
         }
+        // M7·P4: dataset-export triggers. Background / inactive (all windows
+        // closed / hidden on macOS) → kick a sweep; returning to active →
+        // cancel any in-flight sweep (cheap; resumes via the sink's dedup).
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background, .inactive:
+                exportCoordinator?.triggerSweep()
+            case .active:
+                exportCoordinator?.cancelInFlight()
+            @unknown default:
+                break
+            }
+        }
     }
 
     // MARK: - Sub-views
@@ -356,6 +398,37 @@ struct ContentView: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// M7·P4: "Export now" button + last-run status line, shown below the
+    /// flagged-frames list in the inspector. Forces a sweep through the
+    /// coordinator (the same code path the launch / background triggers use);
+    /// the resulting `Summary` is surfaced as a one-line status.
+    @ViewBuilder
+    private var exportFooter: some View {
+        if let exportCoordinator {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Button {
+                        Task { await exportCoordinator.exportNow() }
+                    } label: {
+                        Label("Export now", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    .controlSize(.small)
+                    .disabled(exportCoordinator.isSweeping)
+
+                    if exportCoordinator.isSweeping {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                if let summary = exportCoordinator.lastSummary {
+                    Text(summary.demoStatusLine)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     /// Sidebar: "Open Video…" button + recent picks list. Empty MRU state

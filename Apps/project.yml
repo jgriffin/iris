@@ -50,6 +50,18 @@ targets:
             - path: Shared
               excludes:
                   - "**/*.md"
+                  # Models are added explicitly below so xcodegen doesn't
+                  # also sweep them as globbed compile sources (double-add).
+                  - "**/*.mlpackage"
+            # Bundled Core ML models. Declared explicitly (not via the Shared
+            # glob) and left in xcodegen's default phase for `.mlpackage`
+            # (Compile Sources), so Xcode compiles each to `<name>.mlmodelc`
+            # at build time. That compiled output is what `DemoCatalog`'s
+            # primary lookup expects (`forResource: name, withExtension:
+            # "mlmodelc"`). Do NOT set `buildPhase: resources` — that copies
+            # the raw `.mlpackage` and skips the `.mlmodelc` the loader wants.
+            - path: Shared/yolo12n.mlpackage
+            - path: Shared/yolo26n.mlpackage
             # Bundle the M3 Phase 1 fixture clip into the iOS demo so the
             # Playback tab can load it via `Bundle.main.url(forResource:…)`
             # without a file picker. Referenced by path (no duplication) —
@@ -84,6 +96,18 @@ targets:
             - path: Shared
               excludes:
                   - "**/*.md"
+                  # Models are added explicitly below so xcodegen doesn't
+                  # also sweep them as globbed compile sources (double-add).
+                  - "**/*.mlpackage"
+            # Bundled Core ML models. Declared explicitly (not via the Shared
+            # glob) and left in xcodegen's default phase for `.mlpackage`
+            # (Compile Sources), so Xcode compiles each to `<name>.mlmodelc`
+            # at build time. That compiled output is what `DemoCatalog`'s
+            # primary lookup expects (`forResource: name, withExtension:
+            # "mlmodelc"`). Do NOT set `buildPhase: resources` — that copies
+            # the raw `.mlpackage` and skips the `.mlmodelc` the loader wants.
+            - path: Shared/yolo12n.mlpackage
+            - path: Shared/yolo26n.mlpackage
         configFiles:
             Debug: IrisDemo-macOS/Shared.xcconfig
             Release: IrisDemo-macOS/Shared.xcconfig

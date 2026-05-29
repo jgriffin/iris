@@ -7,34 +7,37 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09FEB1448671C09C039DD333 /* yolo26n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 74B6E51F1AE60A96718C88A5 /* yolo26n.mlpackage */; };
 		2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA38233F14BA878271417160 /* DocumentPicker.swift */; };
 		4F2421A9F1943FF0F9BE93C4 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 53270A4BBE94833D88339CC9 /* Iris */; };
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
 		7C0D8530C9919FD70A380B51 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 0EB7A0FB41B5268DBEA5747D /* Iris */; };
 		80FFD62CD539847D349D137F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */; };
+		9477CA1B7D16970DE695FD66 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D104784A17C46A374D2684 /* DemoCatalog.swift */; };
+		9F56A01199229165D090C641 /* FrameExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */; };
+		A882BF2168C8DAAA86746A27 /* yolo12n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */; };
 		AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */; };
 		B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
+		B7DC85A8376CDF1C7F89D0BF /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D104784A17C46A374D2684 /* DemoCatalog.swift */; };
 		BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
-		898B5D39DDC9DDD7B43C218F /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */; };
-		DFE7EB47103AA9ECF21E20F2 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */; };
-		363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
-		6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */; };
-		DFE5F6538973A2D4FED15009 /* yolo26n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */; };
-		D564F25D9BD30F9818BBA07E /* yolo26n.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
+		EC36E5D49B8977203EE11812 /* FrameExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */; };
+		F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */; };
+		F460335D8F2655630206C25A /* yolo26n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 74B6E51F1AE60A96718C88A5 /* yolo26n.mlpackage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		05A3B47E9D4C21787237A448 /* clipboard-blank-page.mp4 */ = {isa = PBXFileReference; path = "clipboard-blank-page.mp4"; sourceTree = "<group>"; };
 		0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1B460BBC0A9FF30933C587AA /* IrisDemo-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IrisDemo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		20D104784A17C46A374D2684 /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5FE11DED63C51AD082CD66F7 /* iris */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iris; path = ..; sourceTree = SOURCE_ROOT; };
+		74B6E51F1AE60A96718C88A5 /* yolo26n.mlpackage */ = {isa = PBXFileReference; path = yolo26n.mlpackage; sourceTree = "<group>"; };
+		7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameExportCoordinator.swift; sourceTree = "<group>"; };
+		80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */ = {isa = PBXFileReference; path = yolo12n.mlpackage; sourceTree = "<group>"; };
 		8486F9C7159F774FB48A6C3B /* RecentVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentVideos.swift; sourceTree = "<group>"; };
-		C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
-		C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = yolo12n.mlpackage; sourceTree = "<group>"; };
-		FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = yolo26n.mlpackage; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
 		D03976040AAEAF22317D9BE0 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
@@ -83,10 +86,11 @@
 		5FBD4C9628708F6440C039F8 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				20D104784A17C46A374D2684 /* DemoCatalog.swift */,
+				7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */,
 				8486F9C7159F774FB48A6C3B /* RecentVideos.swift */,
-				C2BAF57EE99314DC4A083437 /* DemoCatalog.swift */,
-				C202D0C495CDAB65746FE4E8 /* yolo12n.mlpackage */,
-				FE8CA18367C3CBB9E2F059A5 /* yolo26n.mlpackage */,
+				80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */,
+				74B6E51F1AE60A96718C88A5 /* yolo26n.mlpackage */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -165,7 +169,6 @@
 			buildConfigurationList = 8958D5CA9C4E28A7F285D550 /* Build configuration list for PBXNativeTarget "IrisDemo-macOS" */;
 			buildPhases = (
 				0C9B97C882B423BAA036FDC2 /* Sources */,
-				B87F8AA4F2EB025225C7E2B4 /* Resources */,
 				4666C62F121707C7690ED7C8 /* Frameworks */,
 			);
 			buildRules = (
@@ -246,17 +249,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */,
-				363CC9F359D5C2300DD0AA62 /* yolo12n.mlpackage in Resources */,
-				DFE5F6538973A2D4FED15009 /* yolo26n.mlpackage in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		B87F8AA4F2EB025225C7E2B4 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				6D61A0CCC7F224E419660D49 /* yolo12n.mlpackage in Resources */,
-				D564F25D9BD30F9818BBA07E /* yolo26n.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -268,9 +260,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				80FFD62CD539847D349D137F /* ContentView.swift in Sources */,
+				B7DC85A8376CDF1C7F89D0BF /* DemoCatalog.swift in Sources */,
+				9F56A01199229165D090C641 /* FrameExportCoordinator.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
 				B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */,
-				DFE7EB47103AA9ECF21E20F2 /* DemoCatalog.swift in Sources */,
+				F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */,
+				09FEB1448671C09C039DD333 /* yolo26n.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,10 +274,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */,
+				9477CA1B7D16970DE695FD66 /* DemoCatalog.swift in Sources */,
 				2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */,
+				EC36E5D49B8977203EE11812 /* FrameExportCoordinator.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,
 				BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */,
-				898B5D39DDC9DDD7B43C218F /* DemoCatalog.swift in Sources */,
+				A882BF2168C8DAAA86746A27 /* yolo12n.mlpackage in Sources */,
+				F460335D8F2655630206C25A /* yolo26n.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
