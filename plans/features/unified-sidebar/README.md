@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-30 · pulled forward; M8·P5/P6 shelved. **P1 + P2 shipped** (🔀, unmerged on `m9-unified-shell`); **P3 next** (the heart)._
+_Active milestone (M9) · 2026-05-30 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** penciled — designs pending from the user, folds in before the `main` merge._
 
 ## Intent
 
@@ -80,7 +80,7 @@ iPad / macOS (persistent split sidebar)        iPhone (sidebar → drawer, inspe
 
 ## Phases
 
-### P1 — Reliability quick wins  ✅ shipped (🔀 unmerged on `m9-unified-shell`)
+### P1 — Reliability quick wins  ✅ shipped (`m9-unified-shell`)
 Independent of the rework — **mergeable on its own**. Three fixes that clear standing
 debt before the shell rewrite. All three landed as separate commits; both demo schemes
 build green; the `Iris` library is untouched.
@@ -96,7 +96,7 @@ build green; the `Iris` library is untouched.
   now logs `isStale` (`.notice`/`.warning`) and elevates missing-file / unresolvable
   cases `.debug`→`.warning` via the existing `os.Logger`.
 
-### P2 — Shared model store (foundation)  ✅ shipped (🔀 unmerged on `m9-unified-shell` · `3af1ed8`)
+### P2 — Shared model store (foundation)  ✅ shipped (`m9-unified-shell` · `3af1ed8`)
 `Apps/Shared/ModelSelection.swift` — an app-level `@MainActor @Observable` (UserDefaults-backed,
 like `RecentDetectors`) holding `detectorID` + `minConfidence`, **persisted**, lifted to each app
 root via `.environment`. It **replaced the FOUR independent per-page selections** (iOS Playback +
@@ -159,7 +159,7 @@ Finder`) into a disabled stub — over-read the "reserved-but-deferred DATASET s
 Capture detector still hardcoded to Vision rectangles; `CaptureModel.updateDetector(for:)` is a no-op
 hook left for P4.
 
-### P4 — Capture joins the shared model  ✅ shipped (🔀 on `m9-unified-shell` · `b2201e0`)
+### P4 — Capture joins the shared model  ✅ shipped (`m9-unified-shell` · `b2201e0`)
 Capture was hardcoded to Vision rectangles with no picker. Now it runs the shared
 `ModelSelection`: `CaptureModel.detector` is a `var` the detect loop reads **fresh each
 frame**, so `updateDetector(for:)` (the P3 hook) swaps the detector **in-loop, no session
@@ -167,7 +167,7 @@ restart**; `start(initialEntry:)` resolves the shared `detectorID` on camera sta
 `@MainActor` → race-free. Min-confidence already applied via the overlay (P3 step 1).
 Fixes **A3**. Build-only — on-device camera smoke owed.
 
-### P5 — Simplify  ✅ shipped (🔀 on `m9-unified-shell` · `601c70b`)
+### P5 — Simplify  ✅ shipped (`m9-unified-shell` · `601c70b`)
 One `enum ImportTarget { video, image, model }` + a single `.fileImporting` modifier
 replaced two parallel importer modifiers over five `@State` flags (~−67 lines). The iOS
 `DocumentPicker` vs macOS `.fileImporter` seam is kept on purpose (DocumentPicker
@@ -175,13 +175,22 @@ preserves the security-scoped URL so MRU bookmarks survive relaunch); only the d
 unified. **Deferred to backlog** (untouched, as planned): a generic `RecentImages` /
 `RecentVideos` base, and any playback / image coordinator merge.
 
+### P6 — Design pass  ✏️ penciled (designs pending from the user)
+A round of UI/design changes the user is folding into the unified shell **before** the
+milestone merges to `main`. Designs are not yet in hand — this phase is **penciled**
+(undefined: no brief, scope TBD) until they arrive, at which point it gets scoped here
+(the define-gate) and built. Reopens M9 to 🌱 in-progress: the `main` merge waits on P6.
+*(Fill this section in when the designs land — what's changing, which files, the forks.)*
+
 ---
 
-**M9 status: feature-complete (all 5 phases 🔀 on `m9-unified-shell`, both schemes green).**
-Gating caveat: the P3 shell + P4 live Capture are **build-verified only** (headless; the
-iOS sim has no camera). An on-device/hands-on smoke (macOS + iPhone/iPad) is **owed before
-merge to `main`**; `main` is the deliberate gate. Restored macOS dataset Export/Reveal
-(`871648f`) + sidebar visual polish (`56039f8`) also landed on the branch.
+**M9 status: 🌱 in-progress — P1–P5 built & green on `m9-unified-shell`; P6 (design pass)
+penciled, designs pending.** P6 folds in before the merge, so M9 is no longer
+merge-ready. Also owed before `main`: an on-device/hands-on smoke — the P3 shell + the
+iPhone compact-split nav fix + P4 live Capture are **build-verified only** (headless; the
+iOS sim has no camera). `main` is the deliberate gate. Restored macOS dataset Export/Reveal
+(`871648f`), sidebar visual polish (`56039f8`), and the iPhone compact-nav fix (`22ac8c9`)
+landed on the branch.
 
 ## Leave alone
 

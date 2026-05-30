@@ -817,3 +817,10 @@
 - **Status-tree lifecycle corrected (user):** the §Status tree had P1–P5 all 🔀, which "doesn't accurately show the progress in a useful way." Doctrine clarification: **a phase committed *directly* onto the milestone branch is ✅, not 🔀** — its integration target *is* that branch, so the commits are already merged up; the branch is the safety net (delete it, the work reverts). 🔀 is only for a node on its **own** branch awaiting a merge *up* — in practice the milestone itself awaiting `main`. Painting built-on-the-branch phases 🔀 conflates the two levels and reads as "nothing's done." Corrected M9 P1–P5 → ✅; M9 stays 🔀 (branch `m9-unified-shell` → `main`). Recorded as a new clause under `WORKFLOW.md` §"Status trees" lifecycle + a 📌 on the board.
 - **Design changes incoming:** user has design work to fold into the unified-shell milestone *before* the `main` merge — handed over separately.
 - 👉 Next: unchanged — **smoke M9 on real hardware, then merge `m9-unified-shell` → `main`** (closes M9 ✅), pending the incoming design changes. → [`BOARD.md`](./BOARD.md)
+
+## 2026-05-30 (cont.) — plan: M9 reopened with P6 (design pass)
+
+- User is adding a **P6 design pass** to M9 — a round of incoming UI/design changes to fold into the unified shell *before* it merges to `main`. Designs aren't in hand yet, so P6 is **✏️ penciled** (undefined: no brief, scope TBD; define-on-arrival). Surfaced in the status now per the user's request.
+- Adding open scope reopens the milestone: **M9 🔀 → 🌱 in-progress** — it's no longer "built, awaiting merge" while a phase is pending. P1–P5 stay ✅ (committed on the branch). The `main` merge waits on P6 + the still-owed hands-on smoke (which can fold into the same on-device pass).
+- Edited: BOARD §Status (M9 🌱, P5 `└─`→`├─`, new `└─ ✏️ P6` row + `← here`, rewritten 👉 next), a 📌 entry; `features/unified-sidebar/README.md` (P6 stub section to fill when designs land, rolled-up status → 🌱, P1–P4 header markers de-staled to ✅).
+- 👉 Next: **await the P6 designs**, then define → build P6, then the on-device smoke, then merge M9 → `main`. → [`BOARD.md`](./BOARD.md)
