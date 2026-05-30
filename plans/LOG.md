@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M9 — Unified shell defined** (M8 closed at core P1–P4 ✅; P5 🅿️ parked on `m8-image`, P6 🗓 backlog). One shared model + min-confidence across all three modes + a left pane that drives model selection / navigation / per-page Open…/RECENT — collapsing the iOS tabs + macOS `Videos|Images` toggle. 5 phases (P1 reliability quick wins · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify); demo-wiring only — the `Iris` library is left alone.
-👉 Next: **M9·P1 — reliability quick wins** (macOS importer collision A1, gate Image picker till loaded A6, bookmark resolve logging A5; independent, mergeable alone). Defined, awaiting go to build. → [`BOARD.md`](./BOARD.md)
+📋 **M9 — Unified shell defined; M8 landed on `main`** (M1–M8 all ✅ on main — M8 P1–P5 incl. freeze-from-live shipped, P6 dataset tie-in 🗓 backlog). M9 = one shared model + min-confidence across all three modes + a left pane driving model selection / navigation / per-page Open…/RECENT, collapsing the iOS tabs + macOS `Videos|Images` toggle. 5 phases (P1 reliability quick wins · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify); demo-wiring only — the `Iris` library is left alone.
+👉 Next: **Start M9 — cut `m9-unified-shell` off `main`, then P1** (macOS importer collision A1, gate Image picker till loaded A6, bookmark resolve logging A5; independent, mergeable alone). → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -736,3 +736,14 @@
 - Did: recorded it across the board — [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md) rewritten (M9 title, active status, intent lead, **## Phases** P1–P5 with file refs, **## Leave alone**, updated sequencing note); [`DECISIONS.md`](./DECISIONS.md) gained the dated M9-pulled-forward decision + a **Superseded 2026-05-29** annotation on the prior "after M8·P5/P6" entry; [`BOARD.md`](./BOARD.md) §Status done-line + focus tree + 👉 next + "📌 recent" rewritten, §Milestones legend renumbered (M9 + M8 closed-at-core note), §Backlog gained the two M8·P5/P6 stubs.
 - Note: **no code changed.** Board reset + milestone defined, awaiting go to build P1.
 - 👉 Next: **M9·P1 — reliability quick wins** (macOS importer collision A1, gate Image picker till loaded A6, bookmark resolve logging A5; independent, mergeable alone). → [`BOARD.md`](./BOARD.md)
+
+---
+
+## 2026-05-29 (cont.) — process: honest status board + merge-state doctrine; land M8 on `main`
+
+- Did: **overhauled the status board for honesty + legibility** after the user flagged two process errors. (1) §Status had collapsed every completed milestone into a single `done (all ✅) — M1 · M2 · …` one-liner — **restored the overview tree** (each milestone its own ✅ line) + added an anti-collapse guard (BOARD header comment + WORKFLOW **Rule 6**). (2) Cryptic phase-number codes like `(P1–P3 ✅ · P4 🚫)` are undecodable later — replaced with **named phases** folded into each milestone's delivery summary, every non-done phase named with its reason (new WORKFLOW **Rule 8**). Pulled the real M1–M8 phase content from features docs / LOG (via an Explore subagent) to write the summaries.
+- Did: **settled the merge-state doctrine** (the deeper bug — M8 was ✅ on the board but never merged to `main`). ✅ now means **merged to its integration target** — a *phase* into its milestone branch, a *milestone* into `main`; built-but-unmerged work carries **🔀 (merge-pending)**. *Where the work lives* (branch) names the target reached; the marker names merge-readiness. Picked **🔀** for the marker (over ⏳/📥). Recorded in [`DECISIONS.md`](./DECISIONS.md) (2026-05-29); lifecycle + legend updated in [`WORKFLOW.md`](./WORKFLOW.md) §"Status trees". 🚩 stays reserved for "issue."
+- Discovery that triggered all this: **M8 was never on `main`.** M1–M7 + demo-sim were genuinely merged; M8 (P1–P5) + the M9 planning docs lived only on `m8-image`, yet the board showed M8 ✅. The ✅ had silently drifted from "merged" to "done on a branch."
+- Did: **landed M8 on `main`.** Committed the board/doctrine docs as their own commit on `m8-image` (`fd234d7`, M8 still 🔀), then **fast-forwarded `main` → `m8-image`** (FF-clean; matches this repo's merge convention). M8 P1–P5 (incl. **freeze-from-live — un-parked; it ships with M8**) + the M9 planning docs are now on `main`. Flipped M8 🔀→✅ (collapsed to a peer delivery-summary line); dropped the §Backlog "M8·P5 parked" stub (P6 dataset tie-in stays backlogged).
+- Note: **no app code changed** — docs + a git landing only. `m8-image` left in place (fully merged into `main`; deletable anytime). LOG.md is now >730 lines — 🗓 pruning (roll to `LOG-archive.md`) is overdue (backlog).
+- 👉 Next: **Start M9** — cut `m9-unified-shell` off `main`, then **P1 — reliability quick wins** (A1 macOS importer collision, A6 gate Image picker till loaded, A5 bookmark resolve logging; independent, mergeable alone). → [`BOARD.md`](./BOARD.md)

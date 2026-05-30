@@ -17,25 +17,24 @@ _Snapshot · 2026-05-29_
 ├─ ✅ M5 — Honest detectors — per-detector capability model → derived tuning UI + capability-honest overlays + raw-data inspector
 ├─ ✅ M6 — Custom models — Core ML adapter + pluggable YOLO OutputDecoder (Path A + B) + model-swap catalog/UI  ·  captioning 🚫 dropped (Foundation Models is text-only)
 ├─ ✅ M7 — Dataset — flag frames in playback → headless FrameExporter writes provenance-named PNGs (filenames are the dedup ledger; no sidecar)
-├─ 🔀 M8 — Image — run detectors on one still + swap/compare models on it  ·  done on branch m8-image, awaiting merge to main
-│     ✅ DetectionRunner extraction · ✅ still→upright-Frame decode · ✅ one-shot ImageDetectionCoordinator · ✅ demo Image page
-│     🅿️ freeze-from-live — parked (thin convenience) · 🗓 dataset tie-in — backlog (not training yet)
-└─ 🌱 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
-   ├─ 🗓 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone  ← here
+├─ ✅ M8 — Image — run detectors on a single still + swap/compare models on it; DetectionRunner extraction + still→upright-Frame decode + one-shot ImageDetectionCoordinator + demo Image page + freeze-from-live handoff  ·  dataset tie-in 🗓 backlog (not training yet)
+└─ 📋 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)  ← next
+   ├─ 📋 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone
    ├─ 🗓 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)
    ├─ 🗓 P3 — left-pane shell: one cross-platform sidebar replaces iOS tabs + macOS `Videos|Images`; MODEL top, page-rows w/ inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes A4/A7; absorbs the P5 handoff conduit)
    ├─ 🗓 P4 — Capture joins the shared model: detector picker + live swap + shared confidence (fixes A3)
    └─ 🗓 P5 — simplify: one enum-routed importer pattern, collapse dup (generic MRU + coordinator-merge stay backlog)
 
-👉 next — **M9·P1 — reliability quick wins.** Defined, awaiting go to build. Three independent fixes that clear standing debt before the rework: the macOS movie+model `.fileImporter` collision (→ one enum-routed sheet), gate the Image detector picker/Tune until a frame is loaded, and add bookmark-resolve logging to the MRUs. Mergeable on its own. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
+👉 next — **Start M9 — cut `m9-unified-shell` off `main`, then P1.** M8 is landed on `main` (✅). M9·P1 = three independent, individually-mergeable fixes that clear standing debt before the shell rewrite: the macOS movie+model `.fileImporter` collision (→ one enum-routed sheet), gate the Image detector picker/Tune until a frame is loaded, and bookmark-resolve logging on the MRUs. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- **✅ = merged to its integration target; 🔀 = merge-pending** — phase→milestone branch, milestone→`main`; restores board honesty (M8 was ✅ while still unmerged) → [WORKFLOW.md](./WORKFLOW.md) §"Status trees" (2026-05-29)
 - **M9 pulled forward** as the active milestone — the unified-shell work (shared model + left-pane-driven shell) supersedes the earlier "sidebar after M8·P5/P6" sequencing → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
-- **M8 closed at core** (P1–P4 ✅): P5 freeze-from-live **parked** on `m8-image` (thin convenience, not merged), P6 dataset tie-in **backlogged** (premature — not training yet) → [features/M8.md](./features/M8.md) (2026-05-29)
+- **M8 landed on `main`** (✅ — P1–P5 incl. freeze-from-live; P5 **shipped**, no longer parked); P6 dataset tie-in stays 🗓 backlog (not training yet) → [features/M8.md](./features/M8.md) (2026-05-29)
 - UI-reliability **audit done** → M9 phased **P1–P5**: P1 reliability quick wins · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
 - Milestone naming: descriptive slug + one-liner; numbers assigned at pickup only, never reserved for penciled work → [WORKFLOW.md](./WORKFLOW.md) / [DECISIONS.md](./DECISIONS.md) (2026-05-29)
 - "Unified sidebar nav" penciled after M8·P5/P6; built on near-final nav not the interim P4 seeds (accepted: P5/P6 wire into interim nav) → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
@@ -79,7 +78,6 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 
 - 🗓 Adopt git workflow policy — branching + auto-commit + merge cadence into `WORKFLOW.md` (the portable lead doc), CLAUDE.md pointer, branch rename.
       The assistant's "commit only when asked" is a **harness default** (+ the intent-guard hook), opposite the user's want: proactive commits, milestone (`mN-<slug>`) + phase (`mN-pX-<slug>`) branches, readiness-gated merges, human out of the loop; `main` the one deliberate gate. Single home = `WORKFLOW.md §Branching & commits`; one open fork (main-merge autonomy). → [features/workflow-git-policy.md](./features/workflow-git-policy.md) (user, 2026-05-29)
-- 🗓 M8·P5 freeze-from-live — built but parked on `m8-image` (not merged); a thin convenience, revisit only if a real need appears. → [features/M8.md](./features/M8.md)
 - 🗓 M8·P6 dataset tie-in — flag→PNG export + image-shaped `AssetFingerprint`; genuinely future (not training yet). → [features/M8.md](./features/M8.md)
 - 🗓 Shared MRU generic — `RecentImages` and `RecentVideos` are near-identical bookmark-backed UserDefaults MRUs; factor a common base. Deliberate siblings for now (M8·P4). Also: `RecentImages` is untested (`Apps/Shared/` test-reachability deferral, as with `RecentVideos`), and macOS custom-model-in-image-mode re-selects the *playback* detector id (minor). (Touched by the unified-sidebar milestone, not closed by it; deferred from M9·P5.) (M8·P4, 2026-05-29)
 - 🗓 Per-category tuning — per-class confidence thresholds + per-class hide/show, independent of the global confidence knob.
