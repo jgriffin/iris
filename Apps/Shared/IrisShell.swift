@@ -287,7 +287,10 @@ struct IrisShell: View {
         // .onDisappear), preserving the documented AVFoundation safety. Start
         // when arriving on Capture; tear down when leaving it.
         if newPage == .capture {
-            capture.start(minConfidence: { Float(modelSelection.minConfidence) })
+            capture.start(
+                initialEntry: resolvedEntry,
+                minConfidence: { Float(modelSelection.minConfidence) }
+            )
         } else {
             capture.teardown()
         }
