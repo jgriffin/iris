@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-29 · pulled forward; M8·P5/P6 shelved. **P1 shipped** (🔀, unmerged on `m9-unified-shell`); **P2 next**._
+_Active milestone (M9) · 2026-05-30 · pulled forward; M8·P5/P6 shelved. **P1 + P2 shipped** (🔀, unmerged on `m9-unified-shell`); **P3 next** (the heart)._
 
 ## Intent
 
@@ -96,18 +96,27 @@ build green; the `Iris` library is untouched.
   now logs `isStale` (`.notice`/`.warning`) and elevates missing-file / unresolvable
   cases `.debug`→`.warning` via the existing `os.Logger`.
 
-### P2 — Shared model store (foundation)
-An app-level `@MainActor @Observable` holding `selectedDetectorID` + `minConfidence`,
-**persisted**, lifted to the app root via `.environment`. It **replaces the FOUR
-independent per-page selections**:
-- iOS Playback — `Apps/IrisDemo-iOS/ContentView.swift:~303`
-- iOS Image — `Apps/IrisDemo-iOS/ImageContentView.swift:51`
-- macOS Videos — `Apps/IrisDemo-macOS/ContentView.swift:146`
-- macOS Images — `Apps/IrisDemo-macOS/ContentView.swift:187`
+### P2 — Shared model store (foundation)  ✅ shipped (🔀 unmerged on `m9-unified-shell` · `3af1ed8`)
+`Apps/Shared/ModelSelection.swift` — an app-level `@MainActor @Observable` (UserDefaults-backed,
+like `RecentDetectors`) holding `detectorID` + `minConfidence`, **persisted**, lifted to each app
+root via `.environment`. It **replaced the FOUR independent per-page selections** (iOS Playback +
+Image, macOS Videos + Images) with one global model selection. `modelStore` + `RecentDetectors`
+were left as-is (already shared via UserDefaults) — only the *selection* lifted.
 
-`modelStore` + `RecentDetectors` are **already shared per-platform** (`Apps/Shared/`)
-— only the *selection* lifts. Fixes **A2** (the Image detector silently flipping on
-re-appear).
+**Two findings settled during the build:**
+- **No per-page min-confidence existed to lift.** Since M5, confidence is *detector-intrinsic*
+  (Vision rectangles has none; YOLO26n's lives in its decoder `Settings`/`TuningModel`). So the
+  mock's global "Min confidence" slider is *introduced*, not lifted. Decision: `ModelSelection`
+  **holds + persists** `minConfidence` (default 0.25) now, but it is **not consumed anywhere yet**
+  — its behavior wiring is P3's job (the sidebar MODEL slider).
+- **One global model** (user call): the deliberate macOS playback≠image split was **collapsed**
+  into the single shared selection — switching the model in any mode switches it everywhere, per
+  M9 intent #1.
+
+Fixes **A2** (Image detector silently flipping on re-appear): coordinators don't expose their
+installed detector id, so a demo-side `syncedDetectorID` re-installs on `.onAppear` only when the
+shared id has drifted (and a source/frame is loaded) — no per-appear flicker. **Build-green;
+hands-on smoke of the cross-mode adoption is owed.**
 
 ### P3 — Left-pane-driven shell (the heart)
 One cross-platform custom sidebar replacing the iOS `TabView` + the macOS

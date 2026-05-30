@@ -6,7 +6,7 @@
      phase rows (the embedded focus tree). -->
 
 # Iris — Board
-_Snapshot · 2026-05-29_
+_Snapshot · 2026-05-30_
 
 ## Status
 
@@ -20,18 +20,19 @@ _Snapshot · 2026-05-29_
 ├─ ✅ M8 — Image — run detectors on a single still + swap/compare models on it; DetectionRunner extraction + still→upright-Frame decode + one-shot ImageDetectionCoordinator + demo Image page + freeze-from-live handoff  ·  dataset tie-in 🗓️ backlog (not training yet)
 └─ 🔀 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)  ·  branch `m9-unified-shell` → `main`  ← active
    ├─ 🔀 P1 — reliability quick wins — fixed the macOS movie/model file-picker collision (the two pickers were stacked, only one could ever open), gated the Image detector picker + Tune until a frame is loaded, and added bookmark-resolve logging on Recent Images/Videos  ·  3 commits on `m9-unified-shell`, both demo schemes build green
-   ├─ 📋 P2 — shared model store — one app-level model selection + min-confidence at the app root, replacing the 4 independent per-page selections (this is what makes the Image detector silently change when you leave the page and come back)  ← next
-   ├─ 📋 P3 — left-pane shell — one cross-platform sidebar replaces the iOS tabs + the macOS Videos/Images toggle: MODEL on top, page-rows with inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes the tab-switch reload + scroll-reset; absorbs the freeze-from-live handoff conduit)
+   ├─ 🔀 P2 — shared model store — one app-level `ModelSelection` (the selected detector, now shared across Playback + Image; the deliberate macOS playback≠image split is collapsed into it) replaces the 4 per-page selections, so the Image detector no longer silently changes on re-appear. Min-confidence is held + persisted but not yet wired (its slider lands in P3).  ·  on `m9-unified-shell`, both demo schemes green
+   ├─ 📋 P3 — left-pane shell — one cross-platform sidebar replaces the iOS tabs + the macOS Videos/Images toggle: MODEL on top (the P2 selection + the now-wired min-confidence slider), page-rows with inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes the tab-switch reload + scroll-reset; absorbs the freeze-from-live handoff conduit)  ← next
    ├─ 📋 P4 — Capture joins the shared model — the live camera gets the shared detector picker + a live model-swap + shared confidence (today it's hardcoded to Vision rectangles with no picker)
    └─ 📋 P5 — simplify — one enum-routed importer pattern across all pages (the generic MRU + any coordinator merge stay backlog)
 
-👉 next — **M9·P2 — shared model store.** P1 shipped (3 commits on `m9-unified-shell`, both demo schemes green — unmerged, each fix mergeable on its own). P2 is the foundation: an app-level `@MainActor @Observable` holding the selected model + min-confidence, **persisted**, lifted to the app root via `.environment`, replacing the **four** independent per-page selections (iOS Playback + Image, macOS Videos + Images) — which is exactly what makes the Image detector silently change when you leave the page and come back. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
+👉 next — **M9·P3 — left-pane shell** (the heart of the milestone). P1 + P2 shipped on `m9-unified-shell` (both demo schemes green, unmerged). P3 builds the one cross-platform sidebar that replaces the iOS `TabView` + the macOS `Videos | Images` segmented picker: a `MODEL` section on top (the P2 `ModelSelection` detector picker **+ the min-confidence slider finally wired to behavior**), page-rows (Playback / Image / Capture) with the active page's `Open…` / `RECENT` inline, and a reserved-but-deferred bottom `DATASET` slot. iPad/macOS = persistent split + docked inspector; iPhone = sidebar→drawer + inspector→bottom-sheet. Absorbs the M8·P5 freeze-from-live handoff conduit (one shell holds all coordinators). Biggest phase — worth a design pass before building. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- **M9·P2 shipped** (🔀, unmerged on `m9-unified-shell`) — one app-level `ModelSelection` (`Apps/Shared/`) shared across Playback + Image; macOS playback≠image split **collapsed** into the single global model (per the M9 intent). Min-confidence held + persisted but **not yet consumed** — wired in P3. A2 fix is a demo-side `syncedDetectorID` re-install on appear (coordinators don't expose installed id). Both demo schemes green → [LOG.md](./LOG.md) (2026-05-30)
 - **M9·P1 shipped** (🔀, unmerged on `m9-unified-shell`) — macOS movie/model file-picker collision → one enum-routed importer; Image detector picker + Tune gated until a frame loads; bookmark-resolve logging on Recent Images/Videos. 3 commits, both demo schemes green, library untouched → [LOG.md](./LOG.md) (2026-05-29)
 - **✅ = merged to its integration target; 🔀 = merge-pending** — phase→milestone branch, milestone→`main`; restores board honesty (M8 was ✅ while still unmerged) → [WORKFLOW.md](./WORKFLOW.md) §"Status trees" (2026-05-29)
 - **M9 pulled forward** as the active milestone — the unified-shell work (shared model + left-pane-driven shell) supersedes the earlier "sidebar after M8·P5/P6" sequencing → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
