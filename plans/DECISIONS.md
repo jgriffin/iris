@@ -10,6 +10,18 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-05-30 — Two settings roles: detector input vs. render-time overlay filter; min-confidence is the latter (user)
+
+Q: What does the global "Min confidence" slider in the MODEL section actually do, given M5 made confidence detector-intrinsic?
+
+There are **two distinct settings roles**, and we'd been conflating them:
+- **Detector settings (input).** Parameters fed *into* the detector that change what it computes/emits (e.g. YOLO's decode threshold, NMS IoU). This is the per-detector **Tune** sheet — M5's capability-honest, detector-intrinsic tuning. Vision rectangles deliberately expose no probabilistic confidence here.
+- **Render-time overlay filter (output).** Takes whatever the detector *emitted* and decides what to *draw*, without changing the underlying detections. The raw-data inspector still shows everything; the overlay just hides what's below the floor. This filter operates **uniformly across every detector** because it keys on `Detection.confidence` after the fact (Vision rects stamp `1.0`, so a sub-1.0 floor shows them all — honest, no special-casing).
+
+The MODEL section's **Min-confidence slider is the render-time filter**, not a detector setting — which is why it can be global/universal (my earlier "it can only drive YOLO26n" was the result of mis-treating it as a detector input). The seam doesn't exist yet (today the overlay reads the store and draws everything), so we **create** it. It lives in the **`Iris` library** (the overlay `DetectionLayer` + `ResultStore` are there) — a small, principled, general capability ("overlays"/"tuning" are Iris's domain), **orthogonal to M5** (which governs detector-*input* honesty). This means **M9·P3 intentionally touches the library** — the earlier "demo-wiring only" framing for the milestone is relaxed for exactly this filter seam.
+
+**North star (user, details deferred — "let's see when we get to it"):** the two roles eventually converge on **one shared per-detector settings bundle** — the *same class* fed into the detector (pre-detection) **and** used to filter the overlay (post-detection). The backlog's **Per-category tuning** (per-class floors + per-class hide/show) is the generalization of the render-filter half. **For now we ship only a simple GLOBAL confidence floor**; the unified bundle + per-class controls come later. → [`BOARD.md`](./BOARD.md) §Backlog (Per-category tuning), [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md)
+
 ### 2026-05-29 — ✅ means merged to its integration target; 🔀 is merge-pending
 
 Q: A ✅ asserts the work is merged — but merged to *where*?

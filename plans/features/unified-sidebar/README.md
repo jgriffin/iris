@@ -119,16 +119,37 @@ shared id has drifted (and a source/frame is loaded) — no per-appear flicker. 
 hands-on smoke of the cross-mode adoption is owed.**
 
 ### P3 — Left-pane-driven shell (the heart)
-One cross-platform custom sidebar replacing the iOS `TabView` + the macOS
-`Videos | Images` segmented picker. Structure per the mock — `MODEL` section on top
-(the P2 store), page-rows (Playback / Image / Capture) with the active page's
-`Open…` / `RECENT` inline, a pinned bottom area. **The bottom `DATASET` / Export slot
-is reserved-but-deferred** — it belongs to the shelved dataset work (M8·P6), so the
-shell leaves room for it rather than wiring export now. iPad / macOS = persistent
+One cross-platform sidebar replacing the iOS `TabView` + the macOS `Videos | Images`
+segmented picker. Structure per the mock — `MODEL` section on top (the P2 store +
+the min-confidence slider), page-rows (Playback / Image / Capture) with the active
+page's `Open…` / `RECENT` inline, a reserved-but-deferred bottom `DATASET` slot
+(belongs to shelved M8·P6 — leave room, wire nothing). iPad / macOS = persistent
 split + docked inspector; iPhone = sidebar → drawer + inspector → bottom sheet.
 Fixes **A4** (tab-switch reload) + **A7** (scroll reset). **Absorbs the M8·P5
 `InspectorHandoff` conduit** — one shell holding all coordinators hands frames
 directly, with no environment hop.
+
+**Design pass done (2026-05-30; architect).** Resolved forks:
+- **Min-confidence = a render-time overlay filter, NOT a detector setting** → small
+  **`Iris` library** addition (a confidence floor the overlay applies on draw; raw
+  inspector stays unfiltered). Universal across detectors, honest for non-probabilistic
+  ones. **For now: a simple GLOBAL floor only.** This **relaxes "demo-wiring only"** for
+  this seam — see [DECISIONS.md](../../DECISIONS.md) (2026-05-30) for the two-role model
+  + the north-star unified per-detector settings bundle.
+- **Shell** = `NavigationSplitView` (free persistent-split↔drawer via `columnVisibility`)
+  + custom `VStack` sidebar content + size-class-routed inspector (`.inspector` regular /
+  `.sheet`+`.presentationDetents` compact).
+- **Detail content survives intact** (`ImageDetailView`, `playbackArea`, capture preview);
+  only picker / `Open…` / `RECENT` chrome moves to the sidebar. Extract a shared
+  `PlaybackDetailView`. macOS is already ~90% this shell; iOS is the real migration.
+- **All coordinators persist for the shell's lifetime** (adopt the macOS model — that's
+  what removes A4/A7); **Capture's camera start/teardown keys off active-page selection**
+  (not view-disappear) to preserve the documented AVFoundation safety.
+
+**Phasing** (mergeable sub-steps on `m9-unified-shell`): **(1)** render-time confidence
+filter — library floor + fixture test + wire the slider (shippable on its own) → **(2)**
+scaffold the shared shell on macOS → **(3)** extract shared detail views → **(4)** move
+iOS onto the shell → **(5)** retire `InspectorHandoff` → **(6)** iPhone bottom-sheet reflow.
 
 ### P4 — Capture joins the shared model
 Capture is today **hardcoded to Vision rectangles with no picker**
@@ -145,7 +166,9 @@ duplication. **Deferred to backlog** (explicitly *not* this milestone): a generi
 Out of scope — working and clean, don't touch:
 - **`ImageDetailView`** (shared, clean).
 - The **coordinator internals**.
-- The **`Iris` library package** — this milestone is **demo-wiring only**.
+- The **`Iris` library package** — **mostly demo-wiring**, with **one sanctioned exception**:
+  the P3 render-time confidence-filter seam (the overlay floor) is a small, deliberate
+  library addition (see the P3 design note). Everything else in `Sources/Iris/` stays put.
 - The **playback detail / overlay / scrubber**.
 
 ## Sequencing note
