@@ -791,3 +791,13 @@
 - **P4 seam left in place:** Capture detector is still hardcoded to Vision rectangles; `CaptureModel.updateDetector(for:)` is a no-op hook for P4 to fill.
 - P3 now 🔀 (all 6 steps built, unmerged).
 - 👉 Next: **M9·P4 — Capture joins the shared model** (shared detector + live frame-loop swap + shared min-confidence; fixes A3) — but first settle the 🚩 macOS-export regression + a hands-on smoke of the shell. → [`BOARD.md`](./BOARD.md)
+
+## 2026-05-30 (cont.) — build: M9·P4 — Capture joins the shared model
+
+- Did: the live Capture page now runs the **shared `ModelSelection`** instead of a hardcoded `VisionRectanglesDetector` (fixes A3). `CaptureModel.detector` went `let`→`var`; the detect loop reads `self.detector` **fresh each frame** (no captured snapshot), so a swap takes effect on the next frame with **no camera/session restart**. `start(initialEntry:)` resolves the shared `detectorID` (via `DemoCatalog.detectors(store:)`, catalog-first fallback) so a model chosen while off the Capture page is honored on arrival; `updateDetector(for:)` (the P3 no-op hook) now does the live in-place swap, called from the shell's existing `onDetectorChanged()`.
+- Concurrency: `CaptureModel` is `@MainActor @Observable`; both the per-frame read and the swap write are main-actor-isolated → race-free with no actor indirection / locks / `@unchecked`. The detect call awaits off-loop but captures the detector into a local first, so a mid-await swap just lands on the next frame. Resolution builds the entry's session against a **throwaway `ResultStore`** (reads `router.currentDetector` only — zero cache side effect). AVF session start/teardown untouched (still keyed to page selection, P3); only the detector reference changes.
+- Min-confidence: already applied to the capture overlay via P3 step 1 (`CaptureDetailView` → `DetectionLayer(minConfidence:)`) — confirmed, not changed.
+- No new files (2 edited: `IrisShell+Capture.swift`, `IrisShell.swift`); no xcodegen. Verified: iOS + macOS `xcodebuild`-green; `swift test` **262** (library untouched).
+- **Build-verified only — the iOS Simulator has no real camera, so the loop never runs there.** On-device smoke owed (initial detector matches sidebar; live swap within a frame or two, no flicker; min-conf gates capture boxes).
+- On `m9-unified-shell`, `b2201e0`. P4 now 🔀.
+- 👉 Next: **M9·P5 — simplify** — one enum-routed importer pattern across all pages (the macOS `ActiveImporter` from P1 is the seed); generic MRU + coordinator merge stay backlog. Then an on-device/hands-on smoke of the shell + Capture before M9 → `main`. → [`BOARD.md`](./BOARD.md)

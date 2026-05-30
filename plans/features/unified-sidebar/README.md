@@ -159,10 +159,13 @@ Finder`) into a disabled stub — over-read the "reserved-but-deferred DATASET s
 Capture detector still hardcoded to Vision rectangles; `CaptureModel.updateDetector(for:)` is a no-op
 hook left for P4.
 
-### P4 — Capture joins the shared model
-Capture is today **hardcoded to Vision rectangles with no picker**
-(`Apps/IrisDemo-iOS/ContentView.swift:136`). Give it the shared detector + a
-**live detector-swap in its frame loop** + the shared min-confidence. Fixes **A3**.
+### P4 — Capture joins the shared model  ✅ shipped (🔀 on `m9-unified-shell` · `b2201e0`)
+Capture was hardcoded to Vision rectangles with no picker. Now it runs the shared
+`ModelSelection`: `CaptureModel.detector` is a `var` the detect loop reads **fresh each
+frame**, so `updateDetector(for:)` (the P3 hook) swaps the detector **in-loop, no session
+restart**; `start(initialEntry:)` resolves the shared `detectorID` on camera start. All
+`@MainActor` → race-free. Min-confidence already applied via the overlay (P3 step 1).
+Fixes **A3**. Build-only — on-device camera smoke owed.
 
 ### P5 — Simplify
 One enum-routed importer pattern across all pages; collapse the picker / importer
