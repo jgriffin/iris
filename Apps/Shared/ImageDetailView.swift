@@ -36,6 +36,13 @@ struct ImageDetailView: View {
     @Binding var selectedDetectorID: String
     @Binding var showTuning: Bool
 
+    /// Whether to render the built-in control bar (detector picker + Tune). The
+    /// unified shell (M9·P3) owns model selection in its sidebar MODEL section,
+    /// so it hosts this view with `showsControlBar: false` — the bar is
+    /// suppressed there rather than deleted (the old standalone containers still
+    /// rely on it). Defaults to `true` for those callers.
+    var showsControlBar: Bool = true
+
     /// The shared app-wide selection — read for its render-time
     /// `minConfidence` overlay floor (M9·P3). Injected at both app roots.
     @Environment(ModelSelection.self) private var modelSelection
@@ -55,7 +62,13 @@ struct ImageDetailView: View {
             // is visible — the detector picker + Tune are gated on a loaded frame
             // (no model controls interactive over an empty canvas). They light up
             // the moment `coordinator.frame` becomes non-nil.
-            controlBar
+            //
+            // M9·P3: suppressed when hosted in the unified shell, which owns
+            // model selection in its sidebar MODEL section and the Tune toggle in
+            // its toolbar — the bar would be a redundant second picker there.
+            if showsControlBar {
+                controlBar
+            }
         }
         .sheet(isPresented: $showTuning) {
             tuningSheet
