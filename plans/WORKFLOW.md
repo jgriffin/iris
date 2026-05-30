@@ -76,6 +76,7 @@ One shared vocabulary — a readiness→growth lifecycle:
 - ✏️ **penciled in** — wanted but tentative and undefined (no brief, questions open). Picking it up means **defining it first**.
 - 📋 **defined** — scoped, questions answered, ready to hand off to an agent.
 - 🌱 **in-progress** — actively growing.  🔀 **merge-pending** — built, not yet merged up to its target.  ✅ **done** — merged to its integration target: a **phase** into its **milestone branch** (`mN-<slug>`), a **milestone** into **`main`**.  ⏸ **paused** · 🚫 **abandoned**.  *(The marker names merge-readiness; the branch the work sits on names the target reached.)*
+  - **The common case: a phase committed *directly* onto the milestone branch is ✅, not 🔀.** Its integration target *is* that branch, so its commits are already merged up — there's nothing pending. The branch itself is the safety net (delete it and the work reverts). 🔀 is only for a node that lives on its **own** branch awaiting a merge *up* — in practice the milestone awaiting `main`, or a phase that genuinely took a `mN-pX-<slug>` sub-branch. Don't paint built-on-the-branch phases 🔀 just because the *milestone* hasn't reached `main`; that conflates the two levels and reads as "nothing's done."
 - Markers (ride alongside, not states): 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs verification · ℹ️ note · 🚩 issue · 🗓️ deferred.
 
 ### Focus tree
