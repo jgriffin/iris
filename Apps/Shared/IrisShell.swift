@@ -61,9 +61,17 @@ struct IrisShell: View {
     /// detail pane. Defaults to Playback.
     @State var page: ShellPage = .playback
 
-    /// Sidebar column visibility — `@State` so the iPhone drawer toggle (M9·P3·6)
-    /// can drive it; SwiftUI auto-collapses to a drawer at compact width.
+    /// Sidebar column visibility — drives the persistent split at regular width
+    /// (iPad / Mac). SwiftUI ignores this once the split *collapses* to a single
+    /// column at compact width — see `preferredCompactColumn`.
     @State var columnVisibility: NavigationSplitViewVisibility = .all
+
+    /// Which column the *collapsed* (compact-width iPhone) split shows. This —
+    /// not `columnVisibility` — is the only navigation lever once collapsed.
+    /// Defaults to `.detail` so we land on the active page's content (the video
+    /// player), not the sidebar; the toolbar drawer button flips it to
+    /// `.sidebar`, and picking a page snaps it back to `.detail`.
+    @State var preferredCompactColumn: NavigationSplitViewColumn = .detail
 
     // MARK: - Playback chrome state
 
@@ -152,7 +160,10 @@ struct IrisShell: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView(
+            columnVisibility: $columnVisibility,
+            preferredCompactColumn: $preferredCompactColumn
+        ) {
             SidebarView(
                 page: $page,
                 catalog: catalog,
@@ -268,6 +279,9 @@ struct IrisShell: View {
 
     @MainActor
     private func onPageChanged(to newPage: ShellPage) {
+        // On a collapsed (compact iPhone) split, picking a page in the drawer
+        // should navigate to that page's detail. No-op when not collapsed.
+        preferredCompactColumn = .detail
         #if os(iOS)
         // Capture lifecycle keys off the active-page selection (NOT view
         // .onDisappear), preserving the documented AVFoundation safety. Start
@@ -432,8 +446,11 @@ struct IrisShell: View {
             if !isRegularWidth {
                 Button {
                     withAnimation {
-                        columnVisibility =
-                            columnVisibility == .detailOnly ? .all : .detailOnly
+                        // Compact split is collapsed: navigate between the
+                        // sidebar drawer and the detail via the compact column,
+                        // NOT `columnVisibility` (ignored when collapsed).
+                        preferredCompactColumn =
+                            preferredCompactColumn == .sidebar ? .detail : .sidebar
                     }
                 } label: {
                     Label("Toggle sidebar", systemImage: "sidebar.leading")
