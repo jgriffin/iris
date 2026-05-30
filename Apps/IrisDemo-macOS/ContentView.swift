@@ -806,16 +806,41 @@ struct ContentView: View {
         // control after the P2-revision; the marker rail is a secondary
         // overview and the inspector's "Flagged frames" section lists them.
         .overlay {
-            if let flaggingModel {
-                VideoRectAligned(
-                    contentSize: controller.presentationSize,
-                    alignment: .topTrailing
-                ) {
-                    FlagButton(model: flaggingModel)
-                        .padding(12)
+            VideoRectAligned(
+                contentSize: controller.presentationSize,
+                alignment: .topTrailing
+            ) {
+                // M8·P5: freeze-from-live + flag, clustered top-right on the
+                // frame image. macOS holds both coordinators in this one view, so
+                // "Inspect frame" hands off directly — no environment conduit.
+                HStack(spacing: 8) {
+                    inspectButton
+                    if let flaggingModel {
+                        FlagButton(model: flaggingModel)
+                    }
                 }
+                .padding(12)
             }
         }
+    }
+
+    /// M8·P5: "Inspect frame" — freeze the visible frame, switch to Images mode,
+    /// and run the SAME detector on the still via the image coordinator. Disabled
+    /// until a frame has flowed through the detect loop.
+    @ViewBuilder
+    private var inspectButton: some View {
+        Button {
+            inspectCurrentFrame()
+        } label: {
+            Image(systemName: "camera.viewfinder")
+                .font(.title3)
+                .padding(6)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(coordinator.currentFrame == nil)
+        .help("Inspect this frame in the Image inspector")
+        .accessibilityLabel("Inspect frame")
     }
 
     @ViewBuilder
@@ -1003,6 +1028,30 @@ struct ContentView: View {
         guard let entry = resolvedEntry else { return }
         Task { @MainActor in
             await coordinator.selectDetector(entry)
+        }
+    }
+
+    /// M8·P5: freeze the currently-visible live frame and open it in the Image
+    /// inspector on the SAME detector the playback source was using. Switches the
+    /// sidebar to `.images` mode, mirrors the playback detector selection into the
+    /// image picker, resolves the entry, and runs the still through the image
+    /// coordinator. No-op if no frame has flowed yet. macOS holds both
+    /// coordinators in this one view, so this is a direct hand-off — no
+    /// environment conduit (interim wiring; the unified-sidebar pass subsumes it).
+    @MainActor
+    private func inspectCurrentFrame() {
+        guard let frame = coordinator.currentFrame else { return }
+
+        mode = .images
+        imageSelectedDetectorID = selectedDetectorID
+        recentDetectors.addOrPromote(id: selectedDetectorID)
+
+        let entry = catalog.entries.first(where: { $0.id == selectedDetectorID })
+            ?? catalog.entries.first
+        guard let entry else { return }
+
+        Task { @MainActor in
+            await imageCoordinator.setImage(frame, detector: entry)
         }
     }
 

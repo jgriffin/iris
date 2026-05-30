@@ -52,6 +52,11 @@ struct ImageContentView: View {
     @State private var showTuning = false
     @State private var errorText: String?
 
+    /// M8·P5: freeze-from-live conduit (injected at the root). A source page
+    /// posts a frozen `Frame` + the live detector id here; this page consumes it
+    /// — selects that detector, runs it on the still, then clears the request.
+    @Environment(InspectorHandoff.self) private var handoff
+
     /// The file-picker sheet currently presented, if any. Routed through a single
     /// `.sheet(item:)` rather than two `.sheet(isPresented:)` modifiers: SwiftUI
     /// honors only one `isPresented` sheet per view, so two stacked picker sheets
@@ -154,6 +159,13 @@ struct ImageContentView: View {
             recentDetectors.addOrPromote(id: selectedDetectorID)
             selectDetector()
         }
+        // M8·P5: consume a freeze-from-live request. Keyed on the token so a
+        // re-inspect of the same frame still fires. Runs once on appear (in case
+        // the request was posted while this tab was off-screen) and on each new
+        // token.
+        .task(id: handoff.request?.token) {
+            await consumeInspectRequestIfPresent()
+        }
         .onDisappear {
             let priorScopedURL = scopedURL
             scopedURL = nil
@@ -252,6 +264,28 @@ struct ImageContentView: View {
                 priorScopedURL.stopAccessingSecurityScopedResource()
             }
         }
+    }
+
+    /// M8·P5: if a freeze-from-live request is pending, open its frame in the
+    /// inspector on the live source's detector, then clear the request. Selects
+    /// the request's detector id (resolving it through the catalog, falling back
+    /// to the first entry if it isn't selectable here — e.g. capture's
+    /// `vision.rectangles` is always present, so the fallback is belt-and-braces)
+    /// and runs detection on the frozen still via `setImage`.
+    @MainActor
+    private func consumeInspectRequestIfPresent() async {
+        guard let request = handoff.request else { return }
+
+        let entry = catalog.entries.first(where: { $0.id == request.detectorID })
+            ?? catalog.entries.first
+        guard let entry else { return }
+
+        selectedDetectorID = entry.id
+        recentDetectors.addOrPromote(id: entry.id)
+        await coordinator.setImage(request.frame, detector: entry)
+
+        // Consumed — clear so a later identical inspect re-fires via a new token.
+        handoff.request = nil
     }
 
     /// Re-run detection on the held image under the newly-selected detector.

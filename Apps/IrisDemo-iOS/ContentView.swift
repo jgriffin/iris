@@ -21,26 +21,45 @@ import os
 /// `PlaybackView`/`Scrubber`/`VideoGeometry` stack must work
 /// unchanged on iOS.
 struct ContentView: View {
+    /// M8·P5: stable tab identities so the freeze-from-live affordance can drive
+    /// `selection` to the Image tab when a source page posts an inspect request.
+    enum DemoTab: Hashable { case playback, image, capture }
+
+    @State private var selectedTab: DemoTab = .playback
+
+    /// M8·P5: freeze-from-live conduit. Source pages (Playback overlay, Capture
+    /// overlay) post a frozen `Frame` here; the Image page consumes it. Injected
+    /// into the environment so the separate tabs can hand off across the gap.
+    /// Interim nav glue — the unified-sidebar pass subsumes it.
+    @State private var handoff = InspectorHandoff()
+
     var body: some View {
         // Playback first ⇒ leftmost + default selection (tab order picks it).
         // `.sidebarAdaptable` renders as a bottom bar on iPhone and a left
         // sidebar on iPad / Mac (Designed for iPad). Value-based `Tab(...)`
         // API (iOS 18+; baseline is iOS 26) replaces the old `.tabItem`
         // modifier — see plans/features/demo-sim-runnable.md P1.
-        TabView {
-            Tab("Playback", systemImage: "play.rectangle") {
+        TabView(selection: $selectedTab) {
+            Tab("Playback", systemImage: "play.rectangle", value: DemoTab.playback) {
                 PlaybackContentView()
             }
 
-            Tab("Image", systemImage: "photo") {
+            Tab("Image", systemImage: "photo", value: DemoTab.image) {
                 ImageContentView()
             }
 
-            Tab("Capture", systemImage: "camera") {
+            Tab("Capture", systemImage: "camera", value: DemoTab.capture) {
                 CaptureContentView()
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .environment(handoff)
+        // M8·P5: when a source page freezes a frame, jump to the Image tab so the
+        // inspector (which consumes `handoff.request`) is on-screen. Keyed on the
+        // request's token so a re-inspect of the same frame still switches tabs.
+        .onChange(of: handoff.request?.token) { _, token in
+            if token != nil { selectedTab = .image }
+        }
     }
 }
 
@@ -59,6 +78,14 @@ struct CaptureContentView: View {
     @State private var resultStore = ResultStore()
     @State private var converter: PreviewLayerConverter?
     @State private var errorText: String?
+
+    /// M8·P5: the most recent capture frame, retained for the freeze-from-live
+    /// affordance. Set inside the frame loop; the "Inspect frame" button hands
+    /// it to the Image page. `nil` until the first frame arrives.
+    @State private var lastFrame: Frame?
+
+    /// M8·P5: freeze-from-live conduit (injected at the root).
+    @Environment(InspectorHandoff.self) private var handoff
 
     /// Whether this environment has a video capture device at all. `nil` on the
     /// iOS Simulator and Mac (Designed for iPad) — both lack camera hardware.
@@ -106,6 +133,24 @@ struct CaptureContentView: View {
                 ProgressView("Starting capture…")
             }
         }
+        // M8·P5: floating "Inspect frame" affordance over the live capture. Top-
+        // right, enabled once a frame has arrived; freezes it and hands it to the
+        // Image page on capture's hardcoded Vision-rectangles detector.
+        .overlay(alignment: .topTrailing) {
+            if cameraAvailable, lastFrame != nil {
+                Button {
+                    guard let frame = lastFrame else { return }
+                    handoff.inspect(frame, detectorID: "vision.rectangles")
+                } label: {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.title3)
+                        .padding(8)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("Inspect frame")
+                .padding(16)
+            }
+        }
         .task {
             // No camera hardware (Simulator / Mac Designed for iPad): never
             // start a session — the informational fallback page is shown
@@ -141,6 +186,8 @@ struct CaptureContentView: View {
             )
 
             for await frame in new.frames {
+                // M8·P5: retain the latest frame for freeze-from-live.
+                lastFrame = frame
                 do {
                     let detections = try await detector.detect(in: frame)
                     resultStore.append(
@@ -250,6 +297,11 @@ struct PlaybackContentView: View {
     /// `PlaybackDetectionCoordinator`).
     @State private var coordinator = PlaybackDetectionCoordinator()
     @State private var errorText: String?
+
+    /// M8·P5: freeze-from-live conduit (injected at the root). The "Inspect
+    /// frame" overlay button posts `coordinator.currentFrame` here, on the
+    /// active detector, and the root switches to the Image tab.
+    @Environment(InspectorHandoff.self) private var handoff
 
     /// M7·P2: flagging. One `FlaggingModel` wired to the coordinator (which
     /// conforms to `FlaggingSource`) over a `FlagStore` rooted at the app's
@@ -828,16 +880,40 @@ struct PlaybackContentView: View {
         // Primary flag control after the P2-revision; the marker rail is a
         // secondary overview and the toolbar `bookmark.circle` opens the list.
         .overlay {
-            if let flaggingModel {
-                VideoRectAligned(
-                    contentSize: controller.presentationSize,
-                    alignment: .topTrailing
-                ) {
-                    FlagButton(model: flaggingModel)
-                        .padding(12)
+            VideoRectAligned(
+                contentSize: controller.presentationSize,
+                alignment: .topTrailing
+            ) {
+                // M8·P5: freeze-from-live + flag, clustered top-right on the
+                // frame image. "Inspect frame" freezes the visible frame and
+                // hands it to the Image page on the SAME detector.
+                HStack(spacing: 8) {
+                    inspectButton
+                    if let flaggingModel {
+                        FlagButton(model: flaggingModel)
+                    }
                 }
+                .padding(12)
             }
         }
+    }
+
+    /// M8·P5: "Inspect frame" — freeze the currently-visible frame and hand it to
+    /// the Image page (via the root `InspectorHandoff`) on the active detector.
+    /// Disabled until a frame has flowed through the detect loop.
+    @ViewBuilder
+    private var inspectButton: some View {
+        Button {
+            guard let frame = coordinator.currentFrame else { return }
+            handoff.inspect(frame, detectorID: selectedDetectorID)
+        } label: {
+            Image(systemName: "camera.viewfinder")
+                .font(.title3)
+                .padding(8)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .disabled(coordinator.currentFrame == nil)
+        .accessibilityLabel("Inspect frame")
     }
 
     /// Top-trailing HUD pill showing the best-effort pipeline gauge.

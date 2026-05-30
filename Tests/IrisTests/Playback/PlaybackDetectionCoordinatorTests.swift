@@ -186,6 +186,48 @@ private func awaitLabeledDetection(
         await coordinator.teardown()
     }
 
+    /// **Freeze-from-live (M8·P5).** After the detect loop processes a frame, the
+    /// coordinator publishes it on `currentFrame` (on the @MainActor) so the demo
+    /// can freeze the visible still and hand it to the image inspector. Drive one
+    /// frame via `seek`, and assert `currentFrame` becomes non-nil and reflects a
+    /// processed frame (its timestamp matches the seek target the detect loop just
+    /// ran on). `teardown` then clears it.
+    @Test func currentFrameReflectsProcessedFrame() async throws {
+        let url = try fixtureURL()
+        let source = PlaybackSource(url: url, driver: ManualTickDriver())
+        let coordinator = PlaybackDetectionCoordinator()
+
+        // Nothing processed yet — no frozen frame to inspect.
+        #expect(coordinator.currentFrame == nil)
+
+        await coordinator.setSource(source, detector: DetectorAB.entry(label: DetectorAB.labelA))
+
+        // Drive one frame at t=0 through the single detect loop.
+        let time = CMTime.zero
+        try await source.seek(to: time)
+
+        // The loop publishes `currentFrame` on a MainActor hop after running the
+        // frame; poll until it lands (same async-visibility caveat as the cache).
+        let deadline = ContinuousClock().now + .seconds(3)
+        while coordinator.currentFrame == nil, ContinuousClock().now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+
+        let frozen = try #require(
+            coordinator.currentFrame,
+            "currentFrame should reflect the frame the detect loop just processed"
+        )
+        #expect(
+            frozen.timestamp == time,
+            "currentFrame should be the frame driven through the loop (t=0)"
+        )
+
+        await coordinator.teardown()
+
+        // Teardown clears the frozen frame alongside the controller + cache.
+        #expect(coordinator.currentFrame == nil)
+    }
+
     /// `setSource` resets the metrics gauge and invalidates the cache so a new
     /// video starts from a clean slate (no carried-over counts or stale
     /// detections from the prior session).

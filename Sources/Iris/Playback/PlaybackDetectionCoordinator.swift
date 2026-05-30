@@ -97,6 +97,14 @@ public final class PlaybackDetectionCoordinator {
     /// `setSource` and after `teardown`.
     public private(set) var controller: PlaybackController?
 
+    /// The most recently processed live frame, updated on the @MainActor each
+    /// time the detect loop pulls one. → the demo's "Inspect frame"
+    /// freeze-from-live affordance (M8·P5), which hands this still to the image
+    /// inspector. Mirrors `ImageDetectionCoordinator.frame`. `nil` before the
+    /// first frame flows and after `teardown`; sticky between sources otherwise
+    /// (the last visible frame is the one worth inspecting).
+    public private(set) var currentFrame: Frame?
+
     // MARK: - Stored
 
     /// The single per-source detect loop. Spawned in `setSource`, cancelled in
@@ -201,6 +209,7 @@ public final class PlaybackDetectionCoordinator {
 
         let priorSource = controller?.source
         controller = nil
+        currentFrame = nil
         runner.resultStore.clear()
 
         // Detach AVF observers + finish the frame stream. Awaited so the
@@ -239,7 +248,7 @@ public final class PlaybackDetectionCoordinator {
     private func spawnDetectionLoop(on controller: PlaybackController) {
         let runner = self.runner
         let source = controller.source
-        detectionTask = Task {
+        detectionTask = Task { [weak self] in
             for await frame in source.frames {
                 if Task.isCancelled { break }
 
@@ -247,12 +256,15 @@ public final class PlaybackDetectionCoordinator {
                 await runner.run(on: frame)
 
                 // Bridge the playback-source-specific cumulative counters into
-                // the gauge. `DetectionMetrics` is `@MainActor`, so hop.
+                // the gauge, and publish the just-processed frame for the
+                // freeze-from-live affordance (M8·P5). `DetectionMetrics` is
+                // `@MainActor` and `currentFrame` is `@MainActor`-isolated, so hop.
                 let dropped = source.droppedFrameCount
                 let emitted = source.emittedFrameCount
                 await MainActor.run {
                     runner.metrics.setDropped(dropped)
                     runner.metrics.setEmitted(emitted)
+                    self?.currentFrame = frame
                 }
             }
         }
