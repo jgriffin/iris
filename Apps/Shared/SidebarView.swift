@@ -5,7 +5,8 @@ import SwiftUI
 /// (detector picker + the render-time min-confidence slider), the page-rows in
 /// the middle (Playback / Image / Capture — the active row expands inline to
 /// reveal its `Open…` button + `RECENT` list; inactive rows collapse to a bare
-/// label), and a reserved-but-deferred `DATASET` strip pinned to the bottom.
+/// label), and a `DATASET` strip pinned to the bottom (macOS-only export
+/// controls; read-only exported-frame count everywhere).
 ///
 /// **One long-lived view.** This is the content of the shell's
 /// `NavigationSplitView` sidebar column; it lives for the shell's lifetime.
@@ -40,8 +41,18 @@ struct SidebarView: View {
     let onOpenImage: () -> Void
     let onPickImage: (URL) -> Void
 
-    // DATASET strip (reserved-but-deferred — render a placeholder, wire nothing).
+    // DATASET strip. macOS-only export controls (iOS exposes Documents via
+    // Files.app and never had this footer); the count line shows everywhere.
     let exportedFrameCountText: String
+    /// Whether a dataset sweep is currently running (drives the progress spinner
+    /// + disables the button). Always `false` on platforms without a coordinator.
+    let isSweeping: Bool
+    /// The last sweep's one-line summary, if any.
+    let lastSummaryText: String?
+    /// Export all flagged frames now. `nil` until a coordinator exists.
+    let onExportNow: (() async -> Void)?
+    /// Reveal the exported-frames folder in Finder. macOS-only (`nil` on iOS).
+    let onRevealInFinder: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -225,32 +236,60 @@ struct SidebarView: View {
         }
     }
 
-    // MARK: - DATASET strip (reserved-but-deferred — M8·P6, shelved)
+    // MARK: - DATASET strip
 
-    /// The reserved bottom `DATASET` slot. Renders a disabled placeholder per
-    /// the mock; export wiring belongs to the shelved M8·P6 dataset work and is
-    /// intentionally NOT hooked up here.
+    /// The bottom `DATASET` slot. On macOS it carries the working export
+    /// controls ("Export now" in the header, an exported-frame count, the
+    /// last-run summary, and a full-width "Reveal in Finder"). On iOS it's the
+    /// read-only count only — that footer was always macOS-only (iOS exposes the
+    /// Documents folder via Files.app instead).
     @ViewBuilder
     private var datasetStrip: some View {
         Divider()
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
                 Text("DATASET")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Text(exportedFrameCountText)
+                Spacer()
+                #if os(macOS)
+                if isSweeping {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if let onExportNow {
+                    Button {
+                        Task { await onExportNow() }
+                    } label: {
+                        Label("Export now", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    .controlSize(.small)
+                    .disabled(isSweeping)
+                    .help("Export all flagged frames to the dataset folder")
+                }
+                #endif
+            }
+
+            Text(exportedFrameCountText)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            #if os(macOS)
+            if let lastSummaryText {
+                Text(lastSummaryText)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                    .lineLimit(2)
             }
-            Spacer()
-            Button {
-                // Reserved — export belongs to the shelved M8·P6 dataset work.
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
+
+            if let onRevealInFinder {
+                Button(action: onRevealInFinder) {
+                    Label("Reveal in Finder", systemImage: "folder")
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.small)
+                .help("Open the exported frames folder in Finder")
             }
-            .controlSize(.small)
-            .disabled(true)
-            .help("Dataset export is reserved (M8·P6, deferred)")
+            #endif
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)

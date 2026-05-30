@@ -169,6 +169,19 @@ extension IrisShell {
         )) ?? []
         exportedFrameCount = urls.filter { $0.pathExtension.lowercased() == "png" }.count
     }
+
+    #if os(macOS)
+    /// Reveal the exported-frames folder in Finder (creating it if missing).
+    /// macOS-only — `NSWorkspace` is AppKit, and the DATASET footer is macOS-only.
+    @MainActor
+    func revealFramesInFinder() {
+        let dir = Self.framesDir
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([dir])
+    }
+    #endif
 }
 
 #if os(macOS)

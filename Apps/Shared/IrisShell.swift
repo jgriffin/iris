@@ -136,6 +136,16 @@ struct IrisShell: View {
         #endif
     }
 
+    /// Reveal-in-Finder intent for the DATASET strip — macOS-only (`nil` on iOS,
+    /// which has no Finder and never carried this footer).
+    private var revealInFinderAction: (() -> Void)? {
+        #if os(macOS)
+        return { revealFramesInFinder() }
+        #else
+        return nil
+        #endif
+    }
+
     private var exportedFrameCountText: String {
         switch exportedFrameCount {
         case .none, .some(0): return "No frames yet"
@@ -162,7 +172,14 @@ struct IrisShell: View {
                 recentImages: recentImages.resolve(),
                 onOpenImage: presentImagePicker,
                 onPickImage: { pickImage(url: $0) },
-                exportedFrameCountText: exportedFrameCountText
+                exportedFrameCountText: exportedFrameCountText,
+                isSweeping: exportCoordinator?.isSweeping ?? false,
+                lastSummaryText: exportCoordinator?.lastSummary?.demoStatusLine,
+                onExportNow: exportCoordinator == nil ? nil : {
+                    await exportCoordinator?.exportNow()
+                    refreshExportedFrameCount()
+                },
+                onRevealInFinder: revealInFinderAction
             )
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
             .videoImporter(self)
