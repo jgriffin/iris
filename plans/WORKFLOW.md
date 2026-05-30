@@ -51,9 +51,9 @@ Every doc is either an **index** (a scannable list, one line per item) or a **ho
 
 | Detail size | Home | Shape |
 | --- | --- | --- |
-| One line | the stub itself | `🗓 headline — ½-line hook` |
+| One line | the stub itself | `🗓️ headline — ½-line hook` |
 | A paragraph (≤~4 lines) | indented body directly under the stub, hard-capped at ~4 lines | headline line, then indented body lines |
-| More than a paragraph | a `features/<slug>.md` or an exploration; the stub links out | `🗓 headline — hook → [features/foo.md]` |
+| More than a paragraph | a `features/<slug>.md` or an exploration; the stub links out | `🗓️ headline — hook → [features/foo.md]` |
 
 **Category-level application:** a category gets its OWN file only when its items are *reliably* detail-heavy. Open questions are → `QUESTIONS.md` stays as their home. Backlog items are usually one-liners → there is NO backlog file; overflow rides as a capped indented body in `BOARD.md` §Backlog and graduates to `features/` when it gets big.
 
@@ -76,7 +76,7 @@ One shared vocabulary — a readiness→growth lifecycle:
 - ✏️ **penciled in** — wanted but tentative and undefined (no brief, questions open). Picking it up means **defining it first**.
 - 📋 **defined** — scoped, questions answered, ready to hand off to an agent.
 - 🌱 **in-progress** — actively growing.  🔀 **merge-pending** — built, not yet merged up to its target.  ✅ **done** — merged to its integration target: a **phase** into its **milestone branch** (`mN-<slug>`), a **milestone** into **`main`**.  ⏸ **paused** · 🚫 **abandoned**.  *(The marker names merge-readiness; the branch the work sits on names the target reached.)*
-- Markers (ride alongside, not states): 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs verification · ℹ️ note · 🚩 issue · 🗓 deferred.
+- Markers (ride alongside, not states): 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs verification · ℹ️ note · 🚩 issue · 🗓️ deferred.
 
 ### Focus tree
 
@@ -153,13 +153,37 @@ When a milestone is active, its node expands like the focus tree:
    carry a number. **Penciled-in / future milestones carry no number** — refer to them
    by slug (e.g. "Unified sidebar nav") until they're taken on, at which point they
    receive the next number.
-8. **Name phases, never bare numbers.** A status line must never reduce a phase to a
-   number-and-emoji code like `(P1–P3 ✅ · P4 🚫)` — ten minutes later "P4 🚫" is
-   undecodable. Fold the done phases into a plain-language summary of what the milestone
-   *delivered*, and **name every non-done phase** (🚫/🗓/🅿️/⏸) with a ≤10-word reason
-   (e.g. "captioning 🚫 dropped — Foundation Models is text-only"). The active milestone
-   still expands into named phase rows; completed milestones carry the delivery summary
-   on their one line. Condense freely — never at the cost of meaning.
+8. **Describe in plain language, never bare codes.** A status line must never reduce
+   work to a code the reader has to look up — not a phase code like `(P1–P3 ✅ · P4 🚫)`
+   (ten minutes later "P4 🚫" is undecodable), and **not an internal label** like an
+   audit ID (`A1`, `A6`) or a ticket number. Those codes are bookkeeping; they live in
+   the `features/<slug>.md` that defines them, never in a tree the user reads. Spell out
+   *what the thing is*: fold done phases into a plain-language summary of what the
+   milestone *delivered*, and **name every non-done phase** with a ≤12-word description
+   (+ a reason for 🚫/⏸: "captioning 🚫 dropped — Foundation Models is text-only"). The
+   active milestone expands into named phase rows; completed milestones carry the
+   delivery summary on their one line. Condense freely — never at the cost of meaning.
+   The status tree is **user-facing UI**, not a scratchpad: if a label needs a glossary,
+   it doesn't belong here.
+9. **📋 defined vs 🗓️ deferred — don't confuse them.** A phase of the active milestone
+   that is scoped (its brief exists) but simply *not started yet* is **📋 defined** — it
+   sits in the tree, exactly like the focus-tree example above (`└─ 📋 P3 — …`). **🗓️
+   deferred** means *pushed out of the current plan* — backlog items, or a phase we
+   decided not to do now. Never mark an upcoming, planned phase 🗓️; that wrongly reads
+   as "shelved." Only ✏️ (penciled, undefined), 📋 (defined), 🌱 (in-progress),
+   🔀 (merge-pending), ✅ (done) appear on a live phase row.
+10. **Branch annotations on merge-state nodes.** Because ✅/🔀 are defined by *merge
+   state*, any node that is 🔀 merge-pending — and the active milestone itself — names
+   its branch as a trailing annotation: `· branch \`mN-slug\` → \`main\`` for a milestone
+   (branch + merge target), `· N commits on \`mN-slug\`` or `· branch \`mN-pX-slug\`` for
+   a phase. It answers "what do I merge, and into what" at a glance. Done (✅) nodes are
+   already on their target, so they carry no branch.
+11. **Rendering: markers are monospace-aligned emoji.** Trees are read in a monospace
+   terminal; every marker must use its **emoji-presentation** form so glyphs occupy two
+   cells and rows line up. The deferred marker is **🗓️** (calendar + U+FE0F variation
+   selector) — bare `🗓` renders as a narrow text glyph and shifts the whole row left by
+   a column. When adding a marker, verify it's wide (most are; the spiral-calendar is the
+   one that needs the selector).
 
 ### Surfacing status in conversation
 
@@ -332,11 +356,11 @@ _Snapshot · <date>_
 
 ## Backlog
 
-<!-- Stub = one line (`🗓 headline — hook`). Add a ≤4-line indented body only when needed.
+<!-- Stub = one line (`🗓️ headline — hook`). Add a ≤4-line indented body only when needed.
      Link out (→ features/ or exploration) when the item has a real home. -->
 
-- 🗓 <deferred-work headline> — <½-line hook>
-- 🗓 <bigger item> — <hook> → [`features/<slug>.md`](./features/<slug>.md)
+- 🗓️ <deferred-work headline> — <½-line hook>
+- 🗓️ <bigger item> — <hook> → [`features/<slug>.md`](./features/<slug>.md)
 ```
 
 ### `plans/LOG.md`
@@ -355,7 +379,7 @@ _Snapshot · <date>_
 ## 2026-05-21
 - Did: <thing>
 - 💡 Learned: <thing>
-- 🗓 Deferred: <thing>
+- 🗓️ Deferred: <thing>
 - 👉 Next: <thing>
 ```
 
