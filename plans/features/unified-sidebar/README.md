@@ -167,10 +167,21 @@ restart**; `start(initialEntry:)` resolves the shared `detectorID` on camera sta
 `@MainActor` → race-free. Min-confidence already applied via the overlay (P3 step 1).
 Fixes **A3**. Build-only — on-device camera smoke owed.
 
-### P5 — Simplify
-One enum-routed importer pattern across all pages; collapse the picker / importer
-duplication. **Deferred to backlog** (explicitly *not* this milestone): a generic
-`RecentImages` / `RecentVideos` base, and any playback / image coordinator merge.
+### P5 — Simplify  ✅ shipped (🔀 on `m9-unified-shell` · `601c70b`)
+One `enum ImportTarget { video, image, model }` + a single `.fileImporting` modifier
+replaced two parallel importer modifiers over five `@State` flags (~−67 lines). The iOS
+`DocumentPicker` vs macOS `.fileImporter` seam is kept on purpose (DocumentPicker
+preserves the security-scoped URL so MRU bookmarks survive relaunch); only the dispatch
+unified. **Deferred to backlog** (untouched, as planned): a generic `RecentImages` /
+`RecentVideos` base, and any playback / image coordinator merge.
+
+---
+
+**M9 status: feature-complete (all 5 phases 🔀 on `m9-unified-shell`, both schemes green).**
+Gating caveat: the P3 shell + P4 live Capture are **build-verified only** (headless; the
+iOS sim has no camera). An on-device/hands-on smoke (macOS + iPhone/iPad) is **owed before
+merge to `main`**; `main` is the deliberate gate. Restored macOS dataset Export/Reveal
+(`871648f`) + sidebar visual polish (`56039f8`) also landed on the branch.
 
 ## Leave alone
 
