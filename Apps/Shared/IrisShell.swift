@@ -419,8 +419,43 @@ struct IrisShell: View {
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
         #if os(iOS)
-        // Compact: a sidebar drawer toggle (top-left) when collapsed.
+        // Compact (iPhone): an explicit sidebar drawer toggle, top-left. At
+        // regular width NavigationSplitView already shows its own column
+        // control, so the explicit toggle is compact-only.
+        ToolbarItem(placement: .topBarLeading) {
+            if !isRegularWidth {
+                Button {
+                    withAnimation {
+                        columnVisibility =
+                            columnVisibility == .detailOnly ? .all : .detailOnly
+                    }
+                } label: {
+                    Label("Toggle sidebar", systemImage: "sidebar.leading")
+                }
+                .accessibilityLabel("Toggle sidebar")
+            }
+        }
         #endif
+
+        // Bookmark affordance, top-right of the detail on EVERY size class
+        // (M9·P3 mock). Toggles the current playback frame's flag — the
+        // toolbar sibling of the on-frame FlagButton. Shown on the playback
+        // page once a flagging asset is loaded.
+        ToolbarItem(placement: .primaryAction) {
+            if page == .playback, let flaggingModel, flaggingModel.asset != nil {
+                Button {
+                    flaggingModel.toggleCurrent()
+                } label: {
+                    Label(
+                        "Flag frame",
+                        systemImage: flaggingModel.isCurrentFlagged() ? "bookmark.fill" : "bookmark"
+                    )
+                }
+                .help("Flag / unflag the current frame")
+                .accessibilityLabel("Flag frame")
+            }
+        }
+
         ToolbarItem(placement: .primaryAction) {
             Button {
                 if isRegularWidth {
