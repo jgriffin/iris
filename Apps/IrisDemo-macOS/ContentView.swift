@@ -55,8 +55,31 @@ struct ContentView: View {
     /// loop-respawn dance, which the single-iteration `AsyncStream` made
     /// non-functional — see `PlaybackDetectionCoordinator`).
     @State private var coordinator = PlaybackDetectionCoordinator()
-    @State private var showFilePicker = false
+
+    /// The file importer currently presented, if any. Routed through a single
+    /// enum-driven `.fileImporter(isPresented:)` rather than two stacked
+    /// `.fileImporter(isPresented:)` modifiers: SwiftUI honors only ONE
+    /// `isPresented` importer per view, so a second stacked importer silently
+    /// never presented (the "Load model… does nothing" bug). One enum-routed
+    /// importer whose `allowedContentTypes` + completion switch on the active
+    /// case fixes that. Mirrors the iOS `ImageContentView.ActiveSheet` pattern.
+    @State private var activeImporter: ActiveImporter?
     @State private var errorText: String?
+
+    /// The two on-the-root-view importers, collapsed into one routed importer.
+    /// (The Images-mode image importer lives on the images sidebar — a separate
+    /// view — so it doesn't collide and is intentionally not part of this enum.)
+    private enum ActiveImporter: String, Identifiable {
+        case movie, model
+        var id: String { rawValue }
+
+        var contentTypes: [UTType] {
+            switch self {
+            case .movie: return ContentView.movieContentTypes
+            case .model: return ContentView.modelContentTypes
+            }
+        }
+    }
 
     /// M7·P2: flagging. One `FlaggingModel` wired to the coordinator (which
     /// conforms to `FlaggingSource`) over a `FlagStore` rooted at the app's
@@ -84,9 +107,6 @@ struct ContentView: View {
     /// M6·P3: holds the bundled-model warm-up cache + the file-picked detector.
     /// `@Observable` so the picker re-renders when the custom slot loads.
     @State private var modelStore = DemoModelStore()
-
-    /// M6·P3: presents the Core ML model importer (`.mlpackage` / `.mlmodel`).
-    @State private var showModelPicker = false
 
     /// FIX 3 (macOS only): the sidebar row currently highlighted by the
     /// `List(selection:)` binding. Arrow keys move this highlight WITHOUT
@@ -343,7 +363,7 @@ struct ContentView: View {
             {
                 ToolbarItem(placement: .navigation) {
                     Button {
-                        showModelPicker = true
+                        activeImporter = .model
                     } label: {
                         Label("Load model…", systemImage: "square.and.arrow.down")
                     }
@@ -367,7 +387,7 @@ struct ContentView: View {
             if selectedDetectorID == DemoCatalog.customEntryID,
                 modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
             {
-                showModelPicker = true
+                activeImporter = .model
             }
             // Remember + float the selection so it leads the picker next time
             // and becomes the launch default.
@@ -412,39 +432,40 @@ struct ContentView: View {
             }
             await modelStore.prewarmBundledModels()
         }
+        // M9·P1·A1: a SINGLE enum-routed importer for both the movie and the
+        // Core ML model picks. `allowedContentTypes` + the completion switch on
+        // `activeImporter`, so whichever case is set is the one that presents —
+        // SwiftUI only honors one `.fileImporter(isPresented:)` per view, and the
+        // old two-stacked form meant the model picker silently never presented.
         .fileImporter(
-            isPresented: $showFilePicker,
-            allowedContentTypes: Self.movieContentTypes,
+            isPresented: Binding(
+                get: { activeImporter != nil },
+                set: { if !$0 { activeImporter = nil } }
+            ),
+            allowedContentTypes: activeImporter?.contentTypes ?? [],
             allowsMultipleSelection: false
         ) { result in
+            let importer = activeImporter
+            activeImporter = nil
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                swapToExternal(url: url)
+                switch importer {
+                case .movie:
+                    swapToExternal(url: url)
+                case .model:
+                    // M6·P3: load + prewarm via the store, then re-select the
+                    // custom entry so the existing swap flow runs the new model.
+                    loadPickedModel(at: url)
+                case nil:
+                    break
+                }
             case .failure(let error):
+                let what = importer == .model ? "model" : "file"
                 Logger.demo.error(
-                    "file picker failed: \(error.localizedDescription, privacy: .public)"
+                    "\(what, privacy: .public) picker failed: \(error.localizedDescription, privacy: .public)"
                 )
-                errorText = "Could not open file: \(error.localizedDescription)"
-            }
-        }
-        // M6·P3: Core ML model importer. On pick, load + prewarm via the store,
-        // then re-select the custom entry so the existing swap flow runs the
-        // freshly-loaded detector.
-        .fileImporter(
-            isPresented: $showModelPicker,
-            allowedContentTypes: Self.modelContentTypes,
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                loadPickedModel(at: url)
-            case .failure(let error):
-                Logger.demo.error(
-                    "model picker failed: \(error.localizedDescription, privacy: .public)"
-                )
-                errorText = "Could not open model: \(error.localizedDescription)"
+                errorText = "Could not open \(what): \(error.localizedDescription)"
             }
         }
         // Tear down the active session when the view disappears so the
@@ -507,7 +528,7 @@ struct ContentView: View {
             // bordered-prominent, at the very top of the sidebar — replacing
             // both the old icon-only header button and the bottom-bar button.
             Button {
-                showFilePicker = true
+                activeImporter = .movie
             } label: {
                 Label("Open Video…", systemImage: "folder.badge.plus")
                     .frame(maxWidth: .infinity)
@@ -884,7 +905,7 @@ struct ContentView: View {
                 Text("Open a video file to start.")
                     .foregroundStyle(.secondary)
             }
-            Button("Open Video…") { showFilePicker = true }
+            Button("Open Video…") { activeImporter = .movie }
                 .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1242,7 +1263,7 @@ extension ContentView {
             if imageSelectedDetectorID == DemoCatalog.customEntryID,
                 modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
             {
-                showModelPicker = true
+                activeImporter = .model
             }
             recentDetectors.addOrPromote(id: imageSelectedDetectorID)
             selectImageDetector()
