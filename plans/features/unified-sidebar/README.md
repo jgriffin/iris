@@ -146,11 +146,18 @@ directly, with no environment hop.
   what removes A4/A7); **Capture's camera start/teardown keys off active-page selection**
   (not view-disappear) to preserve the documented AVFoundation safety.
 
-**Phasing** (mergeable sub-steps on `m9-unified-shell`): **(1)** ✅ render-time confidence
-filter — `[Detection].filtered(minConfidence:)` + `DetectionLayer` floor + 6 tests (262 green) +
-working slider, `4c970b7` → **(2)** scaffold the shared shell on macOS ← next → **(3)** extract
-shared detail views → **(4)** move iOS onto the shell → **(5)** retire `InspectorHandoff` →
-**(6)** iPhone bottom-sheet reflow.
+**Phasing** (mergeable sub-steps on `m9-unified-shell`) — **all 6 shipped, both schemes build green
+(build-only; hands-on smoke owed):** **(1)** ✅ render-time confidence filter (`4c970b7`) → **(2)** ✅
+shared shell scaffold on macOS (`cf22a0b`) → **(3)** ✅ extract `PlaybackDetailView`/`CaptureDetailView`
+(`05ffad4`) → **(4)** ✅ iOS onto the shell, retire `TabView` (`a8c1730`) → **(5)** ✅ retire
+`InspectorHandoff`, direct freeze-from-live (`3392e4a`) → **(6)** ✅ iPhone drawer + bottom-sheet
+inspector (`9b56245`).
+
+**🚩 Regression to settle:** step 2 turned the working macOS dataset footer (`Export now`/`Reveal in
+Finder`) into a disabled stub — over-read the "reserved-but-deferred DATASET slot" (that was about not
+*adding* sidebar export, not removing the macOS export that worked). Recommend restoring. **P4 seam:**
+Capture detector still hardcoded to Vision rectangles; `CaptureModel.updateDetector(for:)` is a no-op
+hook left for P4.
 
 ### P4 — Capture joins the shared model
 Capture is today **hardcoded to Vision rectangles with no picker**
