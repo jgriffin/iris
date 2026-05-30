@@ -84,12 +84,25 @@ public struct DetectionLayer: View {
     /// in `lookup(at:)` is drawn unfiltered.
     public let tuning: (any TuningRouter)?
 
+    /// Render-time minimum-confidence floor (M9·P3). A global, draw-time
+    /// **overlay filter**: only detections with `confidence >= minConfidence`
+    /// are drawn. This is distinct from detector settings — it changes what
+    /// the overlay *draws*, never what the detector *emits*, and never touches
+    /// the raw-data inspector (`DetectionInspector`), which stays unfiltered.
+    ///
+    /// Default `0` keeps every detection (behavior-neutral until a caller
+    /// passes a value). The filter is universal and honest across detectors:
+    /// Vision rectangles stamp `confidence == 1.0`, so any floor `< 1.0` shows
+    /// them all; detectors that emit real scores (e.g. YOLO) feel the floor.
+    public let minConfidence: Float
+
     public init(
         store: ResultStore,
         makeConverter: @escaping @Sendable (CGSize) -> any NormalizedGeometryConverting,
         style: OverlayStyle = .default,
         stalenessThreshold: CMTime? = nil,
         tuning: (any TuningRouter)? = nil,
+        minConfidence: Float = 0,
         displayTimeSource: @Sendable @escaping () -> CMTime = {
             CMClockGetTime(CMClockGetHostTimeClock())
         }
@@ -99,6 +112,7 @@ public struct DetectionLayer: View {
         self.style = style
         self.stalenessThreshold = stalenessThreshold
         self.tuning = tuning
+        self.minConfidence = minConfidence
         self.displayTimeSource = displayTimeSource
     }
 
@@ -112,7 +126,11 @@ public struct DetectionLayer: View {
             TimelineView(.animation(minimumInterval: 1.0 / 60)) { _ in
                 let displayTime = displayTimeSource()
                 let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
-                let detections = Self.applyTransform(tuning?.transform, to: raw)
+                let transformed = Self.applyTransform(tuning?.transform, to: raw)
+                // Render-time overlay floor (M9·P3): draw only what clears
+                // `minConfidence`. The raw-data inspector reads the store
+                // directly and is NOT subject to this filter.
+                let detections = transformed.filtered(minConfidence: minConfidence)
 
                 Canvas { gc, _ in
                     for detection in detections {

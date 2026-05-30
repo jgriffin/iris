@@ -95,6 +95,10 @@ struct CaptureContentView: View {
     /// M8·P5: freeze-from-live conduit (injected at the root).
     @Environment(InspectorHandoff.self) private var handoff
 
+    /// The shared app-wide selection — read for its render-time
+    /// `minConfidence` overlay floor (M9·P3). Injected at the app root.
+    @Environment(ModelSelection.self) private var modelSelection
+
     /// Whether this environment has a video capture device at all. `nil` on the
     /// iOS Simulator and Mac (Designed for iPad) — both lack camera hardware.
     /// One runtime check covers `#if targetEnvironment(simulator)` *and*
@@ -125,7 +129,11 @@ struct CaptureContentView: View {
                         store: resultStore,
                         // Capture: AVF owns the geometry off the live preview
                         // layer, so the measured size is ignored.
-                        makeConverter: { _ in converter }
+                        makeConverter: { _ in converter },
+                        // M9·P3: render-time overlay floor. Reading the observed
+                        // `modelSelection.minConfidence` re-runs this body when
+                        // the slider moves (pure draw-time filter, no re-detect).
+                        minConfidence: Float(modelSelection.minConfidence)
                     )
                     .ignoresSafeArea()
                 }
@@ -713,6 +721,27 @@ struct PlaybackContentView: View {
                 .controlSize(.small)
             }
 
+            // M9·P3: global render-time min-confidence floor. A draw-time
+            // OVERLAY filter (what gets drawn), distinct from the detector
+            // Tune sheet (what the detector emits). Drives the shared
+            // `ModelSelection`, so playback / capture / image overlays honor it.
+            // TODO(M9·P3): relocates to the sidebar MODEL section.
+            HStack(spacing: 8) {
+                Text("Min confidence")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: $modelSelection.minConfidence,
+                    in: 0...1,
+                    step: 0.05
+                )
+                .accessibilityLabel("Minimum confidence")
+                Text(String(format: "%.2f", modelSelection.minConfidence))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+            }
+
             customModelRow
         }
         .padding(.horizontal, 12)
@@ -894,6 +923,11 @@ struct PlaybackContentView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
+                // M9·P3: render-time overlay floor. Reading the observed
+                // `modelSelection.minConfidence` re-runs this body when the
+                // slider moves; the overlay re-filters on the next animation
+                // tick even while paused (pure draw-time filter, no re-detect).
+                minConfidence: Float(modelSelection.minConfidence),
                 displayTimeSource: { [controller] in
                     // Same MainActor draw-time guarantee as `makeConverter`.
                     MainActor.assumeIsolated { controller.currentTime }

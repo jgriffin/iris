@@ -370,6 +370,30 @@ struct ContentView: View {
                 .accessibilityLabel("Active detector")
             }
 
+            // M9·P3: global render-time min-confidence floor. A draw-time
+            // OVERLAY filter (what gets drawn), distinct from the detector
+            // Tune sheet (what the detector emits). One slider drives the
+            // shared `ModelSelection`, so both modes' overlays honor it.
+            // TODO(M9·P3): relocates to the sidebar MODEL section.
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 6) {
+                    Text("Min conf")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Slider(
+                        value: $modelSelection.minConfidence,
+                        in: 0...1,
+                        step: 0.05
+                    )
+                    .frame(width: 120)
+                    .accessibilityLabel("Minimum confidence")
+                    Text(String(format: "%.2f", modelSelection.minConfidence))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .trailing)
+                }
+            }
+
             // M6·P3: when the file-picked slot is selected and not yet loaded,
             // surface a "Load model…" toolbar button to open the Core ML
             // importer. The `.onChange(of: selectedDetectorID)` auto-open also
@@ -510,6 +534,9 @@ struct ContentView: View {
                 break
             }
         }
+        // M9·P3: inject the shared selection so the shared `ImageDetailView`
+        // can read `minConfidence` via `@Environment` (mirrors the iOS root).
+        .environment(modelSelection)
     }
 
     // MARK: - Sub-views
@@ -839,6 +866,11 @@ struct ContentView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
+                // M9·P3: render-time overlay floor. Reading the observed
+                // `modelSelection.minConfidence` re-runs this body when the
+                // slider moves; the overlay re-filters on the next animation
+                // tick even while paused (pure draw-time filter, no re-detect).
+                minConfidence: Float(modelSelection.minConfidence),
                 displayTimeSource: { [controller] in
                     // Same MainActor draw-time guarantee as `makeConverter`.
                     MainActor.assumeIsolated { controller.currentTime }

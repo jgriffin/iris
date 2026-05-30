@@ -36,6 +36,10 @@ struct ImageDetailView: View {
     @Binding var selectedDetectorID: String
     @Binding var showTuning: Bool
 
+    /// The shared app-wide selection — read for its render-time
+    /// `minConfidence` overlay floor (M9·P3). Injected at both app roots.
+    @Environment(ModelSelection.self) private var modelSelection
+
     /// Shared CoreImage context for the held-frame → `CGImage` render. Thread-
     /// safe per CoreImage's contract; reused across renders.
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -91,6 +95,11 @@ struct ImageDetailView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
+                // M9·P3: render-time overlay floor. Reading the observed
+                // `modelSelection.minConfidence` here re-runs `body` when the
+                // slider moves, so the held still re-filters live (pure draw-
+                // time filter — no re-detection).
+                minConfidence: Float(modelSelection.minConfidence),
                 displayTimeSource: { [coordinator] in
                     MainActor.assumeIsolated { coordinator.frame?.timestamp ?? .zero }
                 }
