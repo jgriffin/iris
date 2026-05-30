@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-29 · pulled forward; M8·P5/P6 shelved. Defined, awaiting go to build P1._
+_Active milestone (M9) · 2026-05-29 · pulled forward; M8·P5/P6 shelved. **P1 shipped** (🔀, unmerged on `m9-unified-shell`); **P2 next**._
 
 ## Intent
 
@@ -80,18 +80,21 @@ iPad / macOS (persistent split sidebar)        iPhone (sidebar → drawer, inspe
 
 ## Phases
 
-### P1 — Reliability quick wins
+### P1 — Reliability quick wins  ✅ shipped (🔀 unmerged on `m9-unified-shell`)
 Independent of the rework — **mergeable on its own**. Three fixes that clear standing
-debt before the shell rewrite:
-- **A1 — macOS movie + model `.fileImporter` collision.** Both importers are stacked
-  on the root view; SwiftUI honors only **one** `isPresented` importer per view, so
-  the second silently never presents (`Apps/IrisDemo-macOS/ContentView.swift:415`
-  + `:434`). Fix via **one enum-routed sheet per view** — the same pattern the iOS
-  `ImageContentView` already uses.
+debt before the shell rewrite. All three landed as separate commits; both demo schemes
+build green; the `Iris` library is untouched.
+- **A1 — macOS movie + model `.fileImporter` collision.** ✅ `ee6fd0f` — Both importers
+  were stacked on the root view; SwiftUI honors only **one** `isPresented` importer per
+  view, so the model picker silently never presented. Fixed with an `ActiveImporter`
+  enum + **one routed `.fileImporter`** (the pattern iOS `ImageContentView` uses); all
+  five trigger sites rewired.
 - **A6 — gate the Image-mode detector picker + Tune** until a frame is actually
-  loaded (no model controls over an empty canvas).
-- **A5 — bookmark-resolve logging.** Add resolve logging to the `RecentImages` /
-  `RecentVideos` bookmark paths so stale/failed resolves are diagnosable.
+  loaded. ✅ `66e2b0d` — `.disabled(coordinator.frame == nil)` on the picker + Tune in
+  shared `ImageDetailView` (covers both iOS Image tab + macOS Images mode).
+- **A5 — bookmark-resolve logging.** ✅ `7639638` — `Recent{Images,Videos}.resolve()`
+  now logs `isStale` (`.notice`/`.warning`) and elevates missing-file / unresolvable
+  cases `.debug`→`.warning` via the existing `os.Logger`.
 
 ### P2 — Shared model store (foundation)
 An app-level `@MainActor @Observable` holding `selectedDetectorID` + `minConfidence`,

@@ -18,20 +18,21 @@ _Snapshot · 2026-05-29_
 ├─ ✅ M6 — Custom models — Core ML adapter + pluggable YOLO OutputDecoder (Path A + B) + model-swap catalog/UI  ·  captioning 🚫 dropped (Foundation Models is text-only)
 ├─ ✅ M7 — Dataset — flag frames in playback → headless FrameExporter writes provenance-named PNGs (filenames are the dedup ledger; no sidecar)
 ├─ ✅ M8 — Image — run detectors on a single still + swap/compare models on it; DetectionRunner extraction + still→upright-Frame decode + one-shot ImageDetectionCoordinator + demo Image page + freeze-from-live handoff  ·  dataset tie-in 🗓 backlog (not training yet)
-└─ 📋 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)  ← next
-   ├─ 📋 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone
-   ├─ 🗓 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)
+└─ 🔀 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)  ← active
+   ├─ 🔀 P1 — reliability quick wins: macOS importer collision (A1) ✅, gate Image picker till loaded (A6) ✅, bookmark resolve logging (A5) ✅ — 3 commits on `m9-unified-shell`, both schemes green, individually mergeable
+   ├─ 📋 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)  ← next
    ├─ 🗓 P3 — left-pane shell: one cross-platform sidebar replaces iOS tabs + macOS `Videos|Images`; MODEL top, page-rows w/ inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes A4/A7; absorbs the P5 handoff conduit)
    ├─ 🗓 P4 — Capture joins the shared model: detector picker + live swap + shared confidence (fixes A3)
    └─ 🗓 P5 — simplify: one enum-routed importer pattern, collapse dup (generic MRU + coordinator-merge stay backlog)
 
-👉 next — **Start M9 — cut `m9-unified-shell` off `main`, then P1.** M8 is landed on `main` (✅). M9·P1 = three independent, individually-mergeable fixes that clear standing debt before the shell rewrite: the macOS movie+model `.fileImporter` collision (→ one enum-routed sheet), gate the Image detector picker/Tune until a frame is loaded, and bookmark-resolve logging on the MRUs. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
+👉 next — **M9·P2 — shared model store.** P1 shipped (A1/A6/A5, three commits on `m9-unified-shell`, both schemes green — unmerged, individually mergeable). P2 = the foundation: an app-level `@MainActor @Observable` holding `selectedDetectorID` + `minConfidence`, **persisted**, lifted to the app root via `.environment`, replacing the **four** independent per-page selections (iOS Playback + Image, macOS Videos + Images). Fixes A2 (Image detector silently flipping on re-appear). → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- **M9·P1 shipped** (🔀, unmerged) — A1 macOS `.fileImporter` collision → enum-routed importer; A6 gate Image picker/Tune on `coordinator.frame != nil`; A5 bookmark-resolve `.warning`/`.notice` logging on `Recent{Images,Videos}`. 3 commits on `m9-unified-shell`, both schemes green, library untouched → [LOG.md](./LOG.md) (2026-05-29)
 - **✅ = merged to its integration target; 🔀 = merge-pending** — phase→milestone branch, milestone→`main`; restores board honesty (M8 was ✅ while still unmerged) → [WORKFLOW.md](./WORKFLOW.md) §"Status trees" (2026-05-29)
 - **M9 pulled forward** as the active milestone — the unified-shell work (shared model + left-pane-driven shell) supersedes the earlier "sidebar after M8·P5/P6" sequencing → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
 - **M8 landed on `main`** (✅ — P1–P5 incl. freeze-from-live; P5 **shipped**, no longer parked); P6 dataset tie-in stays 🗓 backlog (not training yet) → [features/M8.md](./features/M8.md) (2026-05-29)
