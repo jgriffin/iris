@@ -10,13 +10,19 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-05-29 — Unified-shell milestone (M9) pulled forward as the active milestone — supersedes "sidebar after M8·P5/P6" (user)
+
+**Supersedes the same-day "Unified sidebar nav sequenced after M8·P5/P6" entry below** (annotated there). After hands-on use the user reprioritized: **freeze-from-live (M8·P5) is a thin convenience** and the **dataset tie-in (M8·P6) is premature** (not training yet). So **M8 is closed at its core (P1–P4)** — its goal (run detectors on a still + swap/compare models) shipped; **P5 is parked on branch `m8-image` (built, not merged)** and **P6 is backlogged** (both → [BOARD §Backlog](./BOARD.md)). The **shared-model + left-pane-driven shell** is taken on now as the active milestone **M9** (slug `unified-sidebar`): one shared model + min-confidence across all three modes, and a left pane that drives model selection + navigation + per-page `Open…`/`RECENT`. Phased P1 reliability quick wins → P2 shared model store → P3 left-pane shell → P4 Capture joins the shared model → P5 simplify.
+
+→ [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md)
+
 ### 2026-05-29 — Milestone naming convention (user)
 
 Milestones are identified by a **descriptive slug + a one-line description** — a bare number has no meaning on its own. **Numbers are assigned only at pickup** (active or done milestones carry one), **never reserved in advance** for penciled work; future milestones are slug-only until taken on, at which point they receive the next number. The convention lives in [`WORKFLOW.md`](./WORKFLOW.md) §"Status trees" (Rules).
 
 ### 2026-05-29 — "Unified sidebar nav" sequenced after M8·P5/P6 (user)
 
-The unified-sidebar shell is built *after* freeze-from-live (M8·P5) + the dataset tie-in (M8·P6), not before. **Accepted cost:** P5/P6 wire into the interim P4 nav, which the sidebar pass then rewrites — but both reuse coordinator / MRU plumbing that **survives the reshuffle**, so the throwaway is confined to the nav shell, not the feature work underneath. This is the first **penciled (un-numbered) milestone** under the new naming convention.
+The unified-sidebar shell is built *after* freeze-from-live (M8·P5) + the dataset tie-in (M8·P6), not before. **Accepted cost:** P5/P6 wire into the interim P4 nav, which the sidebar pass then rewrites — but both reuse coordinator / MRU plumbing that **survives the reshuffle**, so the throwaway is confined to the nav shell, not the feature work underneath. This is the first **penciled (un-numbered) milestone** under the new naming convention. **Superseded 2026-05-29** — pulled forward; see the entry above.
 
 → [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md)
 

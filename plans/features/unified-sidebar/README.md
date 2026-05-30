@@ -1,18 +1,25 @@
-# Unified sidebar nav — one cross-platform shell
+# M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Penciled — sequenced after M8·P5 (freeze-from-live) + M8·P6 (dataset tie-in). No number until taken on._
+_Active milestone (M9) · 2026-05-29 · pulled forward; M8·P5/P6 shelved. Defined, awaiting go to build P1._
 
 ## Intent
 
-Replace the two divergent demo shells with **one** custom cross-platform sidebar.
-Today iOS uses a `TabView` with `.sidebarAdaptable`; macOS uses a `Videos | Images`
-segmented picker. Both were stood up in M8·P4 as **interim nav seeds** — the iOS
-tab and the macOS mode-toggle — and were known at the time to be temporary. The
-macOS stacked-`.fileImporter` latent bug is likewise an interim seed: a symptom of
-the un-unified shell. This pass **subsumes all three** — one shell, built once,
-shared across iOS, iPadOS, and macOS, with the divergence collapsed rather than
-papered over.
+Two changes are the heart of this milestone:
+
+1. **One shared model + min-confidence across all three modes.** Today each page
+   carries its **own** `selectedDetectorID` + confidence — **four** independent
+   per-page selections that silently drift (the Image picker even flips on
+   re-appear). M9 lifts a **single** app-level model selection + one confidence
+   knob to the app root, so Playback, Image, and Capture all run the *same* model.
+2. **The left pane becomes the driver.** A single cross-platform sidebar owns
+   model selection, mode navigation, and each page's `Open…` / `RECENT` — collapsing
+   today's divergent shells (iOS `TabView` + macOS `Videos | Images` segmented
+   picker) into one. Both of those were stood up in M8·P4 as **interim nav seeds**,
+   known-temporary; this pass subsumes them rather than papering over them.
+
+The **sidebar mock below is the visual target.** One shell, built once, shared
+across iOS, iPadOS, and macOS, with the divergence collapsed rather than gated.
 
 ## Reference mockups
 
@@ -60,61 +67,81 @@ iPad / macOS (persistent split sidebar)        iPhone (sidebar → drawer, inspe
 - **Page-rows: Playback / Image / Capture.** The *active* page expands inline to
   reveal its **Open …** primary button + its **RECENT** list; inactive pages collapse
   to bare rows. Selecting a row navigates and expands it.
-- **DATASET, pinned bottom.** Export status + an **Export** button — the natural home
-  for M8·P6's dataset tie-in.
+- **DATASET, pinned bottom — reserved-but-deferred.** The mock's bottom `DATASET` /
+  `Export` strip belongs to the shelved dataset work (M8·P6, → BOARD §Backlog). The
+  shell **leaves the slot** for it rather than wiring export now.
 - **Toolbar bookmark, top-right of the detail.** The M7 flag affordance, promoted to
-  the toolbar — the natural home for M8·P5's freeze / inspect handoff.
+  the toolbar.
 - **iPad / macOS.** A persistent `NavigationSplitView` sidebar; the inspector docks
   inside the detail.
 - **iPhone.** The sidebar collapses to a drawer (top-left toggle); the inspector
   becomes a bottom sheet (`.presentationDetents` + a drag handle) carrying
   `LIVE DETECTIONS` + `METRICS`.
 
-## Architectural change (the heart of it)
+## Phases
 
-The substance of this milestone is collapsing the **four independent per-page
-`selectedDetectorID`s** + their per-page tuning into **one app-level shared model
-selection + confidence**. Today those four selections live at:
+### P1 — Reliability quick wins
+Independent of the rework — **mergeable on its own**. Three fixes that clear standing
+debt before the shell rewrite:
+- **A1 — macOS movie + model `.fileImporter` collision.** Both importers are stacked
+  on the root view; SwiftUI honors only **one** `isPresented` importer per view, so
+  the second silently never presents (`Apps/IrisDemo-macOS/ContentView.swift:415`
+  + `:434`). Fix via **one enum-routed sheet per view** — the same pattern the iOS
+  `ImageContentView` already uses.
+- **A6 — gate the Image-mode detector picker + Tune** until a frame is actually
+  loaded (no model controls over an empty canvas).
+- **A5 — bookmark-resolve logging.** Add resolve logging to the `RecentImages` /
+  `RecentVideos` bookmark paths so stale/failed resolves are diagnosable.
 
-- iOS Playback — `Apps/IrisDemo-iOS/ContentView.swift:303`
+### P2 — Shared model store (foundation)
+An app-level `@MainActor @Observable` holding `selectedDetectorID` + `minConfidence`,
+**persisted**, lifted to the app root via `.environment`. It **replaces the FOUR
+independent per-page selections**:
+- iOS Playback — `Apps/IrisDemo-iOS/ContentView.swift:~303`
 - iOS Image — `Apps/IrisDemo-iOS/ImageContentView.swift:51`
 - macOS Videos — `Apps/IrisDemo-macOS/ContentView.swift:146`
 - macOS Images — `Apps/IrisDemo-macOS/ContentView.swift:187`
 
-The global model drives **all three pages, Capture included**. Capture is today
-**hardcoded to Vision rectangles with no picker** (`Apps/IrisDemo-iOS/ContentView.swift:136`),
-so wiring the shared model through it makes **live-capture detector-swap net-new
-work pulled into this milestone**, not a free side effect. `recentDetectors` +
-`modelStore` are **already shared per-platform** (`Apps/Shared/`), so they fit the
-unified store cleanly — only the per-page selection state needs to consolidate.
+`modelStore` + `RecentDetectors` are **already shared per-platform** (`Apps/Shared/`)
+— only the *selection* lifts. Fixes **A2** (the Image detector silently flipping on
+re-appear).
 
-## Subsumes / fixes
+### P3 — Left-pane-driven shell (the heart)
+One cross-platform custom sidebar replacing the iOS `TabView` + the macOS
+`Videos | Images` segmented picker. Structure per the mock — `MODEL` section on top
+(the P2 store), page-rows (Playback / Image / Capture) with the active page's
+`Open…` / `RECENT` inline, a pinned bottom area. **The bottom `DATASET` / Export slot
+is reserved-but-deferred** — it belongs to the shelved dataset work (M8·P6), so the
+shell leaves room for it rather than wiring export now. iPad / macOS = persistent
+split + docked inspector; iPhone = sidebar → drawer + inspector → bottom sheet.
+Fixes **A4** (tab-switch reload) + **A7** (scroll reset). **Absorbs the M8·P5
+`InspectorHandoff` conduit** — one shell holding all coordinators hands frames
+directly, with no environment hop.
 
-- **The M8·P4 nav seeds** — the iOS tab and the macOS `Videos | Images` toggle. Both
-  were always interim; this pass replaces them with the unified sidebar.
-- **The macOS stacked-`.fileImporter` latent bug.** The root view stacks a movie
-  importer and a model importer; SwiftUI honors only **one** `isPresented` importer
-  per view, so the second silently never presents (`Apps/IrisDemo-macOS/ContentView.swift:415`
-  + `:434`). The unified shell gives each page (and each importer) its own node — fix
-  it as part of the reshuffle. General rule: **one presentation modifier per view.**
-- **Relates to** (does not fully close) the "shared MRU generic" backlog item — the
-  `RecentImages` / `RecentVideos` factoring. The sidebar touches that surface but
-  doesn't oblige the refactor.
+### P4 — Capture joins the shared model
+Capture is today **hardcoded to Vision rectangles with no picker**
+(`Apps/IrisDemo-iOS/ContentView.swift:136`). Give it the shared detector + a
+**live detector-swap in its frame loop** + the shared min-confidence. Fixes **A3**.
 
-## Open forks (resolve at pickup)
+### P5 — Simplify
+One enum-routed importer pattern across all pages; collapse the picker / importer
+duplication. **Deferred to backlog** (explicitly *not* this milestone): a generic
+`RecentImages` / `RecentVideos` base, and any playback / image coordinator merge.
 
-- **Where the app-level shared model state lives** — likely an `@Observable` store in
-  `Apps/Shared/`, but the exact shape is open.
-- **The Capture detector-swap mechanism** — Capture's live stream needs an in-place
-  router swap analogous to playback; pin the exact wiring at pickup.
-- **Whether per-page tuning ever diverges from the global confidence.** Today it's a
-  single global knob; the richer per-category axis is tracked separately (see the
-  "per-category tuning" backlog item) and is not assumed here.
+## Leave alone
+
+Out of scope — working and clean, don't touch:
+- **`ImageDetailView`** (shared, clean).
+- The **coordinator internals**.
+- The **`Iris` library package** — this milestone is **demo-wiring only**.
+- The **playback detail / overlay / scrubber**.
 
 ## Sequencing note
 
-Built **after** M8·P5 (freeze-from-live) and M8·P6 (dataset tie-in). Accepted cost:
-P5/P6 wire into the **interim P4 nav**, which this pass then rewrites. The trade is
-deliberate — both P5 and P6 reuse the coordinator / MRU plumbing that **survives the
-reshuffle**, so the throwaway is confined to the nav shell, not the feature work
-underneath it.
+**Pulled forward** (2026-05-29) to be the **active milestone (M9)**, ahead of where it
+was originally penciled (after M8·P5/P6). **M8 is closed at its core** — its goal
+shipped in P1–P4. **M8·P5** (freeze-from-live) is **built but shelved** (parked on
+branch `m8-image`, not merged — a thin convenience); **M8·P6** (dataset tie-in) is
+**shelved to backlog** (genuinely future — not training yet). Both moved to
+[BOARD §Backlog](../../BOARD.md). The shared-model + left-pane-driven shell supersedes
+them as what's next.

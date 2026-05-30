@@ -6,23 +6,25 @@ _Snapshot · 2026-05-29_
 
 ## Status
 
-done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tuning (P4 🚫) · M5 Honest detectors · M6 Custom models (P4 🚫) · PlaybackDetectionCoordinator (P1–P3 ✅ · P4 🗓) · Demo simulator-runnable · M7 Dataset (P1–P4 ✅)
+done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tuning (P4 🚫) · M5 Honest detectors · M6 Custom models (P4 🚫) · PlaybackDetectionCoordinator (P1–P3 ✅ · P4 🗓) · Demo simulator-runnable · M7 Dataset (P1–P4 ✅) · M8 Image (P1–P4 ✅ core; P5 🅿️ parked on `m8-image`; P6 🗓 backlog)
 
-🌱 **M8 — Image** (static-image detection; the source-agnostic decomposition's second consumer) → [features/M8.md](./features/M8.md)
-├─ ✅ P1 — `DetectionRunner` (loop-free core: cache+metrics+session-swap+per-frame `run`) in `Detection/`; playback coordinator composes it  (244 green · demos build · branch `m8-p1-detection-runner`)
-├─ ✅ P2 — image → upright `Frame`: `ImageFrameDecoder` (`Sources/Iris/Image/`, `SourceKind.image`, EXIF baked in via CoreImage `.oriented`)  (250 green · +6 tests)
-├─ ✅ P3 — `ImageDetectionCoordinator` (`@MainActor @Observable`, `Sources/Iris/Image/`): one-shot detect on load; model-swap + `.detector`-tier change re-run the held frame once; composes P1's `DetectionRunner`  (255 green · +5 lib tests · branch `m8-p1-detection-runner`)
-├─ ✅ P4 — demo Image page (iOS+macOS): shared `ImageDetailView` + `RecentImages` MRU + detector picker + tuning sheet, no scrubber; iOS tab + macOS `Videos|Images` mode (both **seeds** for the coming unified-sidebar pass)  (both schemes green · 255 lib tests)
-├─ ✅ P5 — freeze-from-live: "Inspect frame" freezes the visible `Frame` → Image page on the **same detector** (iOS playback+capture, macOS playback); `PlaybackDetectionCoordinator.currentFrame` + `InspectorHandoff` conduit (interim — sidebar subsumes)  (256 green · both schemes build · branch `m8-p1-detection-runner`)
-└─ 🗓 P6 — dataset tie-in: image-shaped `AssetFingerprint` (no `durationSeconds`) + PTS/seek-free `FlaggingSource` + flag→PNG export  ← here
+🌱 **M9 — Unified shell** (one shared model + a left pane that drives Playback/Image/Capture; sidebar-driven; simplify) → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
+├─ 🗓 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone  ← here
+├─ 🗓 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)
+├─ 🗓 P3 — left-pane shell: one cross-platform sidebar replaces iOS tabs + macOS `Videos|Images`; MODEL top, page-rows w/ inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes A4/A7; absorbs the P5 handoff conduit)
+├─ 🗓 P4 — Capture joins the shared model: detector picker + live swap + shared confidence (fixes A3)
+└─ 🗓 P5 — simplify: one enum-routed importer pattern, collapse dup (generic MRU + coordinator-merge stay backlog)
 
-👉 next — **M8·P6 — dataset tie-in.** The last M8 phase: an image-shaped `AssetFingerprint` (drop `durationSeconds`; keep `byteSize` + head-hash), a PTS/seek-free `FlaggingSource` path for a single still, and a flag→**provenance-named PNG** export deduped by filename (M7's "filenames are the ledger" doctrine, [[dataset-filenames-are-the-ledger]]). One Open to settle: shared-vs-sibling `AssetFingerprint`. Acceptance: flag an analyzed image → it exports as a provenance-named PNG into the dataset. → [features/M8.md](./features/M8.md) · [LOG.md](./LOG.md)
+👉 next — **M9·P1 — reliability quick wins.** Defined, awaiting go to build. Three independent fixes that clear standing debt before the rework: the macOS movie+model `.fileImporter` collision (→ one enum-routed sheet), gate the Image detector picker/Tune until a frame is loaded, and add bookmark-resolve logging to the MRUs. Mergeable on its own. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- **M9 pulled forward** as the active milestone — the unified-shell work (shared model + left-pane-driven shell) supersedes the earlier "sidebar after M8·P5/P6" sequencing → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
+- **M8 closed at core** (P1–P4 ✅): P5 freeze-from-live **parked** on `m8-image` (thin convenience, not merged), P6 dataset tie-in **backlogged** (premature — not training yet) → [features/M8.md](./features/M8.md) (2026-05-29)
+- UI-reliability **audit done** → M9 phased **P1–P5**: P1 reliability quick wins · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
 - Milestone naming: descriptive slug + one-liner; numbers assigned at pickup only, never reserved for penciled work → [WORKFLOW.md](./WORKFLOW.md) / [DECISIONS.md](./DECISIONS.md) (2026-05-29)
 - "Unified sidebar nav" penciled after M8·P5/P6; built on near-final nav not the interim P4 seeds (accepted: P5/P6 wire into interim nav) → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
 - Sidebar's global MODEL = app-level shared detector + confidence across all 3 pages incl. Capture ⇒ live-capture detector-swap in scope → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) (2026-05-29)
@@ -55,8 +57,8 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 - **M5 — Honest detectors** — per-detector capability model driving derived tuning UI + capability-honest overlays + a raw-data inspector. → [features/M5-honest-detectors.md](./features/M5-honest-detectors.md)
 - **M6 — Custom models** — Core ML adapter with a pluggable YOLO-style `OutputDecoder`; model-swap UI. (Captioning dropped — Foundation Models is text-only.) → [features/M6.md](./features/M6.md)
 - **M7 — Dataset** — `IrisDataset`: flag frames during playback → extract as provenance-bearing images (filenames are the dedup ledger; no sidecar); training-format export deferred. → [features/M7.md](./features/M7.md)
-- **M8 — Image** — run detectors on a single static image (captured/playback frame, screenshot, any still) + swap/compare models on that one image; `Sources/Iris/Image/` + a demo Image page; triggers the source-agnostic `DetectionRunner` extraction. → [features/M8.md](./features/M8.md)
-- **Unified sidebar nav** *(penciled — after M8·P5/P6)* — one cross-platform sidebar replacing the iOS tab + macOS `Videos|Images` toggle: a global MODEL section (shared detector + confidence across all pages, incl. Capture's new detector-swap), page-rows (Playback / Image / Capture) where the active page expands to its Open… + RECENT, pinned Dataset/Export, a toolbar bookmark; iPhone collapses the sidebar to a drawer + the inspector to a bottom sheet. Subsumes the P4 nav seeds + the macOS stacked-importer bug. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
+- **M8 — Image** *(closed at core; P5/P6 → backlog)* — run detectors on a single static image (captured/playback frame, screenshot, any still) + swap/compare models on that one image; `Sources/Iris/Image/` + a demo Image page; triggers the source-agnostic `DetectionRunner` extraction. → [features/M8.md](./features/M8.md)
+- **M9 — Unified shell** — one shared model + a left pane that drives the modes; one cross-platform sidebar replaces the iOS tabs + macOS `Videos|Images` toggle (global MODEL section shared across Playback / Image / Capture incl. Capture's new detector-swap, page-rows with inline Open…/RECENT, iPhone drawer + bottom-sheet inspector); folds in the reliability fixes. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
 
 ## Backlog
 
@@ -65,7 +67,9 @@ The roadmap legend — one line per milestone, what it delivers. State lives in 
 
 - 🗓 Adopt git workflow policy — branching + auto-commit + merge cadence into `WORKFLOW.md` (the portable lead doc), CLAUDE.md pointer, branch rename.
       The assistant's "commit only when asked" is a **harness default** (+ the intent-guard hook), opposite the user's want: proactive commits, milestone (`mN-<slug>`) + phase (`mN-pX-<slug>`) branches, readiness-gated merges, human out of the loop; `main` the one deliberate gate. Single home = `WORKFLOW.md §Branching & commits`; one open fork (main-merge autonomy). → [features/workflow-git-policy.md](./features/workflow-git-policy.md) (user, 2026-05-29)
-- 🗓 Shared MRU generic — `RecentImages` and `RecentVideos` are near-identical bookmark-backed UserDefaults MRUs; factor a common base. Deliberate siblings for now (M8·P4). Also: `RecentImages` is untested (`Apps/Shared/` test-reachability deferral, as with `RecentVideos`), and macOS custom-model-in-image-mode re-selects the *playback* detector id (minor). (Touched by the unified-sidebar milestone, not closed by it.) (M8·P4, 2026-05-29)
+- 🗓 M8·P5 freeze-from-live — built but parked on `m8-image` (not merged); a thin convenience, revisit only if a real need appears. → [features/M8.md](./features/M8.md)
+- 🗓 M8·P6 dataset tie-in — flag→PNG export + image-shaped `AssetFingerprint`; genuinely future (not training yet). → [features/M8.md](./features/M8.md)
+- 🗓 Shared MRU generic — `RecentImages` and `RecentVideos` are near-identical bookmark-backed UserDefaults MRUs; factor a common base. Deliberate siblings for now (M8·P4). Also: `RecentImages` is untested (`Apps/Shared/` test-reachability deferral, as with `RecentVideos`), and macOS custom-model-in-image-mode re-selects the *playback* detector id (minor). (Touched by the unified-sidebar milestone, not closed by it; deferred from M9·P5.) (M8·P4, 2026-05-29)
 - 🗓 Per-category tuning — per-class confidence thresholds + per-class hide/show, independent of the global confidence knob.
       e.g. turn `person` off entirely while tuning `sports ball` confidence on its own. Bigger effort: extends `IrisTuning`'s settings from a single global confidence to a per-label map; needs the derived-tuning UI (M4 surface) to expose per-class rows + the overlay/filter to honor per-class threshold **and** visibility. Likely an M4-family follow-on / candidate milestone. → [features/M4.md](./features/M4.md) (user, 2026-05-29)
 - 🗓 Offline file-reader pre-pass — pre-computed detection tracks for smooth playback; an `AVAssetReader`-backed offline pass that decodes a file frame-by-frame, runs the detector over every frame, and caches the full `[Detection]` track.

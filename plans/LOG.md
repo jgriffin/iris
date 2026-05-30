@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M8 — Image defined** (static-image detection; M1–M7 + the two sub-tracks all ✅). Run detectors on a single still + swap/compare models in that one world. The pipeline+overlay are already source-agnostic; only `PlaybackDetectionCoordinator`+`Scrubber`+`FlaggingSource` are PTS-coupled. 6 phases (P1 `DetectionRunner` extraction · P2 image→`Frame` · P3 `ImageDetectionCoordinator` · P4 demo Image page · P5 freeze-from-live · P6 dataset tie-in); 5 forks settled (one-shot not stream; full `DetectionRunner` extraction resolves the source-agnostic-decomposition question; `Sources/Iris/Image/`; freeze-from-live in; dataset tie-in in).
-👉 Next: **M8·P1 — extract `DetectionRunner`** (source-agnostic core out of `PlaybackDetectionCoordinator` into `Detection/`, recompose playback). Pure refactor — keep 244 green. → [`BOARD.md`](./BOARD.md)
+🌱 **M9 — Unified shell defined** (M8 closed at core P1–P4 ✅; P5 🅿️ parked on `m8-image`, P6 🗓 backlog). One shared model + min-confidence across all three modes + a left pane that drives model selection / navigation / per-page Open…/RECENT — collapsing the iOS tabs + macOS `Videos|Images` toggle. 5 phases (P1 reliability quick wins · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify); demo-wiring only — the `Iris` library is left alone.
+👉 Next: **M9·P1 — reliability quick wins** (macOS importer collision A1, gate Image picker till loaded A6, bookmark resolve logging A5; independent, mergeable alone). Defined, awaiting go to build. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -724,3 +724,15 @@
 - Notes: the conduit + tab-switch wiring is **interim** (flagged in-code) — the unified-sidebar pass subsumes it. iOS overlay cluster un-gated from `flaggingModel` so Inspect shows before the lazy flagging build finishes. Inspect promotes the chosen detector into the `RecentDetectors` MRU (acts like an explicit selection). Build-env note: the schemes accept the **iOS 26.5 / iPhone 17** sim family (installed iPhone 16 sims are an older runtime).
 - On branch `m8-p1-detection-runner`; **not committed**.
 - 👉 Next: **M8·P6 — dataset tie-in** — image-shaped `AssetFingerprint` (drop `durationSeconds`; keep `byteSize` + head-hash) + a PTS/seek-free `FlaggingSource` path for a single still + flag→provenance-named-PNG export (filenames are the ledger). → [`BOARD.md`](./BOARD.md)
+
+---
+
+## 2026-05-29 (cont.) — plan: shelve M8·P5/P6, close M8 at core, pull the unified shell forward as M9 (docs only)
+
+- Did: ran a **UI-reliability audit** of the three demo modes (Group A bugs A1–A7 + Group B rework). The user reprioritized off the back of it.
+- Did: **shelved M8·P5/P6.** P5 (freeze-from-live) is a **thin convenience** — built, but **parked on branch `m8-image`, not merged**. P6 (dataset tie-in) is **premature** — the user isn't training yet. Both moved to [`BOARD.md`](./BOARD.md) §Backlog (each links back to [`features/M8.md`](./features/M8.md)).
+- Did: **closed M8 at its core (P1–P4).** Its goal — run detectors on a still + swap/compare models — shipped in P1–P4 ([`features/M8.md`](./features/M8.md) gained a `## Closeout` section; header status line updated).
+- Did: **pulled the unified-shell work forward as the active milestone — M9** (slug `unified-sidebar`, title *"Unified shell — one shared model + a left pane that drives the modes"*), superseding the earlier "sidebar sequenced after M8·P5/P6" call. Defined **M9 = P1 reliability quick wins → P2 shared model store → P3 left-pane shell → P4 Capture joins → P5 simplify** (the generic MRU + any coordinator merge stay backlog). The two intent leads: (1) **one shared model + min-confidence across all three modes** (today four independent per-page selections); (2) **the left pane becomes the driver** of model selection + navigation + per-page Open…/RECENT. The mock's bottom DATASET/Export is **reserved-but-deferred** (belongs to the shelved P6).
+- Did: recorded it across the board — [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md) rewritten (M9 title, active status, intent lead, **## Phases** P1–P5 with file refs, **## Leave alone**, updated sequencing note); [`DECISIONS.md`](./DECISIONS.md) gained the dated M9-pulled-forward decision + a **Superseded 2026-05-29** annotation on the prior "after M8·P5/P6" entry; [`BOARD.md`](./BOARD.md) §Status done-line + focus tree + 👉 next + "📌 recent" rewritten, §Milestones legend renumbered (M9 + M8 closed-at-core note), §Backlog gained the two M8·P5/P6 stubs.
+- Note: **no code changed.** Board reset + milestone defined, awaiting go to build P1.
+- 👉 Next: **M9·P1 — reliability quick wins** (macOS importer collision A1, gate Image picker till loaded A6, bookmark resolve logging A5; independent, mergeable alone). → [`BOARD.md`](./BOARD.md)
