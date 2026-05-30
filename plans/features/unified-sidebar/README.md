@@ -146,10 +146,11 @@ directly, with no environment hop.
   what removes A4/A7); **Capture's camera start/teardown keys off active-page selection**
   (not view-disappear) to preserve the documented AVFoundation safety.
 
-**Phasing** (mergeable sub-steps on `m9-unified-shell`): **(1)** render-time confidence
-filter — library floor + fixture test + wire the slider (shippable on its own) → **(2)**
-scaffold the shared shell on macOS → **(3)** extract shared detail views → **(4)** move
-iOS onto the shell → **(5)** retire `InspectorHandoff` → **(6)** iPhone bottom-sheet reflow.
+**Phasing** (mergeable sub-steps on `m9-unified-shell`): **(1)** ✅ render-time confidence
+filter — `[Detection].filtered(minConfidence:)` + `DetectionLayer` floor + 6 tests (262 green) +
+working slider, `4c970b7` → **(2)** scaffold the shared shell on macOS ← next → **(3)** extract
+shared detail views → **(4)** move iOS onto the shell → **(5)** retire `InspectorHandoff` →
+**(6)** iPhone bottom-sheet reflow.
 
 ### P4 — Capture joins the shared model
 Capture is today **hardcoded to Vision rectangles with no picker**
