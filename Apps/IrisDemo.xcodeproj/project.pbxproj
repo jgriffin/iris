@@ -18,12 +18,10 @@
 		3B4AFC1A712C3BD55E59EFA1 /* IrisShell+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC418EF876D9969C797FC630 /* IrisShell+Image.swift */; };
 		3B7EEEF81CBDF37BE9D980B0 /* IrisShell+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45F11AAA065C45D6968914A6 /* IrisShell+Capture.swift */; };
 		3C051541C7932ABA5D2B1855 /* IrisShell+Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC418EF876D9969C797FC630 /* IrisShell+Image.swift */; };
-		3D74503E79A4EB64DA67914B /* InspectorHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */; };
 		403DFDEDE57C245F399F44F6 /* IrisShell+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D29A58F21C0D082A8654CF6 /* IrisShell+Playback.swift */; };
 		4C210257813D66A5E2B86B2C /* ModelSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81A6D4063E536AAEE6295DA /* ModelSelection.swift */; };
 		4DC54F2031F7E26755CDAFAC /* RecentDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9961361C59B68362550982 /* RecentDetectors.swift */; };
 		4F2421A9F1943FF0F9BE93C4 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 53270A4BBE94833D88339CC9 /* Iris */; };
-		5094037CE44FC52686ABC0AE /* ImageContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F665C9F11F094DF9D09ACAF2 /* ImageContentView.swift */; };
 		5C839C2E118D05A9659CA207 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A8F35B723B525FE4E3140423 /* Assets.xcassets */; };
 		73814C778A07CC69AAAD7CB9 /* IrisShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905ADD4B2443CA8E26FFF7AF /* IrisShell.swift */; };
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
@@ -42,7 +40,6 @@
 		B6D8336C0145D4260112AC42 /* RecentDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9961361C59B68362550982 /* RecentDetectors.swift */; };
 		B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
 		B7DC85A8376CDF1C7F89D0BF /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D104784A17C46A374D2684 /* DemoCatalog.swift */; };
-		B84D2FB986D9C7B7EDE06A1A /* InspectorHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */; };
 		BA3FD506AB399507A5A44E7E /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ED148A2008B84B84F3B538 /* RecentImages.swift */; };
 		BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
@@ -84,8 +81,6 @@
 		D03976040AAEAF22317D9BE0 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		DBE7BA6B4109B5C17A746975 /* IrisDemo-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "IrisDemo-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5ED148A2008B84B84F3B538 /* RecentImages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentImages.swift; sourceTree = "<group>"; };
-		F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorHandoff.swift; sourceTree = "<group>"; };
-		F665C9F11F094DF9D09ACAF2 /* ImageContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageContentView.swift; sourceTree = "<group>"; };
 		FA38233F14BA878271417160 /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
 		FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -135,7 +130,6 @@
 				20D104784A17C46A374D2684 /* DemoCatalog.swift */,
 				7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */,
 				06B5CA8EECC8F0F329079830 /* ImageDetailView.swift */,
-				F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */,
 				905ADD4B2443CA8E26FFF7AF /* IrisShell.swift */,
 				45F11AAA065C45D6968914A6 /* IrisShell+Capture.swift */,
 				BC418EF876D9969C797FC630 /* IrisShell+Image.swift */,
@@ -197,7 +191,6 @@
 			children = (
 				34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */,
 				FA38233F14BA878271417160 /* DocumentPicker.swift */,
-				F665C9F11F094DF9D09ACAF2 /* ImageContentView.swift */,
 				C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */,
 				9CB3FBD781002591A717199E /* Shared.xcconfig */,
 			);
@@ -333,7 +326,6 @@
 				B7DC85A8376CDF1C7F89D0BF /* DemoCatalog.swift in Sources */,
 				9F56A01199229165D090C641 /* FrameExportCoordinator.swift in Sources */,
 				B551021CF8D42CC6E9EFEFC7 /* ImageDetailView.swift in Sources */,
-				3D74503E79A4EB64DA67914B /* InspectorHandoff.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
 				9FE13C28D5D0F90AD7D58EA5 /* IrisShell+Capture.swift in Sources */,
 				3B4AFC1A712C3BD55E59EFA1 /* IrisShell+Image.swift in Sources */,
@@ -360,9 +352,7 @@
 				9477CA1B7D16970DE695FD66 /* DemoCatalog.swift in Sources */,
 				2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */,
 				EC36E5D49B8977203EE11812 /* FrameExportCoordinator.swift in Sources */,
-				5094037CE44FC52686ABC0AE /* ImageContentView.swift in Sources */,
 				B3431FD30DC5B1BC5B9AB237 /* ImageDetailView.swift in Sources */,
-				B84D2FB986D9C7B7EDE06A1A /* InspectorHandoff.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,
 				3B7EEEF81CBDF37BE9D980B0 /* IrisShell+Capture.swift in Sources */,
 				3C051541C7932ABA5D2B1855 /* IrisShell+Image.swift in Sources */,
