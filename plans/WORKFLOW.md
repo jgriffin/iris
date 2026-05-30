@@ -70,12 +70,12 @@ and an offer. Annotate `LOG.md` entries, `QUESTIONS.md` tags, and
 One shared vocabulary — a readiness→growth lifecycle:
 
 ```
-✏️ penciled in ──define──▶ 📋 defined ──start──▶ 🌱 in-progress ──▶ ✅ done
+✏️ penciled in ──define──▶ 📋 defined ──start──▶ 🌱 in-progress ──build done──▶ 🔀 merge-pending ──merge up──▶ ✅ done
 ```
 
 - ✏️ **penciled in** — wanted but tentative and undefined (no brief, questions open). Picking it up means **defining it first**.
 - 📋 **defined** — scoped, questions answered, ready to hand off to an agent.
-- 🌱 **in-progress** — actively growing.  ✅ **done** · ⏸ **paused** · 🚫 **abandoned**.
+- 🌱 **in-progress** — actively growing.  🔀 **merge-pending** — built, not yet merged up to its target.  ✅ **done** — merged to its integration target: a **phase** into its **milestone branch** (`mN-<slug>`), a **milestone** into **`main`**.  ⏸ **paused** · 🚫 **abandoned**.  *(The marker names merge-readiness; the branch the work sits on names the target reached.)*
 - Markers (ride alongside, not states): 👉 next · ❓ open question · ⚖️ needs decision · 💡 idea/learned · 📌 decided/answered · 👀 needs verification · ℹ️ note · 🚩 issue · 🗓 deferred.
 
 ### Focus tree
@@ -140,7 +140,12 @@ When a milestone is active, its node expands like the focus tree:
    don't append); past blocks' logged `Next:` lines are frozen history. At a
    boundary it names the **define-gate** ("define M5"), not the work.
 6. One line per item, identical every time — no horizontal stacking. Predictability
-   is the whole point.
+   is the whole point. **Completed milestones are never squashed:** even when many
+   are ✅, each keeps its own `├─ ✅ Mn — name` line in the overview tree — do NOT
+   collapse them into a single `done (all ✅) — M1 · M2 · …` summary line to "make
+   room" for the active milestone. That collapse is the recurring anti-pattern this
+   rule exists to prevent; the active milestone simply hangs as the last node and
+   expands into its phases beneath the full ✅ list.
 7. **Milestone naming.** A milestone's identity is always a *descriptive slug + a
    one-line description* — never the number alone (a bare "M9" carries no meaning
    when you read it back later). Numbers mark **execution order** and are **assigned
@@ -148,6 +153,13 @@ When a milestone is active, its node expands like the focus tree:
    carry a number. **Penciled-in / future milestones carry no number** — refer to them
    by slug (e.g. "Unified sidebar nav") until they're taken on, at which point they
    receive the next number.
+8. **Name phases, never bare numbers.** A status line must never reduce a phase to a
+   number-and-emoji code like `(P1–P3 ✅ · P4 🚫)` — ten minutes later "P4 🚫" is
+   undecodable. Fold the done phases into a plain-language summary of what the milestone
+   *delivered*, and **name every non-done phase** (🚫/🗓/🅿️/⏸) with a ≤10-word reason
+   (e.g. "captioning 🚫 dropped — Foundation Models is text-only"). The active milestone
+   still expands into named phase rows; completed milestones carry the delivery summary
+   on their one line. Condense freely — never at the cost of meaning.
 
 ### Surfacing status in conversation
 

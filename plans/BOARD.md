@@ -1,19 +1,31 @@
 <!-- The board: where work stands (Status), the path (Milestones), what's deferred (Backlog).
-     Status rewritten each block; Milestones/Backlog edited as they change. Best viewed monospace. -->
+     Status rewritten each block; Milestones/Backlog edited as they change. Best viewed monospace.
+     §Status IS the overview tree (WORKFLOW.md §"Status trees"): every completed milestone keeps its
+     OWN `├─ ✅ Mn — name` line — NEVER collapse them into a "done (all ✅) — M1 · M2 · …" one-liner
+     (Rule 6: no horizontal stacking). The active milestone is the last node, expanded inline into its
+     phase rows (the embedded focus tree). -->
 
 # Iris — Board
 _Snapshot · 2026-05-29_
 
 ## Status
 
-done (all ✅) — M1 Capture · M2 Detection+overlay · M3 Playback · M4 Tuning (P4 🚫) · M5 Honest detectors · M6 Custom models (P4 🚫) · PlaybackDetectionCoordinator (P1–P3 ✅ · P4 🗓) · Demo simulator-runnable · M7 Dataset (P1–P4 ✅) · M8 Image (P1–P4 ✅ core; P5 🅿️ parked on `m8-image`; P6 🗓 backlog)
-
-🌱 **M9 — Unified shell** (one shared model + a left pane that drives Playback/Image/Capture; sidebar-driven; simplify) → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
-├─ 🗓 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone  ← here
-├─ 🗓 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)
-├─ 🗓 P3 — left-pane shell: one cross-platform sidebar replaces iOS tabs + macOS `Videos|Images`; MODEL top, page-rows w/ inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes A4/A7; absorbs the P5 handoff conduit)
-├─ 🗓 P4 — Capture joins the shared model: detector picker + live swap + shared confidence (fixes A3)
-└─ 🗓 P5 — simplify: one enum-routed importer pattern, collapse dup (generic MRU + coordinator-merge stay backlog)
+├─ ✅ M1 — Capture core — IrisCapture + CameraPreview view + AsyncStream<Frame> (iOS-only)
+├─ ✅ M2 — Detection + overlay — Vision adapter + ResultStore + DetectionLayer overlay + coordinate converters; live iOS demo
+├─ ✅ M3 — Playback — PlaybackSource video stream + seek/step controls + Scrubber UI; first macOS demo target
+├─ ✅ M4 — Tuning — @Observable TuningModel + TunableDetector + built-in Vision tuning UI  ·  filter-time pipeline pass 🚫 dropped (live re-run proved fast enough)
+├─ ✅ M5 — Honest detectors — per-detector capability model → derived tuning UI + capability-honest overlays + raw-data inspector
+├─ ✅ M6 — Custom models — Core ML adapter + pluggable YOLO OutputDecoder (Path A + B) + model-swap catalog/UI  ·  captioning 🚫 dropped (Foundation Models is text-only)
+├─ ✅ M7 — Dataset — flag frames in playback → headless FrameExporter writes provenance-named PNGs (filenames are the dedup ledger; no sidecar)
+├─ 🔀 M8 — Image — run detectors on one still + swap/compare models on it  ·  done on branch m8-image, awaiting merge to main
+│     ✅ DetectionRunner extraction · ✅ still→upright-Frame decode · ✅ one-shot ImageDetectionCoordinator · ✅ demo Image page
+│     🅿️ freeze-from-live — parked (thin convenience) · 🗓 dataset tie-in — backlog (not training yet)
+└─ 🌱 M9 — Unified shell — one shared model + a left pane that drives Playback/Image/Capture → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md)
+   ├─ 🗓 P1 — reliability quick wins: macOS importer collision (A1), gate Image picker till loaded (A6), bookmark resolve logging (A5) — independent, mergeable alone  ← here
+   ├─ 🗓 P2 — shared model store: one app-level `@Observable` detector + min-confidence at the root, replacing the 4 per-page selections (fixes A2)
+   ├─ 🗓 P3 — left-pane shell: one cross-platform sidebar replaces iOS tabs + macOS `Videos|Images`; MODEL top, page-rows w/ inline Open…/RECENT, iPhone drawer + bottom-sheet inspector (fixes A4/A7; absorbs the P5 handoff conduit)
+   ├─ 🗓 P4 — Capture joins the shared model: detector picker + live swap + shared confidence (fixes A3)
+   └─ 🗓 P5 — simplify: one enum-routed importer pattern, collapse dup (generic MRU + coordinator-merge stay backlog)
 
 👉 next — **M9·P1 — reliability quick wins.** Defined, awaiting go to build. Three independent fixes that clear standing debt before the rework: the macOS movie+model `.fileImporter` collision (→ one enum-routed sheet), gate the Image detector picker/Tune until a frame is loaded, and add bookmark-resolve logging to the MRUs. Mergeable on its own. → [features/unified-sidebar/README.md](./features/unified-sidebar/README.md) · [LOG.md](./LOG.md)
 

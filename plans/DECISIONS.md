@@ -10,6 +10,12 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-05-29 — ✅ means merged to its integration target; 🔀 is merge-pending
+
+Q: A ✅ asserts the work is merged — but merged to *where*?
+
+Doneness is **relative to level**. A **phase** is ✅ when it's merged into its **milestone branch** (`mN-<slug>`); a **milestone** is ✅ only when its branch is merged into **`main`**. Built-but-not-yet-merged-up work carries **🔀 (merge-pending)** at either level. *Where the work lives* (which branch) is the source of truth for what's reached where — the marker states merge-readiness, the branch states the target attained. This refines an earlier "nothing is done until it's on `main`" framing, which was too strong for phases. Example: M8's phases are ✅ on their milestone branch `m8-image`, but the **milestone** M8 is 🔀 until that branch lands on `main`. 🚩 stays reserved for "issue." Lifecycle + legend in [`WORKFLOW.md`](./WORKFLOW.md) §"Status trees".
+
 ### 2026-05-29 — Unified-shell milestone (M9) pulled forward as the active milestone — supersedes "sidebar after M8·P5/P6" (user)
 
 **Supersedes the same-day "Unified sidebar nav sequenced after M8·P5/P6" entry below** (annotated there). After hands-on use the user reprioritized: **freeze-from-live (M8·P5) is a thin convenience** and the **dataset tie-in (M8·P6) is premature** (not training yet). So **M8 is closed at its core (P1–P4)** — its goal (run detectors on a still + swap/compare models) shipped; **P5 is parked on branch `m8-image` (built, not merged)** and **P6 is backlogged** (both → [BOARD §Backlog](./BOARD.md)). The **shared-model + left-pane-driven shell** is taken on now as the active milestone **M9** (slug `unified-sidebar`): one shared model + min-confidence across all three modes, and a left pane that drives model selection + navigation + per-page `Open…`/`RECENT`. Phased P1 reliability quick wins → P2 shared model store → P3 left-pane shell → P4 Capture joins the shared model → P5 simplify.
