@@ -163,9 +163,29 @@ struct ContentView: View {
     // the file-picked `coreml.custom` slot is always listed (placeholder until
     // the user supplies a model).
     private var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
-    @State private var selectedDetectorID: String = "vision.rectangles"
 
-    /// Resolve the current picker selection into a catalog entry, falling back
+    /// M9·P2: the single app-level model selection, shared across BOTH modes.
+    /// Replaces the former independent `selectedDetectorID` (videos) and
+    /// `imageSelectedDetectorID` (images) — videos and images now read the SAME
+    /// detector, so switching modes carries the model with it (the intended
+    /// one-global-model collapse). macOS holds everything in one view, so this
+    /// is a `@State` accessed directly rather than injected. `minConfidence`
+    /// rides along, persisted but not yet consumed.
+    @State private var modelSelection = ModelSelection()
+
+    /// Read alias onto the shared selection's `detectorID` (videos mode).
+    private var selectedDetectorID: String { modelSelection.detectorID }
+
+    /// M9·P2: the detector id last installed into the VIDEO coordinator, so an
+    /// on-appear sync can skip a redundant re-detect when it's already on the
+    /// shared selection. The library coordinator doesn't expose its installed
+    /// entry id, so the demo tracks it here.
+    @State private var syncedVideoDetectorID: String?
+
+    /// M9·P2: the detector id last installed into the IMAGE coordinator.
+    @State private var syncedImageDetectorID: String?
+
+    /// Resolve the current shared selection into a catalog entry, falling back
     /// to the first entry. The single point where the demo turns a selection
     /// (after any custom-model load) into the `DetectorCatalogEntry` it hands
     /// the coordinator.
@@ -202,10 +222,6 @@ struct ContentView: View {
     /// MRU of recently-opened images. The image-page sibling of `recentVideos`.
     @State private var recentImages = RecentImages()
 
-    /// `.images`-mode picker selection. Independent of the playback selection so
-    /// switching modes doesn't clobber either.
-    @State private var imageSelectedDetectorID: String = "vision.rectangles"
-
     /// Whether the image-mode tuning sheet is presented.
     @State private var showImageTuning = false
 
@@ -218,11 +234,9 @@ struct ContentView: View {
     /// Last image-mode error (decode / scope), surfaced below the detail.
     @State private var imageErrorText: String?
 
-    /// Whether the image-mode launch selection has been applied once.
-    @State private var imageDidApplyLaunchSelection = false
-
     var body: some View {
-        NavigationSplitView {
+        @Bindable var modelSelection = modelSelection
+        return NavigationSplitView {
             VStack(spacing: 0) {
                 // M8·P4: top-level source-mode selector. Additive — `.videos`
                 // shows the existing playback sidebar + detail unchanged;
@@ -344,7 +358,9 @@ struct ContentView: View {
             // inspector hosts only Tuning / Live detections / Metrics; the
             // gear "Tune" toggle in `.primaryAction` opens it.
             ToolbarItem(placement: .navigation) {
-                Picker("Detector", selection: $selectedDetectorID) {
+                // M9·P2: binds to the app-level shared selection. Shown in BOTH
+                // modes — videos and images run the same detector now.
+                Picker("Detector", selection: $modelSelection.detectorID) {
                     ForEach(recentDetectors.sortedEntries(catalog)) { entry in
                         detectorRow(for: entry).tag(entry.id)
                     }
@@ -389,10 +405,14 @@ struct ContentView: View {
             {
                 activeImporter = .model
             }
-            // Remember + float the selection so it leads the picker next time
-            // and becomes the launch default.
+            // Remember + float the selection so it leads the picker next time.
             recentDetectors.addOrPromote(id: selectedDetectorID)
+            // M9·P2: ONE shared selection drives BOTH coordinators. Each
+            // `selectDetector` no-ops if its coordinator has nothing loaded, so
+            // this is safe regardless of the current mode — the inactive mode's
+            // coordinator simply has no source/frame to re-run.
             swapDetector()
+            selectImageDetector()
         }
         // M6·P3: warm the bundled Core ML models off the main actor at launch
         // so the first selection isn't a cold compile/load stall. Idempotent.
@@ -419,15 +439,15 @@ struct ContentView: View {
                 // immediately opening/playing a video (the sweep opens headless
                 // PlaybackSources). Background (scenePhase) + manual button only.
 
-                // CHANGE 2: launch selection from the detector MRU — the most
-                // recent detector that still exists in the catalog. Falls back
-                // to the catalog's first entry (preserving the prior default)
-                // when the MRU is empty or all-stale. Done once, here, so it
-                // doesn't clobber a selection the user makes mid-session.
-                if let mru = recentDetectors.firstAvailable(in: catalog) {
-                    selectedDetectorID = mru
-                } else if let first = catalog.entries.first {
-                    selectedDetectorID = first.id
+                // M9·P2: launch selection is the shared `ModelSelection`
+                // (persisted; shared across both modes) — no per-page MRU launch
+                // read. If the shared id is stale (not in this catalog), fall
+                // back to the catalog's first entry so resolve never lands on
+                // nothing. `recentDetectors` still drives picker ordering.
+                if catalog.entries.first(where: { $0.id == selectedDetectorID }) == nil,
+                    let first = catalog.entries.first
+                {
+                    modelSelection.detectorID = first.id
                 }
             }
             await modelStore.prewarmBundledModels()
@@ -591,7 +611,13 @@ struct ContentView: View {
             // CHANGE 3: dataset section pinned to the bottom of the sidebar.
             datasetSection
         }
-        .onAppear { refreshExportedFrameCount() }
+        .onAppear {
+            refreshExportedFrameCount()
+            // M9·P2: re-sync the video coordinator to the shared selection in
+            // case it changed while videos mode was off-screen (e.g. switched
+            // in images mode).
+            syncVideoCoordinatorToSharedSelection()
+        }
     }
 
     /// CHANGE 3 (macOS only): a small "Dataset" footer at the bottom of the
@@ -954,11 +980,14 @@ struct ContentView: View {
         Task {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             await modelStore.loadPickedModel(at: url)
-            // Re-select to trigger swapDetector even if already selected.
+            // Re-select to trigger the swap even if already selected. M9·P2:
+            // re-run BOTH coordinators (each no-ops if it has nothing loaded)
+            // since the shared selection drives both modes.
             if selectedDetectorID == DemoCatalog.customEntryID {
                 swapDetector()
+                selectImageDetector()
             } else {
-                selectedDetectorID = DemoCatalog.customEntryID
+                modelSelection.detectorID = DemoCatalog.customEntryID
             }
         }
     }
@@ -1010,6 +1039,7 @@ struct ContentView: View {
         self.highlightedURL = url
         self.activeLabel = url.lastPathComponent
         self.errorText = nil
+        self.syncedVideoDetectorID = entry.id
         // The overlay keys off `coordinator.controller.presentationSize` (an
         // `@Observable` on the new controller) and the SwiftUI-measured frame —
         // no `AVPlayerLayer` handle to thread across the swap.
@@ -1047,9 +1077,21 @@ struct ContentView: View {
     @MainActor
     private func swapDetector() {
         guard let entry = resolvedEntry else { return }
+        syncedVideoDetectorID = entry.id
         Task { @MainActor in
             await coordinator.selectDetector(entry)
         }
+    }
+
+    /// M9·P2: install the shared selection into the VIDEO coordinator if it
+    /// drifted while videos mode was off-screen. No-op when no source is loaded
+    /// or the coordinator is already on the shared id (guards a redundant
+    /// re-detect on every appear).
+    @MainActor
+    private func syncVideoCoordinatorToSharedSelection() {
+        guard coordinator.controller != nil, let entry = resolvedEntry else { return }
+        guard syncedVideoDetectorID != entry.id else { return }
+        swapDetector()
     }
 
     /// M8·P5: freeze the currently-visible live frame and open it in the Image
@@ -1063,14 +1105,17 @@ struct ContentView: View {
     private func inspectCurrentFrame() {
         guard let frame = coordinator.currentFrame else { return }
 
+        // M9·P2: videos and images share the SAME selection, so freezing a frame
+        // already carries the live detector into images mode — no separate
+        // picker to mirror.
         mode = .images
-        imageSelectedDetectorID = selectedDetectorID
         recentDetectors.addOrPromote(id: selectedDetectorID)
 
         let entry = catalog.entries.first(where: { $0.id == selectedDetectorID })
             ?? catalog.entries.first
         guard let entry else { return }
 
+        syncedImageDetectorID = entry.id
         Task { @MainActor in
             await imageCoordinator.setImage(frame, detector: entry)
         }
@@ -1109,10 +1154,11 @@ extension ContentView {
 
     fileprivate static let imageContentTypes: [UTType] = [.image]
 
-    /// Resolve the image-mode picker selection into a catalog entry.
+    /// Resolve the shared selection into a catalog entry for images mode.
+    /// M9·P2: images and videos share one selection, so this is the same as
+    /// `resolvedEntry` — kept as a named alias for the image-mode call sites.
     fileprivate var imageResolvedEntry: DetectorCatalogEntry? {
-        catalog.entries.first(where: { $0.id == imageSelectedDetectorID })
-            ?? catalog.entries.first
+        resolvedEntry
     }
 
     /// `.images` sidebar: "Open Image…" button + recent-images list. Mirrors the
@@ -1171,18 +1217,12 @@ extension ContentView {
                 .listStyle(.sidebar)
             }
         }
-        // Apply the launch detector selection + warm bundled models once, when
-        // the images sidebar first appears.
-        .task {
-            guard !imageDidApplyLaunchSelection else { return }
-            imageDidApplyLaunchSelection = true
-            if let mru = recentDetectors.firstAvailable(in: catalog) {
-                imageSelectedDetectorID = mru
-            } else if let first = catalog.entries.first {
-                imageSelectedDetectorID = first.id
-            }
-            await modelStore.prewarmBundledModels()
-        }
+        // M9·P2: no per-mode launch selection — images mode reads the SAME
+        // shared `ModelSelection` as videos (the root `.task` already handles
+        // the stale-id fallback + bundled-model warm-up). On appear, re-run the
+        // held image under the shared detector if it drifted while images mode
+        // was off-screen.
+        .onAppear { syncImageCoordinatorToSharedSelection() }
         // M8·P4: the image importer lives HERE, on the images sidebar — NOT
         // stacked on the root view with the movie + model importers. SwiftUI
         // honors only one `.fileImporter(isPresented:)` per view; a third stacked
@@ -1239,15 +1279,20 @@ extension ContentView {
     }
 
     /// `.images` detail: the shared `ImageDetailView` plus an inline error line.
+    /// M9·P2: the picker binds to the app-level shared selection (same one the
+    /// videos toolbar picker drives). The selection-change side effects (MRU,
+    /// custom-importer auto-open, coordinator re-run) live in the SINGLE root
+    /// `.onChange(of: selectedDetectorID)` so they aren't duplicated per mode.
     @ViewBuilder
     private var imageDetail: some View {
+        @Bindable var modelSelection = modelSelection
         VStack(spacing: 0) {
             ImageDetailView(
                 coordinator: imageCoordinator,
                 catalog: catalog,
                 recentDetectors: recentDetectors,
                 modelStore: modelStore,
-                selectedDetectorID: $imageSelectedDetectorID,
+                selectedDetectorID: $modelSelection.detectorID,
                 showTuning: $showImageTuning
             )
             if let imageErrorText {
@@ -1258,15 +1303,6 @@ extension ContentView {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 6)
             }
-        }
-        .onChange(of: imageSelectedDetectorID) {
-            if imageSelectedDetectorID == DemoCatalog.customEntryID,
-                modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
-            {
-                activeImporter = .model
-            }
-            recentDetectors.addOrPromote(id: imageSelectedDetectorID)
-            selectImageDetector()
         }
     }
 
@@ -1305,6 +1341,7 @@ extension ContentView {
         let priorScopedURL = imageScopedURL
         imageScopedURL = url
         imageErrorText = nil
+        syncedImageDetectorID = entry.id
 
         Task { @MainActor in
             await imageCoordinator.setImage(frame, detector: entry)
@@ -1318,9 +1355,21 @@ extension ContentView {
     @MainActor
     private func selectImageDetector() {
         guard let entry = imageResolvedEntry else { return }
+        syncedImageDetectorID = entry.id
         Task { @MainActor in
             await imageCoordinator.selectDetector(entry)
         }
+    }
+
+    /// M9·P2: re-run the held image under the shared selection if it drifted
+    /// while images mode was off-screen. No-op when no frame is held or the
+    /// image coordinator is already on the shared id (guards a redundant
+    /// re-detect on every appear).
+    @MainActor
+    fileprivate func syncImageCoordinatorToSharedSelection() {
+        guard imageCoordinator.frame != nil, let entry = imageResolvedEntry else { return }
+        guard syncedImageDetectorID != entry.id else { return }
+        selectImageDetector()
     }
 }
 

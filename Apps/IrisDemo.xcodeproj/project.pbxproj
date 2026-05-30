@@ -12,6 +12,7 @@
 		364F7FE5B24B9AEE305936FD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A8F35B723B525FE4E3140423 /* Assets.xcassets */; };
 		38A115C00B744C15694E392B /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ED148A2008B84B84F3B538 /* RecentImages.swift */; };
 		3D74503E79A4EB64DA67914B /* InspectorHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */; };
+		4C210257813D66A5E2B86B2C /* ModelSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81A6D4063E536AAEE6295DA /* ModelSelection.swift */; };
 		4DC54F2031F7E26755CDAFAC /* RecentDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB9961361C59B68362550982 /* RecentDetectors.swift */; };
 		4F2421A9F1943FF0F9BE93C4 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 53270A4BBE94833D88339CC9 /* Iris */; };
 		5094037CE44FC52686ABC0AE /* ImageContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F665C9F11F094DF9D09ACAF2 /* ImageContentView.swift */; };
@@ -32,6 +33,7 @@
 		BA3FD506AB399507A5A44E7E /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ED148A2008B84B84F3B538 /* RecentImages.swift */; };
 		BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8486F9C7159F774FB48A6C3B /* RecentVideos.swift */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
+		DBE304453941A6351319808F /* ModelSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81A6D4063E536AAEE6295DA /* ModelSelection.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
 		EC36E5D49B8977203EE11812 /* FrameExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */; };
 		F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */; };
@@ -51,6 +53,7 @@
 		80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */ = {isa = PBXFileReference; path = yolo12n.mlpackage; sourceTree = "<group>"; };
 		8486F9C7159F774FB48A6C3B /* RecentVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentVideos.swift; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		A81A6D4063E536AAEE6295DA /* ModelSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelection.swift; sourceTree = "<group>"; };
 		A8F35B723B525FE4E3140423 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB9961361C59B68362550982 /* RecentDetectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentDetectors.swift; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 				7E4F4E93F9ECE13493C03F33 /* FrameExportCoordinator.swift */,
 				06B5CA8EECC8F0F329079830 /* ImageDetailView.swift */,
 				F0C3023B80161B7AE3C7FC6D /* InspectorHandoff.swift */,
+				A81A6D4063E536AAEE6295DA /* ModelSelection.swift */,
 				AB9961361C59B68362550982 /* RecentDetectors.swift */,
 				E5ED148A2008B84B84F3B538 /* RecentImages.swift */,
 				8486F9C7159F774FB48A6C3B /* RecentVideos.swift */,
@@ -298,6 +302,7 @@
 				B551021CF8D42CC6E9EFEFC7 /* ImageDetailView.swift in Sources */,
 				3D74503E79A4EB64DA67914B /* InspectorHandoff.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
+				DBE304453941A6351319808F /* ModelSelection.swift in Sources */,
 				B6D8336C0145D4260112AC42 /* RecentDetectors.swift in Sources */,
 				38A115C00B744C15694E392B /* RecentImages.swift in Sources */,
 				B7A35B537A165F47414D972C /* RecentVideos.swift in Sources */,
@@ -318,6 +323,7 @@
 				B3431FD30DC5B1BC5B9AB237 /* ImageDetailView.swift in Sources */,
 				B84D2FB986D9C7B7EDE06A1A /* InspectorHandoff.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,
+				4C210257813D66A5E2B86B2C /* ModelSelection.swift in Sources */,
 				4DC54F2031F7E26755CDAFAC /* RecentDetectors.swift in Sources */,
 				BA3FD506AB399507A5A44E7E /* RecentImages.swift in Sources */,
 				BB58096C3840DD5BB14580B4 /* RecentVideos.swift in Sources */,

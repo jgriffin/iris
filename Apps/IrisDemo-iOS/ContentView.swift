@@ -33,6 +33,13 @@ struct ContentView: View {
     /// Interim nav glue — the unified-sidebar pass subsumes it.
     @State private var handoff = InspectorHandoff()
 
+    /// M9·P2: the single app-level model selection, shared across every tab.
+    /// Injected into the environment alongside the handoff; Playback and Image
+    /// read it via `@Environment(ModelSelection.self)` so they always run the
+    /// SAME detector (and so the Image tab no longer flips its detector on
+    /// re-appear). `minConfidence` rides along, persisted but not yet consumed.
+    @State private var modelSelection = ModelSelection()
+
     var body: some View {
         // Playback first ⇒ leftmost + default selection (tab order picks it).
         // `.sidebarAdaptable` renders as a bottom bar on iPhone and a left
@@ -54,6 +61,7 @@ struct ContentView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .environment(handoff)
+        .environment(modelSelection)
         // M8·P5: when a source page freezes a frame, jump to the Image tab so the
         // inspector (which consumes `handoff.request`) is on-screen. Keyed on the
         // request's token so a re-inspect of the same frame still switches tabs.
@@ -352,9 +360,26 @@ struct PlaybackContentView: View {
     // the file-picked `coreml.custom` slot is always listed (placeholder until
     // the user supplies a model).
     private var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
-    @State private var selectedDetectorID: String = "vision.rectangles"
 
-    /// Resolve the current picker selection into a catalog entry, falling back
+    /// M9·P2: the app-level shared model selection, injected at the root. The
+    /// per-page `@State selectedDetectorID` is gone — every mode binds its
+    /// picker to this single selection so Playback and Image run the SAME
+    /// detector. `selectedDetectorID` below is a read alias kept so the rest of
+    /// the file's resolve/sync logic is unchanged.
+    @Environment(ModelSelection.self) private var modelSelection
+
+    /// Read alias onto the shared selection's `detectorID`.
+    private var selectedDetectorID: String { modelSelection.detectorID }
+
+    /// M9·P2: the detector id last installed into THIS page's coordinator.
+    /// The shared `detectorID` can change while this page is off-screen, so on
+    /// appear we resolve it and install only if it drifted — this guards
+    /// against a redundant re-detect flicker when the coordinator is already on
+    /// the shared selection. The library coordinator does not expose its
+    /// installed entry id, so the demo tracks it here.
+    @State private var syncedDetectorID: String?
+
+    /// Resolve the current shared selection into a catalog entry, falling back
     /// to the first entry. The single point where the demo turns a selection
     /// (after any custom-model load) into the `DetectorCatalogEntry` it hands
     /// the coordinator.
@@ -579,16 +604,17 @@ struct PlaybackContentView: View {
                 // immediately opening/playing a video (the sweep opens headless
                 // PlaybackSources). Background (scenePhase) + manual button only.
 
-                // CHANGE 2: launch selection from the detector MRU — the most
-                // recent detector that still exists in the catalog. Falls back
-                // to the catalog's first entry (preserving the prior default)
-                // when the MRU is empty or all-stale. Gated on the same
-                // first-build guard so it runs once and doesn't clobber a
-                // mid-session selection.
-                if let mru = recentDetectors.firstAvailable(in: catalog) {
-                    selectedDetectorID = mru
-                } else if let first = catalog.entries.first {
-                    selectedDetectorID = first.id
+                // M9·P2: launch selection no longer comes from the detector MRU
+                // here — the shared `ModelSelection` persists its own
+                // `detectorID`, so it IS the launch selection (and is shared
+                // with the Image page). `recentDetectors` still drives picker
+                // ordering. If the shared id is stale (no longer in this
+                // catalog), fall back to the catalog's first entry so the
+                // resolve never lands on nothing.
+                if catalog.entries.first(where: { $0.id == selectedDetectorID }) == nil,
+                    let first = catalog.entries.first
+                {
+                    modelSelection.detectorID = first.id
                 }
             }
             // First-launch / first-appear behavior: if the user hasn't
@@ -612,11 +638,16 @@ struct PlaybackContentView: View {
             {
                 showModelPicker = true
             }
-            // Remember + float the selection so it leads the picker next time
-            // and becomes the launch default.
+            // Remember + float the selection so it leads the picker next time.
             recentDetectors.addOrPromote(id: selectedDetectorID)
             swapDetector()
         }
+        // M9·P2: the shared selection can change while this tab is off-screen
+        // (e.g. the user switches the model on the Image tab). On re-appear,
+        // resolve the shared id and install it into THIS coordinator only if it
+        // drifted from what we last installed — guarding against a redundant
+        // re-detect when the coordinator is already on the shared selection.
+        .onAppear { syncCoordinatorToSharedSelection() }
         .onDisappear {
             teardown()
         }
@@ -646,10 +677,12 @@ struct PlaybackContentView: View {
     /// they're reachable at top level without opening the sheet.
     @ViewBuilder
     private var controlBar: some View {
+        @Bindable var modelSelection = modelSelection
         VStack(spacing: 4) {
             HStack {
-                // Always-visible detector picker — leads the row.
-                Picker("Detector", selection: $selectedDetectorID) {
+                // Always-visible detector picker — leads the row. Binds to the
+                // app-level shared selection (M9·P2).
+                Picker("Detector", selection: $modelSelection.detectorID) {
                     ForEach(recentDetectors.sortedEntries(catalog)) { entry in
                         detectorRow(for: entry).tag(entry.id)
                     }
@@ -979,6 +1012,7 @@ struct PlaybackContentView: View {
 
         self.errorText = nil
         self.activeLabel = "Bundled fixture"
+        self.syncedDetectorID = entry.id
 
         let source = PlaybackSource(url: url)
         Task { @MainActor in
@@ -1041,6 +1075,7 @@ struct PlaybackContentView: View {
         self.scopedURL = url
         self.activeLabel = url.lastPathComponent
         self.errorText = nil
+        self.syncedDetectorID = entry.id
         // The overlay keys off `coordinator.controller.presentationSize` (an
         // `@Observable` on the new controller) and the SwiftUI-measured frame —
         // no `AVPlayerLayer` handle to thread across the swap.
@@ -1077,9 +1112,22 @@ struct PlaybackContentView: View {
     @MainActor
     private func swapDetector() {
         guard let entry = resolvedEntry else { return }
+        syncedDetectorID = entry.id
         Task { @MainActor in
             await coordinator.selectDetector(entry)
         }
+    }
+
+    /// M9·P2: install the shared selection into this page's coordinator if it
+    /// drifted while the page was off-screen. No-op when the coordinator is
+    /// already on the shared id (guards a redundant re-detect on every appear)
+    /// or when no source is loaded yet (the fixture/source load installs the
+    /// resolved entry itself, and sets `syncedDetectorID` via `swapDetector`).
+    @MainActor
+    private func syncCoordinatorToSharedSelection() {
+        guard coordinator.controller != nil, let entry = resolvedEntry else { return }
+        guard syncedDetectorID != entry.id else { return }
+        swapDetector()
     }
 
     /// Tear down the active playback session, then release the security scope
@@ -1149,7 +1197,7 @@ struct PlaybackContentView: View {
             if selectedDetectorID == DemoCatalog.customEntryID {
                 swapDetector()
             } else {
-                selectedDetectorID = DemoCatalog.customEntryID
+                modelSelection.detectorID = DemoCatalog.customEntryID
             }
         }
     }

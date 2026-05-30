@@ -48,7 +48,20 @@ struct ImageContentView: View {
             ?? catalog.entries.first
     }
 
-    @State private var selectedDetectorID: String = "vision.rectangles"
+    /// M9·P2: the app-level shared model selection, injected at the root. The
+    /// per-page `@State selectedDetectorID` is gone — the Image page now reads
+    /// the SAME selection as Playback, so the two always run the same detector
+    /// and the Image page no longer silently flips its detector on re-appear.
+    @Environment(ModelSelection.self) private var modelSelection
+
+    /// Read alias onto the shared selection's `detectorID`.
+    private var selectedDetectorID: String { modelSelection.detectorID }
+
+    /// M9·P2: the detector id last installed into this page's coordinator, so
+    /// an on-appear sync can skip a redundant re-detect when the coordinator is
+    /// already on the shared selection.
+    @State private var syncedDetectorID: String?
+
     @State private var showTuning = false
     @State private var errorText: String?
 
@@ -88,6 +101,7 @@ struct ImageContentView: View {
     }()
 
     var body: some View {
+        @Bindable var modelSelection = modelSelection
         NavigationStack {
             VStack(spacing: 0) {
                 ImageDetailView(
@@ -95,7 +109,7 @@ struct ImageContentView: View {
                     catalog: catalog,
                     recentDetectors: recentDetectors,
                     modelStore: modelStore,
-                    selectedDetectorID: $selectedDetectorID,
+                    selectedDetectorID: $modelSelection.detectorID,
                     showTuning: $showTuning
                 )
 
@@ -139,14 +153,15 @@ struct ImageContentView: View {
             }
         }
         .task {
-            // Launch selection from the detector MRU — the most recent detector
-            // that still exists in the catalog; fall back to the catalog's
-            // first entry. Then warm the bundled Core ML models off the main
-            // actor so the first selection isn't a cold stall.
-            if let mru = recentDetectors.firstAvailable(in: catalog) {
-                selectedDetectorID = mru
-            } else if let first = catalog.entries.first {
-                selectedDetectorID = first.id
+            // M9·P2: launch selection is the shared `ModelSelection.detectorID`
+            // (persisted + shared with Playback) — no per-page MRU launch read.
+            // If the shared id is stale (not in this catalog), fall back to the
+            // catalog's first entry so resolve never lands on nothing. Then warm
+            // the bundled Core ML models off the main actor.
+            if catalog.entries.first(where: { $0.id == selectedDetectorID }) == nil,
+                let first = catalog.entries.first
+            {
+                modelSelection.detectorID = first.id
             }
             await modelStore.prewarmBundledModels()
         }
@@ -159,6 +174,11 @@ struct ImageContentView: View {
             recentDetectors.addOrPromote(id: selectedDetectorID)
             selectDetector()
         }
+        // M9·P2: the shared selection can change while this tab is off-screen
+        // (e.g. switched on the Playback tab). On re-appear, re-run the held
+        // frame under the shared detector if it drifted from what's installed —
+        // skipping a redundant re-detect when already on the shared selection.
+        .onAppear { syncCoordinatorToSharedSelection() }
         // M8·P5: consume a freeze-from-live request. Keyed on the token so a
         // re-inspect of the same frame still fires. Runs once on appear (in case
         // the request was posted while this tab was off-screen) and on each new
@@ -253,6 +273,7 @@ struct ImageContentView: View {
         let priorScopedURL = scopedURL
         scopedURL = url
         errorText = nil
+        syncedDetectorID = entry.id
 
         Task { @MainActor in
             await coordinator.setImage(frame, detector: entry)
@@ -280,8 +301,11 @@ struct ImageContentView: View {
             ?? catalog.entries.first
         guard let entry else { return }
 
-        selectedDetectorID = entry.id
+        // M9·P2: write the live source's detector into the shared selection so
+        // the whole app (incl. Playback) reflects what the inspector ran.
+        modelSelection.detectorID = entry.id
         recentDetectors.addOrPromote(id: entry.id)
+        syncedDetectorID = entry.id
         await coordinator.setImage(request.frame, detector: entry)
 
         // Consumed — clear so a later identical inspect re-fires via a new token.
@@ -292,9 +316,22 @@ struct ImageContentView: View {
     @MainActor
     private func selectDetector() {
         guard let entry = resolvedEntry else { return }
+        syncedDetectorID = entry.id
         Task { @MainActor in
             await coordinator.selectDetector(entry)
         }
+    }
+
+    /// M9·P2: re-run the held frame under the shared selection if it drifted
+    /// while this page was off-screen. No-op when no frame is held yet (a pick
+    /// / inspect installs the resolved entry itself and sets `syncedDetectorID`)
+    /// or when the coordinator is already on the shared id (guards a redundant
+    /// re-detect on every appear).
+    @MainActor
+    private func syncCoordinatorToSharedSelection() {
+        guard coordinator.frame != nil, let entry = resolvedEntry else { return }
+        guard syncedDetectorID != entry.id else { return }
+        selectDetector()
     }
 
     /// Load a file-picked Path-A model, then re-select the custom entry so the
@@ -308,7 +345,7 @@ struct ImageContentView: View {
             if selectedDetectorID == DemoCatalog.customEntryID {
                 selectDetector()
             } else {
-                selectedDetectorID = DemoCatalog.customEntryID
+                modelSelection.detectorID = DemoCatalog.customEntryID
             }
         }
     }
