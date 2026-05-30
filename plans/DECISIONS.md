@@ -10,6 +10,22 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-05-29 — Milestone naming convention (user)
+
+Milestones are identified by a **descriptive slug + a one-line description** — a bare number has no meaning on its own. **Numbers are assigned only at pickup** (active or done milestones carry one), **never reserved in advance** for penciled work; future milestones are slug-only until taken on, at which point they receive the next number. The convention lives in [`WORKFLOW.md`](./WORKFLOW.md) §"Status trees" (Rules).
+
+### 2026-05-29 — "Unified sidebar nav" sequenced after M8·P5/P6 (user)
+
+The unified-sidebar shell is built *after* freeze-from-live (M8·P5) + the dataset tie-in (M8·P6), not before. **Accepted cost:** P5/P6 wire into the interim P4 nav, which the sidebar pass then rewrites — but both reuse coordinator / MRU plumbing that **survives the reshuffle**, so the throwaway is confined to the nav shell, not the feature work underneath. This is the first **penciled (un-numbered) milestone** under the new naming convention.
+
+→ [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md)
+
+### 2026-05-29 — Global model spans all three pages, incl. Capture (user)
+
+The sidebar's top `MODEL` section (detector picker + min-confidence) is **app-level shared state**, replacing today's **four independent per-page `selectedDetectorID`s** + per-page tuning. One model selection + one confidence knob drives **Playback, Image, and Capture**. Because Capture is currently fixed to Vision rectangles with **no picker**, this pulls **live-capture detector-swap** into the milestone as **net-new work** (not a free side effect). `recentDetectors` + `modelStore` are already shared per-platform, so they fit the unified store cleanly.
+
+→ [`features/unified-sidebar/README.md`](./features/unified-sidebar/README.md)
+
 ### 2026-05-29 — M8 — Image defined: run detectors on a single static image, swap/compare models in that one world
 
 M8 adds a **static-image** detection path: load an interesting captured/playback frame, a screen capture, or any still on disk, run Iris's detectors on it, and **swap/compare models on that one image** (defined in [`features/M8.md`](./features/M8.md)). The recurring want is the model-swap loop *over the same pixels* — a still is a fixed canvas with no time axis. **Architectural finding (up front):** the detection + overlay halves of Iris are already source-agnostic — `Frame` ([`Frame.swift`](../Sources/Iris/Frame.swift)) is pixelBuffer+timestamp+orientation+source+format+dimensions; `Detector.detect(in:)` and `DetectorPipeline.detect(in:cache:tuning:)` take one `Frame` (already one-shot-shaped); the whole overlay stack (`VideoGeometry`, `DetectionLayer`, `VideoRectAligned`, `ResultStore`) is image-agnostic via `contentSize = imageSize` + a frozen `displayTimeSource`; the model-swap machinery (`DetectorCatalog`, `DemoModelStore`, `ActiveDetectorSession`, tuning sheet, `RecentDetectors`) is fully reusable. The **only** video-coupled cluster is `PlaybackDetectionCoordinator` + `PlaybackController` + `PlaybackSource` + `Scrubber` + the `FlaggingSource` protocol (PTS/seek). So M8 is not fighting the architecture — it sidesteps that cluster and triggers the deferred source-agnostic decomposition (the image inspector is the second consumer). Six phases: **P1** extract `DetectionRunner` · **P2** image→`Frame` · **P3** `ImageDetectionCoordinator` · **P4** demo Image page (iOS+macOS) · **P5** freeze-from-live · **P6** dataset tie-in.

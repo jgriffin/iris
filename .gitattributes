@@ -7,3 +7,7 @@ Tests/IrisTests/Fixtures/*.png            filter=lfs diff=lfs merge=lfs -text
 # M6·P2: Core ML model bundled into the demo app targets (iOS + macOS).
 # Same `.mlpackage` binary inner files as the test fixture — track via LFS.
 Apps/Shared/*.mlpackage/**                filter=lfs diff=lfs merge=lfs -text
+
+# Planning docs and their assets (mockups, diagrams) are small, human-reviewed,
+# and want to stay plain diffable blobs — never LFS, even if a broad rule lands later.
+plans/**                                  filter= diff= merge= text=auto

@@ -141,6 +141,13 @@ When a milestone is active, its node expands like the focus tree:
    boundary it names the **define-gate** ("define M5"), not the work.
 6. One line per item, identical every time — no horizontal stacking. Predictability
    is the whole point.
+7. **Milestone naming.** A milestone's identity is always a *descriptive slug + a
+   one-line description* — never the number alone (a bare "M9" carries no meaning
+   when you read it back later). Numbers mark **execution order** and are **assigned
+   at pickup**, not reserved in advance: only milestones that are active or completed
+   carry a number. **Penciled-in / future milestones carry no number** — refer to them
+   by slug (e.g. "Unified sidebar nav") until they're taken on, at which point they
+   receive the next number.
 
 ### Surfacing status in conversation
 
