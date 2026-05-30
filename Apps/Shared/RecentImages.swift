@@ -149,17 +149,26 @@ final class RecentImages {
 
                 let exists = FileManager.default.fileExists(atPath: url.path)
                 guard exists else {
-                    Logger.recentImages.debug(
+                    Logger.recentImages.warning(
                         "resolve: dropping missing \(url.lastPathComponent, privacy: .public)"
                     )
                     continue
                 }
 
                 if isStale {
+                    // M9·P1·A5: a stale bookmark still resolved to an existing
+                    // file — log it so a flaky / repeatedly-refreshing entry is
+                    // diagnosable, then refresh the blob in place.
                     if let refreshedBlob = try? Self.makeBookmark(for: url) {
+                        Logger.recentImages.notice(
+                            "resolve: refreshed stale bookmark for \(url.lastPathComponent, privacy: .public)"
+                        )
                         nextBookmarks.append(refreshedBlob)
                         refreshed = true
                     } else {
+                        Logger.recentImages.warning(
+                            "resolve: stale bookmark refresh FAILED for \(url.lastPathComponent, privacy: .public); keeping original blob"
+                        )
                         nextBookmarks.append(bookmark)
                     }
                 } else {
@@ -168,7 +177,7 @@ final class RecentImages {
 
                 resolved.append(url)
             } catch {
-                Logger.recentImages.debug(
+                Logger.recentImages.warning(
                     "resolve: dropping unresolvable bookmark: \(String(describing: error), privacy: .public)"
                 )
             }

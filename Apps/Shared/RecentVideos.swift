@@ -184,21 +184,29 @@ final class RecentVideos {
                 // treated as "missing" and the entry is dropped.
                 let exists = FileManager.default.fileExists(atPath: url.path)
                 guard exists else {
-                    Logger.recents.debug(
+                    Logger.recents.warning(
                         "resolve: dropping missing \(url.lastPathComponent, privacy: .public)"
                     )
                     continue
                 }
 
                 if isStale {
-                    // Refresh the bookmark in place. If the refresh fails,
-                    // keep the original blob — the URL still resolved, so
+                    // M9·P1·A5: a stale bookmark still resolved to an existing
+                    // file — log it so a flaky / repeatedly-refreshing entry is
+                    // diagnosable. Refresh the bookmark in place. If the refresh
+                    // fails, keep the original blob — the URL still resolved, so
                     // it's usable for *this* session; the user may have to
                     // re-pick later.
                     if let refreshedBlob = try? Self.makeBookmark(for: url) {
+                        Logger.recents.notice(
+                            "resolve: refreshed stale bookmark for \(url.lastPathComponent, privacy: .public)"
+                        )
                         nextBookmarks.append(refreshedBlob)
                         refreshed = true
                     } else {
+                        Logger.recents.warning(
+                            "resolve: stale bookmark refresh FAILED for \(url.lastPathComponent, privacy: .public); keeping original blob"
+                        )
                         nextBookmarks.append(bookmark)
                     }
                 } else {
@@ -207,11 +215,11 @@ final class RecentVideos {
 
                 resolved.append(url)
             } catch {
-                Logger.recents.debug(
+                Logger.recents.warning(
                     "resolve: dropping unresolvable bookmark: \(String(describing: error), privacy: .public)"
                 )
-                // Drop silently — this is the common "user deleted the
-                // file" case after a relaunch.
+                // Common "user deleted the file" case after a relaunch — now
+                // logged at warning level so stale/failed resolves surface.
             }
         }
 
