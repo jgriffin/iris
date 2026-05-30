@@ -73,12 +73,12 @@ struct IrisShell: View {
     @State var showTuning = false
     /// The detector id last installed into the playback coordinator (drift guard).
     @State var syncedVideoDetectorID: String?
-    #if os(macOS)
-    @State var activeImporter: ActiveImporter?
-    #else
-    @State var showVideoPicker = false
-    @State var showModelPicker = false
-    #endif
+
+    /// The single file-importer state for the whole shell. One enum-routed
+    /// importer per platform presents off this and dispatches by case (M9·P5) —
+    /// replaces the prior five per-platform `show*Picker` / `activeImporter`
+    /// flags.
+    @State var importTarget: ImportTarget?
 
     // MARK: - Image chrome state
 
@@ -86,11 +86,6 @@ struct IrisShell: View {
     @State var imageErrorText: String?
     @State var showImageTuning = false
     @State var syncedImageDetectorID: String?
-    #if os(macOS)
-    @State var showImagePicker = false
-    #else
-    @State var showImageDocPicker = false
-    #endif
 
     // MARK: - Dataset count (read-only display in the reserved strip)
 
@@ -182,8 +177,7 @@ struct IrisShell: View {
                 onRevealInFinder: revealInFinderAction
             )
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
-            .videoImporter(self)
-            .imageImporter(self)
+            .fileImporting(self)
         } detail: {
             detailPane
         }
@@ -257,19 +251,11 @@ struct IrisShell: View {
 
     @MainActor
     private func onDetectorChanged() {
-        #if os(macOS)
         if selectedDetectorID == DemoCatalog.customEntryID,
             modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
         {
-            activeImporter = .model
+            importTarget = .model
         }
-        #else
-        if selectedDetectorID == DemoCatalog.customEntryID,
-            modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
-        {
-            showModelPicker = true
-        }
-        #endif
         recentDetectors.addOrPromote(id: selectedDetectorID)
         // One shared selection drives BOTH coordinators; each no-ops if its
         // coordinator has nothing loaded.
@@ -496,20 +482,10 @@ struct IrisShell: View {
     var inspectorSheetBinding: Binding<Bool> { $showInspectorSheet }
 
     // MARK: - Importer accessors (cross the `private @State` boundary for the
-    // presentation extension; `#if`-gated to match the per-platform state)
+    // presentation extension)
 
-    #if os(macOS)
-    var activeImporterValue: ActiveImporter? { activeImporter }
-    func clearActiveImporter() { activeImporter = nil }
-    var imagePickerBinding: Binding<Bool> { $showImagePicker }
-    #else
-    var videoPickerBinding: Binding<Bool> { $showVideoPicker }
-    func setVideoPicker(_ v: Bool) { showVideoPicker = v }
-    var modelPickerBinding: Binding<Bool> { $showModelPicker }
-    func setModelPicker(_ v: Bool) { showModelPicker = v }
-    var imagePickerBinding: Binding<Bool> { $showImageDocPicker }
-    func setImagePicker(_ v: Bool) { showImageDocPicker = v }
-    #endif
+    var importTargetValue: ImportTarget? { importTarget }
+    func clearImportTarget() { importTarget = nil }
 }
 
 extension Logger {

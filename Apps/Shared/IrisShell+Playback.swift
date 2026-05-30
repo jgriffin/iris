@@ -108,16 +108,13 @@ extension IrisShell {
 
     // MARK: File pickers
 
-    /// Present the platform video picker (macOS `.fileImporter`; iOS sheet).
+    /// Present the video picker. One enum-routed importer per platform
+    /// (`importTarget`) drives both the macOS `.fileImporter` and the iOS
+    /// `DocumentPicker` sheet — see `IrisShell+Presentation`.
     func presentVideoPicker() {
-        #if os(macOS)
-        activeImporter = .movie
-        #else
-        showVideoPicker = true
-        #endif
+        importTarget = .video
     }
 
-    #if os(macOS)
     /// Load a file-picked Core ML model, then re-select the custom entry so the
     /// swap flow runs the freshly-loaded detector across both coordinators.
     @MainActor
@@ -134,22 +131,6 @@ extension IrisShell {
             }
         }
     }
-    #else
-    @MainActor
-    func loadPickedModel(at url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
-        Task {
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            await modelStore.loadPickedModel(at: url)
-            if selectedDetectorID == DemoCatalog.customEntryID {
-                swapDetector()
-                selectImageDetector()
-            } else {
-                modelSelection.detectorID = DemoCatalog.customEntryID
-            }
-        }
-    }
-    #endif
 
     // MARK: Dataset count (read-only)
 
@@ -184,24 +165,37 @@ extension IrisShell {
     #endif
 }
 
-#if os(macOS)
-/// The two macOS root-view importers (movie + Core ML model), collapsed into one
-/// routed `.fileImporter` — SwiftUI honors only one `isPresented` importer per
-/// view (the image importer rides a separate modifier).
-enum ActiveImporter: String, Identifiable {
-    case movie, model
+/// The single demo importer target. Every file-pick flow — pick a video, pick
+/// an image, load a custom Core ML model — routes through ONE importer per
+/// platform driven by `IrisShell.importTarget`; the completion dispatches by
+/// case (M9·P5). Generalizes the P1 macOS movie+model `ActiveImporter` so the
+/// shell carries one importer state and one dispatch instead of five flags and
+/// two parallel modifiers.
+enum ImportTarget: String, Identifiable, CaseIterable {
+    case video, image, model
     var id: String { rawValue }
 
     var contentTypes: [UTType] {
         switch self {
-        case .movie: return IrisShell.movieContentTypes
+        case .video: return IrisShell.movieContentTypes
+        case .image: return IrisShell.imageContentTypes
         case .model: return IrisShell.modelContentTypes
         }
     }
 }
-#endif
 
 extension IrisShell {
+    /// Dispatch a picked `url` to the per-target pick handler. The handlers own
+    /// security-scope + MRU; this just routes by case.
+    @MainActor
+    func handlePicked(_ url: URL, for target: ImportTarget) {
+        switch target {
+        case .video: swapToExternal(url: url)
+        case .image: pickImage(url: url)
+        case .model: loadPickedModel(at: url)
+        }
+    }
+
     static let movieContentTypes: [UTType] = [.movie, .mpeg4Movie, .quickTimeMovie]
     static let modelContentTypes: [UTType] = {
         var types: [UTType] = []

@@ -104,10 +104,6 @@ extension IrisShell {
     }
 
     func presentImagePicker() {
-        #if os(macOS)
-        showImagePicker = true
-        #else
-        showImageDocPicker = true
-        #endif
+        importTarget = .image
     }
 }

@@ -12,16 +12,10 @@ import os
 
 extension View {
 
-    /// Attach the video (and, on macOS, the routed model) importer.
+    /// Attach the single enum-routed file importer (video / image / model).
     @ViewBuilder
-    func videoImporter(_ shell: IrisShell) -> some View {
-        shell.attachVideoImporter(to: self)
-    }
-
-    /// Attach the image importer.
-    @ViewBuilder
-    func imageImporter(_ shell: IrisShell) -> some View {
-        shell.attachImageImporter(to: self)
+    func fileImporting(_ shell: IrisShell) -> some View {
+        shell.attachFileImporter(to: self)
     }
 
     /// Attach the inspector: docked (`.inspector`) at regular width, a bottom
@@ -34,77 +28,50 @@ extension View {
 
 extension IrisShell {
 
-    // MARK: Video / model importer
+    // MARK: File importer (M9·P5)
+    //
+    // ONE importer per platform, driven by `importTarget` and dispatched by
+    // case through `handlePicked(_:for:)`. The iOS `DocumentPicker` vs. macOS
+    // `.fileImporter` divergence is a real platform seam (DocumentPicker keeps
+    // the original URL + scope; `.fileImporter` on iOS copies into the sandbox
+    // and breaks MRU bookmarks — see `DocumentPicker.swift`), so the *dispatch*
+    // is unified even though the SwiftUI surface legitimately differs.
 
     @ViewBuilder
-    func attachVideoImporter(to content: some View) -> some View {
+    func attachFileImporter(to content: some View) -> some View {
         #if os(macOS)
         content.fileImporter(
             isPresented: Binding(
-                get: { activeImporterValue != nil },
-                set: { if !$0 { clearActiveImporter() } }
+                get: { importTargetValue != nil },
+                set: { if !$0 { clearImportTarget() } }
             ),
-            allowedContentTypes: activeImporterValue?.contentTypes ?? [],
+            allowedContentTypes: importTargetValue?.contentTypes ?? [],
             allowsMultipleSelection: false
         ) { result in
-            let importer = activeImporterValue
-            clearActiveImporter()
+            let target = importTargetValue
+            clearImportTarget()
             switch result {
             case .success(let urls):
-                guard let url = urls.first else { return }
-                switch importer {
-                case .movie: swapToExternal(url: url)
-                case .model: loadPickedModel(at: url)
-                case nil: break
-                }
+                guard let url = urls.first, let target else { return }
+                handlePicked(url, for: target)
             case .failure(let error):
-                Logger.shell.error("video/model picker failed: \(error.localizedDescription, privacy: .public)")
+                Logger.shell.error("file picker failed: \(error.localizedDescription, privacy: .public)")
             }
         }
         #else
-        content
-            .sheet(isPresented: videoPickerBinding) {
-                DocumentPicker(contentTypes: Self.movieContentTypes) { url in
-                    setVideoPicker(false)
-                    swapToExternal(url: url)
+        content.sheet(
+            isPresented: Binding(
+                get: { importTargetValue != nil },
+                set: { if !$0 { clearImportTarget() } }
+            )
+        ) {
+            if let target = importTargetValue {
+                DocumentPicker(contentTypes: target.contentTypes) { url in
+                    clearImportTarget()
+                    handlePicked(url, for: target)
                 }
                 .ignoresSafeArea()
             }
-            .sheet(isPresented: modelPickerBinding) {
-                DocumentPicker(contentTypes: Self.modelContentTypes) { url in
-                    setModelPicker(false)
-                    loadPickedModel(at: url)
-                }
-                .ignoresSafeArea()
-            }
-        #endif
-    }
-
-    // MARK: Image importer
-
-    @ViewBuilder
-    func attachImageImporter(to content: some View) -> some View {
-        #if os(macOS)
-        content.fileImporter(
-            isPresented: imagePickerBinding,
-            allowedContentTypes: Self.imageContentTypes,
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                pickImage(url: url)
-            case .failure(let error):
-                Logger.shell.error("image picker failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        #else
-        content.sheet(isPresented: imagePickerBinding) {
-            DocumentPicker(contentTypes: Self.imageContentTypes) { url in
-                setImagePicker(false)
-                pickImage(url: url)
-            }
-            .ignoresSafeArea()
         }
         #endif
     }
