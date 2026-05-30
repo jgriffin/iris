@@ -44,10 +44,14 @@ struct ImageDetailView: View {
         VStack(spacing: 0) {
             if coordinator.frame != nil {
                 imageArea
-                controlBar
             } else {
                 emptyState
             }
+            // M9·P1·A6: the control bar is always present so its disabled state
+            // is visible — the detector picker + Tune are gated on a loaded frame
+            // (no model controls interactive over an empty canvas). They light up
+            // the moment `coordinator.frame` becomes non-nil.
+            controlBar
         }
         .sheet(isPresented: $showTuning) {
             tuningSheet
@@ -135,6 +139,9 @@ struct ImageDetailView: View {
     /// containers own the platform-specific pick affordance).
     @ViewBuilder
     private var controlBar: some View {
+        // M9·P1·A6: no model controls over an empty canvas. Both the picker and
+        // the Tune toggle are disabled until a frame is loaded.
+        let hasFrame = coordinator.frame != nil
         HStack {
             Picker("Detector", selection: $selectedDetectorID) {
                 ForEach(recentDetectors.sortedEntries(catalog)) { entry in
@@ -144,6 +151,7 @@ struct ImageDetailView: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .accessibilityLabel("Active detector")
+            .disabled(!hasFrame)
 
             Spacer()
 
@@ -155,6 +163,7 @@ struct ImageDetailView: View {
             }
             .controlSize(.small)
             .accessibilityLabel("Tune detector")
+            .disabled(!hasFrame)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
