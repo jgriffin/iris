@@ -64,13 +64,18 @@ struct SidebarView: View {
             Divider()
 
             // Page-rows scroll between the pinned MODEL header and DATASET footer.
+            // Horizontal rules separate the three sections so each reads as its
+            // own block (more like a sectioned native sidebar).
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     pageRow(.playback)
+                    Divider().padding(.horizontal, 12)
                     pageRow(.image)
+                    Divider().padding(.horizontal, 12)
                     pageRow(.capture)
                 }
                 .padding(.vertical, 8)
+                .animation(.snappy(duration: 0.22), value: page)
             }
 
             Spacer(minLength: 0)
@@ -115,6 +120,8 @@ struct SidebarView: View {
                 Slider(value: $modelSelection.minConfidence, in: 0...1, step: 0.05)
                     .accessibilityLabel("Minimum confidence")
             }
+            // Indented to read as a setting nested under the detector picker.
+            .padding(.leading, 16)
         }
     }
 
@@ -144,17 +151,23 @@ struct SidebarView: View {
                 HStack(spacing: 8) {
                     Image(systemName: rowPage.systemImage)
                         .frame(width: 20)
+                        .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
                     Text(rowPage.title)
                         .fontWeight(isActive ? .semibold : .regular)
-                    Spacer()
-                    if isActive {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 6, height: 6)
-                    }
+                    Spacer(minLength: 0)
                 }
+                .padding(.vertical, 5)
+                .padding(.horizontal, 8)
                 .contentShape(Rectangle())
                 .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                // Active mode = a subtle accent-tinted rounded selection
+                // (the native-sidebar idiom), replacing the old accent dot.
+                .background {
+                    if isActive {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.15))
+                    }
+                }
             }
             .buttonStyle(.plain)
             .disabled(disabled)
@@ -163,6 +176,7 @@ struct SidebarView: View {
                 expandedContent(for: rowPage)
                     .padding(.leading, 28)
                     .padding(.trailing, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 12)
@@ -188,12 +202,13 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func openButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        // A modest, content-width bordered button — it's a utility action, not
+        // the hero of the panel, so it shouldn't shout.
         Button(action: action) {
             Label(title, systemImage: systemImage)
-                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.regular)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .padding(.bottom, 4)
     }
 
@@ -205,29 +220,30 @@ struct SidebarView: View {
         emptyHint: String
     ) -> some View {
         Text("RECENT")
-            .font(.caption2.weight(.semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .padding(.top, 2)
+            .padding(.top, 4)
 
         if recents.isEmpty {
             Text(emptyHint)
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.tertiary)
         } else {
             ForEach(recents, id: \.self) { url in
                 Button {
                     onPick(url)
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: systemImage)
                             .foregroundStyle(.secondary)
-                            .font(.caption)
+                            .font(.body)
                         Text(url.lastPathComponent)
-                            .font(.caption)
+                            .font(.body)
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Spacer(minLength: 0)
                     }
+                    .padding(.vertical, 1)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
