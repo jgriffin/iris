@@ -16,149 +16,32 @@ extension IrisShell {
 
     // MARK: Detail
 
+    /// Hosts the shared `PlaybackDetailView` (M9·P3·3). The shell owns the
+    /// coordinator / flagging / min-confidence / freeze-from-live; the detail
+    /// view renders the player + overlay + scrubber + affordances. The chrome
+    /// background is the only per-platform divergence.
     @ViewBuilder
     var playbackDetail: some View {
-        VStack(spacing: 0) {
-            if let controller = coordinator.controller {
-                playbackArea(controller: controller)
-
-                Scrubber(model: controller) {
-                    if let flaggingModel {
-                        FlagMarkerStrip(model: flaggingModel, duration: controller.duration)
-                    }
-                }
-                #if os(macOS)
-                .background(Color(.windowBackgroundColor))
-                #endif
-
-                bottomBar
-            } else if let errorText {
-                playbackError(errorText)
-            } else {
-                #if os(iOS)
-                ProgressView("Loading fixture…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                #else
-                playbackEmptyState
-                #endif
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func playbackArea(controller: PlaybackController) -> some View {
-        ZStack {
-            PlaybackView(source: controller.source)
-                .id(ObjectIdentifier(controller.source))
-
-            DetectionLayer(
-                store: coordinator.resultStore,
-                makeConverter: { [controller] size in
-                    MainActor.assumeIsolated {
-                        VideoGeometry(
-                            contentSize: controller.presentationSize,
-                            containerSize: size,
-                            contentMode: .aspectFit
-                        )
-                    }
-                },
-                stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
-                tuning: coordinator.session?.router,
-                minConfidence: Float(modelSelection.minConfidence),
-                displayTimeSource: { [controller] in
-                    MainActor.assumeIsolated { controller.currentTime }
-                }
-            )
-            .allowsHitTesting(false)
-        }
-        // On-frame affordances, top-right of the actual video IMAGE.
-        .overlay {
-            VideoRectAligned(
-                contentSize: controller.presentationSize,
-                alignment: .topTrailing
-            ) {
-                HStack(spacing: 8) {
-                    inspectButton(frameProvider: { coordinator.currentFrame })
-                    if let flaggingModel {
-                        FlagButton(model: flaggingModel)
-                    }
-                }
-                .padding(12)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var bottomBar: some View {
-        HStack {
-            if !activeLabel.isEmpty {
-                Text(activeLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(coordinator.metrics.compactSummary)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
         #if os(macOS)
-        .background(Color(.windowBackgroundColor))
+        let chrome = Color(.windowBackgroundColor)
+        let loadingFixture = false
+        #else
+        let chrome = Color(.systemBackground)
+        // iOS auto-loads a bundled fixture on first launch, so a nil controller
+        // with no error is the loading state (not the empty state).
+        let loadingFixture = (coordinator.controller == nil && errorText == nil)
         #endif
-    }
-
-    @ViewBuilder
-    private var playbackEmptyState: some View {
-        VStack(spacing: 16) {
-            if let errorText {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.largeTitle)
-                    .foregroundStyle(.orange)
-                Text(errorText).multilineTextAlignment(.center).padding(.horizontal)
-            } else {
-                Image(systemName: "film")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-                Text("Open a video file to start.").foregroundStyle(.secondary)
-            }
-            Button("Open Video…") { presentVideoPicker() }
-                .controlSize(.large)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    @ViewBuilder
-    private func playbackError(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.orange)
-            Text(message).multilineTextAlignment(.center).padding(.horizontal)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    /// "Inspect frame" — freeze the visible live frame and open it on the Image
-    /// page under the SAME detector. Direct hand-off: one shell holds both
-    /// coordinators (no `InspectorHandoff` conduit — M9·P3·5).
-    @ViewBuilder
-    func inspectButton(frameProvider: @escaping () -> Frame?) -> some View {
-        Button {
-            inspectFrame(frameProvider())
-        } label: {
-            Image(systemName: "camera.viewfinder")
-                .font(.title3)
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(frameProvider() == nil)
-        .help("Inspect this frame on the Image page")
-        .accessibilityLabel("Inspect frame")
+        PlaybackDetailView(
+            coordinator: coordinator,
+            flaggingModel: flaggingModel,
+            minConfidence: Float(modelSelection.minConfidence),
+            activeLabel: activeLabel,
+            errorText: errorText,
+            isLoadingFixture: loadingFixture,
+            onInspect: { inspectFrame($0) },
+            onOpenVideo: presentVideoPicker,
+            chromeBackground: chrome
+        )
     }
 
     // MARK: Lifecycle
