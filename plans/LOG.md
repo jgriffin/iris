@@ -833,3 +833,16 @@
 - Verified: iOS + macOS `xcodebuild` both green; `swift test` **262**. Library untouched. Commit `c9a66fa` (18 files, +295/−90).
 - Incidental hygiene: `.claude/worktrees/` was an untracked dir at session start; got swept into the commit as an embedded repo, then removed (`git rm --cached`) and added to `.gitignore`. Working tree clean.
 - 👉 Next: **iterate the left-pane design in Xcode previews** (`Apps/Shared/Shell/SidebarView.swift`, flip schemes), landing changes as P6·2+ on `m9-unified-shell`. M9 → `main` waits on P6 + the owed on-device smoke. → [`BOARD.md`](./BOARD.md)
+
+## 2026-05-31 (cont.) — refactor: M9·P6·2 — sidebar decomposition (design-language components)
+
+- Why: `SidebarView` was one file doing MODEL + nav-rows + DATASET *and* owning every header/row/section style inline — no seam to work the design language. User: pull out shared components (section headers, collapsibility) + give each section its own file.
+- **Behavior-preserving** split (`8594444`). New `Shell/Sidebar/`:
+  - `Components/SidebarSection.swift` — labeled-section primitive: shared `SidebarSectionHeader` style + **optional collapsibility** (`isExpanded: Binding<Bool>?` — nil = static, current behavior; non-nil = disclosure chevron) + a trailing header accessory slot (how DATASET hangs its Export control). Convenience init for the no-accessory case.
+  - `Components/SidebarRow.swift` — the selectable nav-row treatment (icon · title · active accent-tint), copied modifier-for-modifier from the old `pageRow`; caller applies `.disabled`.
+  - `ModelSection` / `NavigationSection` / `DatasetSection` / `RecentList` — one file each. `ShellPage` lifted to `Shell/ShellPage.swift` (it's routing, used by IrisShell too).
+  - `SidebarView` → thin assembler; **public init byte-identical** (all 18 stored props verbatim) so the IrisShell call site + the 4 `#Preview`s are untouched. Each new component/section carries its own `#Preview`.
+- Pixel-parity calls (agent, all verified): `SidebarSection` spacing parameterized (MODEL 8 default / DATASET passes 6); `RecentList` wrapped in `VStack(spacing: 6)` to reproduce the splatted gaps; the DATASET `Divider()` moved up into the assembler skeleton (same render order); the `ScrollView`/`.animation(.snappy, value: page)`/`Spacer`/outer paddings stay in the assembler.
+- **Latent nit (deliberately left to keep the init identical):** `selectedDetectorID` is now an unread stored prop on `SidebarView` (was already unused — the picker binds `modelSelection.detectorID`). Drop in a later non-parity pass.
+- Verified: iOS + macOS `xcodebuild` green; `swift test` **262**. Only sidebar files + `ShellPage.swift` touched; IrisShell / detail views / `State/` untouched. 10 files, +895/−457.
+- 👉 Next: **work the design language in-canvas** against the new components (`Shell/Sidebar/Components/` + the section files), landing P6·3+ on `m9-unified-shell`. M9 → `main` waits on P6 + the owed on-device smoke. → [`BOARD.md`](./BOARD.md)

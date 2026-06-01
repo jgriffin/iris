@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding (previews + folder split) done, design iteration in Xcode next; folds in before the `main` merge._
+_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding + P6·2 sidebar decomposition done; design iteration in Xcode next; folds in before the `main` merge._
 
 ## Intent
 
@@ -195,10 +195,23 @@ the first step.
   scheme** — iOS vs macOS (incl. the macOS-only export strip) is a canvas scheme-flip, no
   per-platform fork. Both schemes build green; `swift test` 262.
 
-**P6·2+ — the design changes themselves.** Iterated in-canvas; commit onto `m9-unified-shell`
-as they settle. *(Record what changed / which files as each lands.)* The render-filter →
-unified per-detector settings north-star (DECISIONS, 2026-05-30) is the design backdrop but
-not in P6 scope unless the user pulls it in.
+**P6·2 — sidebar decomposition** ✅ (`8594444`). Behavior-preserving split of the one big
+`SidebarView` so the design language can be worked on independent of section content:
+- **`Shell/Sidebar/Components/`** — content-agnostic primitives: `SidebarSection` (shared
+  header style + **optional collapsibility** via `isExpanded:` + a trailing header accessory
+  slot) and `SidebarRow` (the selectable nav-row treatment: icon · title · active accent-tint).
+- **Per-section files** — `ModelSection` (picker + min-confidence), `NavigationSection` (the
+  three page-rows + inline expansion), `DatasetSection` (count + macOS export controls),
+  `RecentList` (the shared RECENT list). `ShellPage` lifted to its own `Shell/ShellPage.swift`.
+- `SidebarView` is now a thin assembler with a **byte-identical public init** (call site +
+  previews unchanged); each component/section carries its own `#Preview`. Both schemes green,
+  `swift test` 262. *(Latent nit, deliberately left to keep the init identical: `selectedDetectorID`
+  is now an unread stored prop on `SidebarView` — drop in a later non-parity pass.)*
+
+**P6·3+ — the design changes themselves.** Iterated in-canvas against the new components;
+commit onto `m9-unified-shell` as they settle. *(Record what changed / which files as each
+lands.)* The render-filter → unified per-detector settings north-star (DECISIONS, 2026-05-30)
+is the design backdrop but not in P6 scope unless the user pulls it in.
 
 ---
 
