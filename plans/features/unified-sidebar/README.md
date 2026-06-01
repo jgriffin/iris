@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding + P6·2 sidebar decomposition done; design iteration in Xcode next; folds in before the `main` merge._
+_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding + P6·2 decomposition + P6·3 sidebar-is-sections done; look-and-feel iteration in Xcode next; folds in before the `main` merge._
 
 ## Intent
 
@@ -208,10 +208,27 @@ the first step.
   `swift test` 262. *(Latent nit, deliberately left to keep the init identical: `selectedDetectorID`
   is now an unread stored prop on `SidebarView` — drop in a later non-parity pass.)*
 
-**P6·3+ — the design changes themselves.** Iterated in-canvas against the new components;
-commit onto `m9-unified-shell` as they settle. *(Record what changed / which files as each
-lands.)* The render-filter → unified per-detector settings north-star (DECISIONS, 2026-05-30)
-is the design backdrop but not in P6 scope unless the user pulls it in.
+**P6·3 — sidebar is sections, not rows** ✅ (`c1c12f9`). Behavior-preserving recast of the
+component model (user: "these aren't rows, they're entire sections"):
+- **Playback/Image/Capture are now selectable `ModeSection`s**, not rows-with-expansion. A
+  mode section's expansion is **keyed to the page selection** (accordion): expanded ⇔
+  `selection == page`, tapping the header sets `selection = page` (collapsing the others).
+  The page selection *is* the section's identifier — which faithfully reproduces today's
+  behavior (active page expanded, others hidden), just modeled as sections.
+- **One shared header component, two styles** — `SidebarSectionHeader` gained `.label` (the
+  all-caps MODEL/DATASET look) and `.mode(systemImage:isActive:)` (the selectable
+  icon+title+active-tint treatment, ex-`SidebarRow`). Header look-and-feel lives in one
+  place; the two variants stay visually distinct (user's call — "keep them separate for now").
+- **`SourcePicker`** extracts the duplicated Open…-button + `RecentList` pairing (Playback &
+  Image shared it). **`SidebarView` lists the five sections explicitly — no `ForEach`** (user:
+  "list them straight up … preview each one"). `NavigationSection` + `SidebarRow` deleted.
+- Public init byte-identical; both schemes green, `swift test` 262. (The `selectedDetectorID`
+  dead-prop nit from P6·2 still stands — drop in a later non-parity pass.)
+
+**P6·4+ — the look-and-feel changes themselves.** Iterated in-canvas against the section
+model; commit onto `m9-unified-shell` as they settle. *(Record what changed / which files as
+each lands.)* The render-filter → unified per-detector settings north-star (DECISIONS,
+2026-05-30) is the design backdrop but not in P6 scope unless the user pulls it in.
 
 ---
 

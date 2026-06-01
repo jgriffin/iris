@@ -846,3 +846,16 @@
 - **Latent nit (deliberately left to keep the init identical):** `selectedDetectorID` is now an unread stored prop on `SidebarView` (was already unused — the picker binds `modelSelection.detectorID`). Drop in a later non-parity pass.
 - Verified: iOS + macOS `xcodebuild` green; `swift test` **262**. Only sidebar files + `ShellPage.swift` touched; IrisShell / detail views / `State/` untouched. 10 files, +895/−457.
 - 👉 Next: **work the design language in-canvas** against the new components (`Shell/Sidebar/Components/` + the section files), landing P6·3+ on `m9-unified-shell`. M9 → `main` waits on P6 + the owed on-device smoke. → [`BOARD.md`](./BOARD.md)
+
+## 2026-05-31 (cont.) — refactor: M9·P6·3 — sidebar is sections, not rows
+
+- User reframe on the P6·2 component model: the Playback/Image/Capture items "aren't rows, they're entire sections"; NavigationSection "knows too much" (a per-page switch repeating the Open+RECENT shape); the missing component is a shared **section header** look-and-feel; and "no ForEach — list them straight up … preview each one." Settled: keep MODEL/DATASET vs mode headers visually distinct ("for now").
+- **Behavior-preserving recast** (`c1c12f9`):
+  - **`ModeSection`** (new) — Playback/Image/Capture are now selectable *sections*. Expansion is keyed to the page selection (accordion): `isExpanded = (selection == page) && isEnabled`; the header is a `.plain` Button setting `selection = page`. The page selection *is* the section identifier — expanding selects, others collapse. Reproduces the old `row(_:)`/`expandedContent` skeleton + paddings + transition + Capture-disabled gating exactly.
+  - **Shared header, two styles** — `SidebarSectionHeader` gained a `Style` enum: `.label` (default — the all-caps MODEL/DATASET/RECENT look, existing call sites untouched) and `.mode(systemImage:isActive:)` (the ex-`SidebarRow` selectable treatment, copied modifier-for-modifier). One place for header look-and-feel; the two variants stay visually distinct per the user.
+  - **`SourcePicker`** (new) — extracts the Open…-button + `RecentList` pairing Playback & Image duplicated.
+  - **`SidebarView`** lists the five sections **explicitly, no `ForEach`** (Model · Playback · Image · Capture · Dataset) inside the unchanged outer skeleton (MODEL pinned, ScrollView of the three modes with dividers + `.animation(.snappy, value: page)`, Spacer, DATASET). Public init byte-identical (incl. the unread `selectedDetectorID`).
+  - **Deleted** `NavigationSection.swift` + `Components/SidebarRow.swift` (`git rm`; no live refs).
+- Per-piece `#Preview`s: `ModeSection` (active/inactive/disabled), `SourcePicker` (populated/empty), `SidebarSection` header preview now shows both styles.
+- Verified: iOS + macOS `xcodebuild` green; `swift test` **262**. Only sidebar files touched. 8 files, +311/−220.
+- 👉 Next: **iterate the look-and-feel in-canvas** against the section model, landing P6·4+ on `m9-unified-shell`. M9 → `main` waits on P6 + the owed on-device smoke. → [`BOARD.md`](./BOARD.md)
