@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-30 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** penciled — designs pending from the user, folds in before the `main` merge._
+_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding (previews + folder split) done, design iteration in Xcode next; folds in before the `main` merge._
 
 ## Intent
 
@@ -175,12 +175,30 @@ preserves the security-scoped URL so MRU bookmarks survive relaunch); only the d
 unified. **Deferred to backlog** (untouched, as planned): a generic `RecentImages` /
 `RecentVideos` base, and any playback / image coordinator merge.
 
-### P6 — Design pass  ✏️ penciled (designs pending from the user)
-A round of UI/design changes the user is folding into the unified shell **before** the
-milestone merges to `main`. Designs are not yet in hand — this phase is **penciled**
-(undefined: no brief, scope TBD) until they arrive, at which point it gets scoped here
-(the define-gate) and built. Reopens M9 to 🌱 in-progress: the `main` merge waits on P6.
-*(Fill this section in when the designs land — what's changing, which files, the forks.)*
+### P6 — Design pass  🌱 in-progress
+A round of UI/design changes for the unified shell, folded in **before** the milestone
+merges to `main`. The designs weren't coming out cleanly on paper, so the call (user) is
+to **iterate them live in Xcode previews** — making the demo views previewable is itself
+the first step.
+
+**P6·1 — scaffolding** ✅ (`c9a66fa`). Two parts:
+- **Reorg** — `Apps/Shared/` split into `Shell/` (IrisShell + the 4 `IrisShell+…` extensions
+  + SidebarView), `Details/` (Playback/Image/CaptureDetailView), `State/` (ModelSelection,
+  DemoCatalog, the three `Recent*` MRUs, FrameExportCoordinator). Resources (`*.mlpackage`,
+  `Assets.xcassets`) stay at root. `Shared/` is a **recursive glob** in `project.yml`, so no
+  spec edit — just regenerate the tracked `.pbxproj`.
+- **Previews** — `Apps/Shared/PreviewFixtures.swift` (`#if DEBUG`): sample `ModelSelection` on
+  a throwaway `iris.preview` `UserDefaults` suite (never touches real defaults), a populated
+  `RecentDetectors` (`coreml.yolo26n` / `coreml.yolo12n` / `vision.rectangles`), `DemoModelStore`,
+  catalog, sample recent URLs. A `SidebarView` `#Preview` matrix (`Playback · populated`,
+  `Image · empty RECENT`, `Capture active`, `Sweeping`). **One block renders per selected
+  scheme** — iOS vs macOS (incl. the macOS-only export strip) is a canvas scheme-flip, no
+  per-platform fork. Both schemes build green; `swift test` 262.
+
+**P6·2+ — the design changes themselves.** Iterated in-canvas; commit onto `m9-unified-shell`
+as they settle. *(Record what changed / which files as each lands.)* The render-filter →
+unified per-detector settings north-star (DECISIONS, 2026-05-30) is the design backdrop but
+not in P6 scope unless the user pulls it in.
 
 ---
 
