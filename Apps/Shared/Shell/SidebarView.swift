@@ -335,3 +335,117 @@ enum ShellPage: String, CaseIterable, Identifiable, Hashable {
         }
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+/// The same preview block renders on whichever scheme is selected in the Xcode
+/// canvas (iOS or macOS). The macOS-only `#if os(macOS)` export controls in the
+/// DATASET strip naturally appear on the Mac scheme and vanish on iOS — that
+/// cross-platform behavior is the point, so the previews don't fork per
+/// platform. Each case constructs a real `SidebarView` from `PreviewFixtures`.
+
+#Preview("Playback · populated") {
+    @Previewable @State var page: ShellPage = .playback
+    let store = PreviewFixtures.modelStore
+    SidebarView(
+        page: $page,
+        catalog: PreviewFixtures.catalog(store: store),
+        recentDetectors: PreviewFixtures.recentDetectors,
+        modelStore: store,
+        modelSelection: PreviewFixtures.modelSelection,
+        selectedDetectorID: "vision.rectangles",
+        captureAvailable: true,
+        recentVideos: PreviewFixtures.sampleVideoURLs,
+        onOpenVideo: {},
+        onPickVideo: { _ in },
+        recentImages: PreviewFixtures.sampleImageURLs,
+        onOpenImage: {},
+        onPickImage: { _ in },
+        exportedFrameCountText: "12 frames exported",
+        isSweeping: false,
+        lastSummaryText: nil,
+        onExportNow: {},
+        onRevealInFinder: {}
+    )
+    .frame(width: 280, height: 700)
+}
+
+#Preview("Image · empty RECENT") {
+    @Previewable @State var page: ShellPage = .image
+    let store = PreviewFixtures.modelStore
+    SidebarView(
+        page: $page,
+        catalog: PreviewFixtures.catalog(store: store),
+        recentDetectors: PreviewFixtures.recentDetectors,
+        modelStore: store,
+        modelSelection: PreviewFixtures.modelSelection,
+        selectedDetectorID: "vision.rectangles",
+        captureAvailable: true,
+        recentVideos: [],
+        onOpenVideo: {},
+        onPickVideo: { _ in },
+        recentImages: [],
+        onOpenImage: {},
+        onPickImage: { _ in },
+        exportedFrameCountText: "No frames exported yet",
+        isSweeping: false,
+        lastSummaryText: nil,
+        onExportNow: nil,
+        onRevealInFinder: nil
+    )
+    .frame(width: 280, height: 700)
+}
+
+#Preview("Capture active") {
+    @Previewable @State var page: ShellPage = .capture
+    let store = PreviewFixtures.modelStore
+    SidebarView(
+        page: $page,
+        catalog: PreviewFixtures.catalog(store: store),
+        recentDetectors: PreviewFixtures.recentDetectors,
+        modelStore: store,
+        modelSelection: PreviewFixtures.modelSelection,
+        selectedDetectorID: "vision.rectangles",
+        captureAvailable: true,
+        recentVideos: PreviewFixtures.sampleVideoURLs,
+        onOpenVideo: {},
+        onPickVideo: { _ in },
+        recentImages: PreviewFixtures.sampleImageURLs,
+        onOpenImage: {},
+        onPickImage: { _ in },
+        exportedFrameCountText: "12 frames exported",
+        isSweeping: false,
+        lastSummaryText: nil,
+        onExportNow: nil,
+        onRevealInFinder: nil
+    )
+    .frame(width: 280, height: 700)
+}
+
+#Preview("Sweeping") {
+    @Previewable @State var page: ShellPage = .playback
+    let store = PreviewFixtures.modelStore
+    SidebarView(
+        page: $page,
+        catalog: PreviewFixtures.catalog(store: store),
+        recentDetectors: PreviewFixtures.recentDetectors,
+        modelStore: store,
+        modelSelection: PreviewFixtures.modelSelection,
+        selectedDetectorID: "vision.rectangles",
+        captureAvailable: true,
+        recentVideos: PreviewFixtures.sampleVideoURLs,
+        onOpenVideo: {},
+        onPickVideo: { _ in },
+        recentImages: PreviewFixtures.sampleImageURLs,
+        onOpenImage: {},
+        onPickImage: { _ in },
+        exportedFrameCountText: "12 frames exported",
+        isSweeping: true,
+        lastSummaryText: "Last sweep: 8 frames → ~/Datasets/iris (3.2 MB)",
+        onExportNow: {},
+        onRevealInFinder: {}
+    )
+    .frame(width: 280, height: 700)
+}
+#endif

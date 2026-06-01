@@ -94,3 +94,6 @@ captures/
 # Claude / planning workspace artifacts
 .planning/cache/
 .claude/local/
+
+# Claude Code worktrees
+.claude/worktrees/
