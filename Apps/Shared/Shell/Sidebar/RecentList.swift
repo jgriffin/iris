@@ -13,7 +13,7 @@ struct RecentList: View {
     // NOTE: emits header + entries inside a `VStack(spacing: 6)` so the
     // header→entries gap matches the original, where `recentList` was a
     // @ViewBuilder helper splatted into `pageRow`'s `VStack(spacing: 6)`.
-    // `NavigationSection` likewise places the open button and this list as
+    // `SourcePicker` likewise places the open button and this list as
     // siblings at spacing 6, so the assembled column reads identically.
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

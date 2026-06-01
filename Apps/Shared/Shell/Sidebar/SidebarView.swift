@@ -13,12 +13,14 @@ import SwiftUI
 /// Only row expansion toggles as the active page changes — there is no
 /// per-page disappear / reload (that's what removes A4/A7).
 ///
-/// **Thin assembler (M9·P6·2).** This view owns only the outer skeleton — the
-/// pinned MODEL header, the divider, the scrolling navigation block, and the
-/// pinned DATASET footer. The section content lives in `ModelSection`,
-/// `NavigationSection`, and `DatasetSection`, built from the design-language
-/// primitives in `Sidebar/Components/` (`SidebarSection`, `SidebarRow`). The
-/// public init is unchanged so the `IrisShell` call site and previews are
+/// **Thin assembler (M9·P6·3).** This view owns only the outer skeleton — the
+/// pinned MODEL header, the divider, the scrolling block of page-sections, and
+/// the pinned DATASET footer. It lists the five sections explicitly (no
+/// `ForEach`): `ModelSection`, then the three selectable `ModeSection`s
+/// (Playback / Image / Capture), then `DatasetSection`. The mode sections are
+/// built from the design-language primitives in `Sidebar/Components/`
+/// (`SidebarSection`/`SidebarSectionHeader`, `ModeSection`) plus `SourcePicker`.
+/// The public init is unchanged so the `IrisShell` call site and previews are
 /// untouched.
 ///
 /// Cross-platform. macOS has no camera, so the Capture row renders disabled
@@ -76,22 +78,45 @@ struct SidebarView: View {
 
             Divider()
 
-            // Page-rows scroll between the pinned MODEL header and DATASET
-            // footer. The expansion animation lives here (keyed on `page`) so it
-            // drives the whole scroll block — matching the original placement;
-            // the section rules + the per-row layout live inside
-            // `NavigationSection`.
+            // The page-sections scroll between the pinned MODEL header and the
+            // DATASET footer. The three selectable `ModeSection`s form an
+            // accordion keyed to `page`: expanding a section IS selecting it,
+            // and the others collapse. The expansion animation lives here
+            // (keyed on `page`) so it drives the whole scroll block — matching
+            // the original placement; each section owns its own header + content
+            // layout.
             ScrollView {
-                NavigationSection(
-                    page: $page,
-                    captureAvailable: captureAvailable,
-                    recentVideos: recentVideos,
-                    onOpenVideo: onOpenVideo,
-                    onPickVideo: onPickVideo,
-                    recentImages: recentImages,
-                    onOpenImage: onOpenImage,
-                    onPickImage: onPickImage
-                )
+                VStack(alignment: .leading, spacing: 4) {
+                    ModeSection(page: .playback, selection: $page) {
+                        SourcePicker(
+                            openTitle: "Open Video…",
+                            openSystemImage: "folder.badge.plus",
+                            onOpen: onOpenVideo,
+                            recents: recentVideos,
+                            recentSystemImage: "play.rectangle",
+                            onPick: onPickVideo,
+                            emptyHint: "Use Open Video… to pick a clip."
+                        )
+                    }
+                    Divider().padding(.horizontal, 12)
+                    ModeSection(page: .image, selection: $page) {
+                        SourcePicker(
+                            openTitle: "Open Image…",
+                            openSystemImage: "photo.badge.plus",
+                            onOpen: onOpenImage,
+                            recents: recentImages,
+                            recentSystemImage: "photo",
+                            onPick: onPickImage,
+                            emptyHint: "Use Open Image… to pick a still."
+                        )
+                    }
+                    Divider().padding(.horizontal, 12)
+                    ModeSection(page: .capture, selection: $page, isEnabled: captureAvailable) {
+                        Text("Live camera")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 .padding(.vertical, 8)
                 .animation(.snappy(duration: 0.22), value: page)
             }
