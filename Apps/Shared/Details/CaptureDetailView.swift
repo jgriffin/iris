@@ -15,7 +15,7 @@ import SwiftUI
 /// overlay and the top-right "Inspect frame" affordance.
 struct CaptureDetailView: View {
     let capture: CaptureModel
-    let minConfidence: Float
+    let filter: OverlayFilter
     let onInspect: (Frame?) -> Void
 
     var body: some View {
@@ -33,7 +33,7 @@ struct CaptureDetailView: View {
                 DetectionLayer(
                     store: capture.resultStore,
                     makeConverter: { _ in converter },
-                    minConfidence: minConfidence
+                    filter: filter
                 )
                 .ignoresSafeArea()
             } else if let session = capture.session {

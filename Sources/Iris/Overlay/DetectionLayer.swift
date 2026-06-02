@@ -84,17 +84,20 @@ public struct DetectionLayer: View {
     /// in `lookup(at:)` is drawn unfiltered.
     public let tuning: (any TuningRouter)?
 
-    /// Render-time minimum-confidence floor (M9·P3). A global, draw-time
-    /// **overlay filter**: only detections with `confidence >= minConfidence`
-    /// are drawn. This is distinct from detector settings — it changes what
-    /// the overlay *draws*, never what the detector *emits*, and never touches
-    /// the raw-data inspector (`DetectionInspector`), which stays unfiltered.
+    /// Render-time **overlay filter** (M9·P3 global floor, generalized M10·P1).
+    /// A draw-time filter over what the detector emitted: per-label confidence
+    /// floors + a hidden-label set, with `globalMinConfidence` as the fallback.
+    /// This is distinct from detector settings — it changes what the overlay
+    /// *draws*, never what the detector *emits*, and never touches the raw-data
+    /// inspector (`DetectionInspector`), which stays unfiltered.
     ///
-    /// Default `0` keeps every detection (behavior-neutral until a caller
-    /// passes a value). The filter is universal and honest across detectors:
-    /// Vision rectangles stamp `confidence == 1.0`, so any floor `< 1.0` shows
-    /// them all; detectors that emit real scores (e.g. YOLO) feel the floor.
-    public let minConfidence: Float
+    /// The default empty `OverlayFilter()` is a behavior-neutral passthrough
+    /// (no hidden labels, no per-label entries, a zero global floor), so a
+    /// caller that passes nothing draws every detection — exactly the pre-M9
+    /// behavior. The filter is universal and honest across detectors: Vision
+    /// rectangles stamp `confidence == 1.0`, so any floor `< 1.0` shows them
+    /// all; detectors that emit real scores (e.g. YOLO) feel the floor.
+    public let filter: OverlayFilter
 
     public init(
         store: ResultStore,
@@ -102,7 +105,7 @@ public struct DetectionLayer: View {
         style: OverlayStyle = .default,
         stalenessThreshold: CMTime? = nil,
         tuning: (any TuningRouter)? = nil,
-        minConfidence: Float = 0,
+        filter: OverlayFilter = OverlayFilter(),
         displayTimeSource: @Sendable @escaping () -> CMTime = {
             CMClockGetTime(CMClockGetHostTimeClock())
         }
@@ -112,7 +115,7 @@ public struct DetectionLayer: View {
         self.style = style
         self.stalenessThreshold = stalenessThreshold
         self.tuning = tuning
-        self.minConfidence = minConfidence
+        self.filter = filter
         self.displayTimeSource = displayTimeSource
     }
 
@@ -127,10 +130,11 @@ public struct DetectionLayer: View {
                 let displayTime = displayTimeSource()
                 let raw = store.lookup(at: displayTime, stale: stalenessThreshold)
                 let transformed = Self.applyTransform(tuning?.transform, to: raw)
-                // Render-time overlay floor (M9·P3): draw only what clears
-                // `minConfidence`. The raw-data inspector reads the store
-                // directly and is NOT subject to this filter.
-                let detections = transformed.filtered(minConfidence: minConfidence)
+                // Render-time overlay filter (M9·P3 floor, generalized M10·P1):
+                // draw only what the per-label / global filter keeps. The
+                // raw-data inspector reads the store directly and is NOT
+                // subject to this filter.
+                let detections = transformed.filtered(by: filter)
 
                 Canvas { gc, _ in
                     for detection in detections {

@@ -44,7 +44,8 @@ struct ImageDetailView: View {
     var showsControlBar: Bool = true
 
     /// The shared app-wide selection — read for its render-time
-    /// `minConfidence` overlay floor (M9·P3). Injected at both app roots.
+    /// ``ModelSelection/overlayFilter`` (M9·P3 floor, generalized M10). Injected
+    /// at both app roots.
     @Environment(ModelSelection.self) private var modelSelection
 
     /// Shared CoreImage context for the held-frame → `CGImage` render. Thread-
@@ -108,11 +109,12 @@ struct ImageDetailView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
-                // M9·P3: render-time overlay floor. Reading the observed
-                // `modelSelection.minConfidence` here re-runs `body` when the
-                // slider moves, so the held still re-filters live (pure draw-
-                // time filter — no re-detection).
-                minConfidence: Float(modelSelection.minConfidence),
+                // M9·P3 floor, generalized M10: render-time overlay filter.
+                // Reading the observed `modelSelection.overlayFilter` here
+                // re-runs `body` when any knob (global floor, per-label floor,
+                // hidden set) changes, so the held still re-filters live (pure
+                // draw-time filter — no re-detection).
+                filter: modelSelection.overlayFilter,
                 displayTimeSource: { [coordinator] in
                     MainActor.assumeIsolated { coordinator.frame?.timestamp ?? .zero }
                 }

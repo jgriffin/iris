@@ -15,7 +15,7 @@ extension IrisShell {
         #if os(iOS)
         CaptureDetailView(
             capture: capture,
-            minConfidence: Float(modelSelection.minConfidence),
+            filter: modelSelection.overlayFilter,
             onInspect: { inspectFrame($0) }
         )
         #else

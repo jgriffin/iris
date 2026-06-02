@@ -34,7 +34,7 @@ extension IrisShell {
         PlaybackDetailView(
             coordinator: coordinator,
             flaggingModel: flaggingModel,
-            minConfidence: Float(modelSelection.minConfidence),
+            filter: modelSelection.overlayFilter,
             activeLabel: activeLabel,
             errorText: errorText,
             isLoadingFixture: loadingFixture,

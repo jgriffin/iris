@@ -14,11 +14,11 @@ import SwiftUI
 /// and the on-frame Inspect + Flag affordances clustered top-right of the video.
 ///
 /// Hosted by `IrisShell`; the shell owns the coordinator, flagging model,
-/// min-confidence, and the freeze-from-live hand-off (`onInspect`).
+/// overlay filter, and the freeze-from-live hand-off (`onInspect`).
 struct PlaybackDetailView: View {
     let coordinator: PlaybackDetectionCoordinator
     let flaggingModel: FlaggingModel?
-    let minConfidence: Float
+    let filter: OverlayFilter
     let activeLabel: String
     let errorText: String?
     /// First-launch loading state (iOS auto-loads a bundled fixture).
@@ -75,7 +75,7 @@ struct PlaybackDetailView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
-                minConfidence: minConfidence,
+                filter: filter,
                 displayTimeSource: { [controller] in
                     MainActor.assumeIsolated { controller.currentTime }
                 }
