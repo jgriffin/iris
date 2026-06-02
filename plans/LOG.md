@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-📋 **M9 — Unified shell shipped to `main`** (M1–M9 all ✅ on main). M9 delivered one app-level shared model (detector + min-confidence) across Playback/Image/Capture and a cross-platform left-pane sidebar — `NavigationSplitView` + a custom `ModeSection` accordion — replacing the iOS tabs + macOS `Videos|Images` toggle. 6 phases: P1 reliability · P2 shared model store · P3 left-pane shell · P4 Capture joins · P5 simplify · P6 in-canvas design pass (active-section redesign). Demo-wiring only — the `Iris` library was left alone (the one exception: P3's render-time min-confidence overlay filter).
-👉 Next: **milestone boundary — pick the next milestone** from the backlog (per-category tuning · offline file-reader pre-pass · dataset training tie-in · adopt the git workflow policy). → [`BOARD.md`](./BOARD.md)
+📋 **M10 — Per-class tuning defined** (M1–M9 all ✅ on `main`). Generalize M9's global confidence floor into per-label floors + per-label hide/show, surfaced in a unified model-settings panel (detector knobs + display/filter rows, delineated, in the sidebar MODEL section). Render-side data; library gains only the generalized filter + an `availableLabels` capability. 4 phases drafted: P1 library filter+capability · P2 app state+wiring · P3 unified panel · P4 polish.
+👉 Next: **start P1** on a new `m10-per-class-tuning` branch — generalize `[Detection].filtered(minConfidence:)` to per-label floors + visibility (global as fallback, scalar form preserved) + add `DetectorCapabilities.availableLabels`, with fixture tests. → [`features/per-class-tuning.md`](./features/per-class-tuning.md)
 <!-- /STATUS -->
 
 ---
@@ -870,3 +870,11 @@
 - Verified: macOS `xcodebuild` green at every step; user reviewed iOS + iPad **on device** through the iteration and called it "good enough for now." (Did not re-run `swift test` — no library/test changes this phase.)
 - **M9 closed**: merged `m9-unified-shell` → `main`. Two residuals parked in [`BOARD.md`](./BOARD.md) §Backlog — Image's `photo.fill`/`photo` pairing (fill-vs-outline of one glyph, not two distinct like Playback) and the Capture live-camera on-device smoke (sim has no camera; the iPhone compact-nav + sidebar were eyeballed on device, the camera path wasn't).
 - 👉 Next: **milestone boundary — pick the next milestone** (per-category tuning · offline file-reader pre-pass · dataset training tie-in · git workflow policy adoption). → [`BOARD.md`](./BOARD.md)
+
+---
+
+## 2026-06-01
+- Did: **defined M10 — Per-class tuning** (the backlog's "per-category tuning", now scoped + numbered at pickup). Mapped the seams with an Explore agent (render filter `[Detection].filtered(minConfidence:)` @ `DetectionConfidenceFilter.swift` / `DetectionLayer.swift:133`; `Detection.label` as the per-class key; `DetectorCapabilities` for a new `availableLabels` axis; `ModelSelection` as the app-side state home; the unwired `CapabilityTuningView`; the sidebar `ModelSection`). Wrote [`features/per-class-tuning.md`](./features/per-class-tuning.md) (4 phases), recorded the design call in [`DECISIONS.md`](./DECISIONS.md), updated [`BOARD.md`](./BOARD.md) §Status/§Milestones/§Backlog.
+- 📌 Decided (user's framing on 3 forks): **unified UI presentation, honest data** — one MODEL-section panel co-presents detector-input knobs + the render-time filter, *visually delineated* into a Detector group + a Display/filter group, but the data classes stay distinct (2026-05-30 split holds; north-star "one settings class" still deferred). Per-class is **render-side data** keyed on `Detection.label`; state app-side by the global floor; library touched only for the generalized filter + `availableLabels`. UI home = sidebar MODEL section expanded ("part of picking the model is picking settings for it"). Labels **present-only + show-all**.
+- 🗓️ Deferred (spun off M10 → §Backlog): per-class **favorites** (pin a class to always-show before it appears) and **config profiles** (saved bundles, no re-typing).
+- 👉 Next: **start P1** on a new `m10-per-class-tuning` branch — generalize the render filter to per-label floors + visibility (global fallback, scalar form preserved) + add `DetectorCapabilities.availableLabels`, with fixture tests. The one library-touching phase.

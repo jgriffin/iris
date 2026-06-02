@@ -10,6 +10,17 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-01 — M10 Per-class tuning: unified settings *presentation*, render-side *data*, profiles deferred (user)
+
+Q: How does per-class tuning relate to the two settings roles — and where does its UI live?
+
+Picking up the backlog's "Per-category tuning" as **M10 — Per-class tuning** (per-label confidence floors + per-label hide/show, generalizing M9·P3's global floor). The user's framing settles three forks:
+- **Unified UI, honest data.** From the user's view they're "adjusting the model," so **one panel co-presents both control kinds** — but the 2026-05-30 split holds: detector-**input** knobs (M5 capability-honest) vs. render-time **output** filter stay distinct *data*, just **visually delineated** into a Detector group + a Display/filter group in the same panel. The north-star "one shared settings *class*" stays deferred — co-presentation doesn't require merging the classes.
+- **Per-class is render-side.** Per-label floors + visibility key on `Detection.label` *after* emit (uniform across detectors, no rebuild) — the generalization of the render-filter half, **not** a detector input. State lives **app-side** alongside the global floor (in `ModelSelection`, not the library tuning model). Library gains only the generalized filter + a new `DetectorCapabilities.availableLabels` axis (Vision rects → `nil` → no per-class section).
+- **UI home = the sidebar MODEL section, expanded** ("part of picking the model is picking settings for it") — not a separate sheet. Labels shown **present-only + "show all"**. **Favorites** (pin a class to always-show) and **config profiles** (saved bundles) are **deferred** → [`BOARD.md`](./BOARD.md) §Backlog.
+
+→ [`features/per-class-tuning.md`](./features/per-class-tuning.md)
+
 ### 2026-05-30 — Two settings roles: detector input vs. render-time overlay filter; min-confidence is the latter (user)
 
 Q: What does the global "Min confidence" slider in the MODEL section actually do, given M5 made confidence detector-intrinsic?
