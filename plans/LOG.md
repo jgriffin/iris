@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🔀 **M10 — Per-class tuning — feature-complete on `m10-per-class-tuning`** (P1–P4 ✅; not yet merged to `main`). Per-label confidence floors + per-label hide/show, surfaced in the sidebar MODEL section, render-side, wired across all 3 modes. **Deferred:** the unified-panel Detector group (in-sidebar detector-input knobs) + full-roster "show all" + present-label accumulation → §Backlog.
-👉 Next: **two decisions before close** — (1) do the Detector-group lift now (a P5) or accept the deferral; (2) merge `m10-per-class-tuning` → `main` (the deliberate gate). → [`BOARD.md`](./BOARD.md)
+✅ **M10 — Per-class tuning shipped to `main`** (M1–M10 all ✅ on `main`). Per-label confidence floors + per-label hide/show in the sidebar MODEL section, render-side, wired across all 3 modes. User accepted the one deferral: the unified-panel **Detector group** (in-sidebar detector-input knobs) + full-roster "show all" + present-label accumulation → §Backlog.
+👉 Next: **milestone boundary — pick the next milestone** from the backlog (offline file-reader pre-pass · dataset training tie-in · M10 follow-ons · git workflow policy). → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -888,3 +888,5 @@
 - 🗓️ Deferred → §Backlog: **unified-panel Detector group** (in-sidebar detector-input knobs — the heavy lift; each coordinator owns its `TuningModel` privately), **"show all" full roster** (needs `availableLabels` from the active `detectorID`, not exposed by the catalog), **present-label accumulation** (P3 reads the current frame → rows can flicker), and a dead `CaptureModel.start(minConfidence:)` param.
 - 💡 Scope honesty: the user's M10 intent was a *unified* panel (detector knobs + filter together). Shipped the per-class filter half (the milestone's core capability) solidly; the detector-knob co-presentation is the one real deferral — flagged as a P5 choice rather than forcing a risky `TuningModel`-to-shell lift that could break the working coordinators.
 - 👉 Next: user's call — (1) P5 Detector-group lift now vs. accept the deferral; (2) merge `m10-per-class-tuning` → `main`.
+- Did: **closed M10** — user accepted the Detector-group deferral, so merged `m10-per-class-tuning` → `main` (fast-forward; 6 commits). M1–M10 now on `main`. Deleted the throwaway `per-class-preview.html` (the SwiftUI `#Preview` gallery is the durable artifact). Detector-knob co-presentation + "show all" + accumulation live in §Backlog as M10 follow-ons.
+- 👉 Next: milestone boundary — pick the next milestone.
