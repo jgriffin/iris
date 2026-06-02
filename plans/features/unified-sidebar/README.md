@@ -1,7 +1,7 @@
 # M9 — Unified shell: one shared model + a left pane that drives the modes
 
 <!-- Working plan. Lifetime ~ this milestone; LOG.md keeps the trail. Status vocab per WORKFLOW.md §"Status trees". -->
-_Active milestone (M9) · 2026-05-31 · pulled forward; M8·P5/P6 shelved. **P1–P5 shipped** (✅ on `m9-unified-shell`); **P6 design pass** 🌱 — P6·1 scaffolding + P6·2 decomposition + P6·3 sidebar-is-sections done; look-and-feel iteration in Xcode next; folds in before the `main` merge._
+_✅ **M9 shipped to `main`** · 2026-06-01 · pulled forward; M8·P5/P6 shelved. All 6 phases done — P1 reliability · P2 shared model · P3 left-pane shell · P4 Capture joins · P5 simplify · P6 in-canvas design pass (P6·1 scaffolding → P6·2 decomposition → P6·3 sidebar-is-sections → **P6·4 active-section redesign**). Two residuals in [BOARD §Backlog](../../BOARD.md#backlog): Image glyph pairing · Capture on-device smoke._
 
 ## Intent
 
