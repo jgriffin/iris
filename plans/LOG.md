@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M10 — Per-class tuning** (P1 ✅ · P2–P4 📋 · branch `m10-per-class-tuning` → `main`). Generalize M9's global confidence floor into per-label floors + per-label hide/show, in a unified model-settings panel (detector knobs + display/filter rows). P1 shipped the library half: `OverlayFilter` + `[Detection].filtered(by:)` + `DetectorCapabilities.availableLabels`.
-👉 Next: **start P2** — extend app-side state with the per-class floor map + hidden set + persistence, snapshot present-labels, wire `filtered(by:)` into `DetectionLayer` (Playback/Image/Capture). → [`features/per-class-tuning.md`](./features/per-class-tuning.md)
+🔀 **M10 — Per-class tuning — feature-complete on `m10-per-class-tuning`** (P1–P4 ✅; not yet merged to `main`). Per-label confidence floors + per-label hide/show, surfaced in the sidebar MODEL section, render-side, wired across all 3 modes. **Deferred:** the unified-panel Detector group (in-sidebar detector-input knobs) + full-roster "show all" + present-label accumulation → §Backlog.
+👉 Next: **two decisions before close** — (1) do the Detector-group lift now (a P5) or accept the deferral; (2) merge `m10-per-class-tuning` → `main` (the deliberate gate). → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -881,3 +881,10 @@
 - Verified: `swift build` clean, `swift test` **272 green** (OverlayFilterTests ×6 + scalar-delegation + availableLabels ×3 + a detector-roster assertion in the YOLO26n LFS fixture test). No `#if os(iOS)` in any touched file, so the host `swift build` fully covers it.
 - 💡 Seam note: putting `availableLabels` on the decoder (not hand-set per detector) means the per-class roster can't drift from what the model actually emits — same pattern `CoreMLDetector` already uses for `tunableKnobs`.
 - 👉 Next: **P2** — extend app-side state (`ModelSelection` or a sibling) with the per-class floor map + hidden set + persistence, snapshot present-labels, and swap the `DetectionLayer` call site to `filtered(by:)` across Playback/Image/Capture.
+
+## 2026-06-02
+- Did: **shipped M10·P2 + P3 (+P4)** — M10 feature-complete on the branch (subagents per phase, my build/test/diff-review + a static HTML preview between). **P2** (`b2480be`): `DetectionLayer` now takes `filter: OverlayFilter` (default empty = no-op, so behavior-neutral); `ModelSelection` gained `perLabelMinConfidence [String:Double]` + `hiddenLabels Set<String>` (persisted `.v1` keys) + a computed `overlayFilter`; `modelSelection.overlayFilter` wired into the overlay across Playback/Image/Capture. **P3** (`a0767c4`): `IrisShell.activeResultStore`/`presentLabels` (distinct non-empty labels in the active mode's `ResultStore` via the per-page `lookup(at:)` the overlay already uses) threaded to a new `PerClassControls`/`PerClassRow` under the MODEL section — eye visibility toggle (→ `hiddenLabels`), per-label floor slider over a derived override-or-global binding, override dot + reset-to-global, dimmed-when-hidden — plus a 5-case `#Preview` gallery. P4's planned items (reset, agnostic empty state, preview gallery) all landed inside P3.
+- Verified: `swift build`/`swift test` **272 green** at every step (library only changed in P2's `DetectionLayer` signature); **IrisDemo-iOS + IrisDemo-macOS both BUILD SUCCEEDED** after P2 and after P3. Sent the user a static HTML mock of the panel (`per-class-preview.html`) for the design eyeball.
+- 🗓️ Deferred → §Backlog: **unified-panel Detector group** (in-sidebar detector-input knobs — the heavy lift; each coordinator owns its `TuningModel` privately), **"show all" full roster** (needs `availableLabels` from the active `detectorID`, not exposed by the catalog), **present-label accumulation** (P3 reads the current frame → rows can flicker), and a dead `CaptureModel.start(minConfidence:)` param.
+- 💡 Scope honesty: the user's M10 intent was a *unified* panel (detector knobs + filter together). Shipped the per-class filter half (the milestone's core capability) solidly; the detector-knob co-presentation is the one real deferral — flagged as a P5 choice rather than forcing a risky `TuningModel`-to-shell lift that could break the working coordinators.
+- 👉 Next: user's call — (1) P5 Detector-group lift now vs. accept the deferral; (2) merge `m10-per-class-tuning` → `main`.
