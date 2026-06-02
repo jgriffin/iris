@@ -46,6 +46,25 @@ public protocol OutputDecoder: Sendable {
         frameSize: CGSize,
         modelID: String
     ) throws -> [Detection]
+
+    /// The full class set this decoder can map a detection onto, or `nil` when
+    /// the decoder carries no statically-known label set. Surfaced by the
+    /// wrapping `CoreMLDetector` as `DetectorCapabilities.availableLabels` — the
+    /// single source of truth for the M10 per-class tuning roster.
+    ///
+    /// A raw-tensor path-B decoder (``YOLOEnd2EndDecoder``) is constructed with
+    /// its `labels`, so it knows the whole class set up front and returns it. A
+    /// path-A ``VisionObjectDecoder`` reads a `NonMaximumSuppression` pipeline
+    /// whose label list is baked into the model and only surfaces *per
+    /// detection* at decode time — the decoder holds no static roster, so it
+    /// keeps the `nil` default.
+    var availableLabels: [String]? { get }
+}
+
+extension OutputDecoder {
+    /// Default: no statically-known class set. A decoder whose labels are
+    /// supplied at construction overrides this.
+    public var availableLabels: [String]? { nil }
 }
 
 /// An ``OutputDecoder`` that carries a runtime-tunable **confidence

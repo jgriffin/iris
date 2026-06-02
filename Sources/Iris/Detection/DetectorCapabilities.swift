@@ -60,16 +60,27 @@ public struct DetectorCapabilities: Sendable, Hashable {
     /// Order is display order.
     public let introspectableFields: [IntrospectableField]
 
+    /// The class labels this detector can emit — its full class set (e.g. the
+    /// 80 COCO classes for a stock YOLO detector), or `nil` for a
+    /// class-agnostic detector that emits no meaningful label set (e.g. Vision
+    /// rectangles). The single source of truth for the M10 per-class tuning UI:
+    /// the "show all" class roster a consumer offers per-label floor / hide
+    /// controls over. A `nil` label set means *no per-class section* — the same
+    /// graceful gating the tuning UI does for `confidence == .none`.
+    public let availableLabels: [String]?
+
     public init(
         geometryKinds: Set<GeometryKind>,
         confidence: ConfidenceSemantics,
         tunableKnobs: SettingSchema,
-        introspectableFields: [IntrospectableField]
+        introspectableFields: [IntrospectableField],
+        availableLabels: [String]? = nil
     ) {
         self.geometryKinds = geometryKinds
         self.confidence = confidence
         self.tunableKnobs = tunableKnobs
         self.introspectableFields = introspectableFields
+        self.availableLabels = availableLabels
     }
 }
 

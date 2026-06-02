@@ -71,6 +71,12 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
     ///
     /// **Introspectable fields.** What a box detection carries: the bounding
     /// box, the class label, and the confidence.
+    ///
+    /// **Available labels: decoder-derived.** The class roster comes off the
+    /// decoder (`decoder.availableLabels`) — a path-B ``YOLOEnd2EndDecoder``
+    /// surfaces its `labels` (the COCO-80 set for stock YOLO), while a path-A
+    /// ``VisionObjectDecoder`` carries no static roster and yields `nil`.
+    /// Reading it off the decoder keeps the class set from drifting.
     public var capabilities: DetectorCapabilities {
         let knobs = (decoder as? any TunableOutputDecoder).map {
             type(of: $0).settingSchema
@@ -98,7 +104,8 @@ public final class CoreMLDetector<Decoder: OutputDecoder>: Detector {
                     valueKind: .scalar,
                     source: .confidence
                 ),
-            ]
+            ],
+            availableLabels: decoder.availableLabels
         )
     }
 

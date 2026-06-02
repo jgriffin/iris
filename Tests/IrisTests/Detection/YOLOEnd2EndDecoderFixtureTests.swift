@@ -44,6 +44,16 @@ func yoloEnd2EndDecoderDetectsPersonOnDancerClip() async throws {
         modelIdentifier: "coreml.yolo26n"
     )
 
+    // M10·P1: the wrapping detector projects the decoder's class roster as
+    // `capabilities.availableLabels` — the per-class tuning panel's "show all"
+    // source. Proof the projection holds on a real, model-backed detector.
+    let availableLabels = try #require(
+        detector.capabilities.availableLabels,
+        "YOLO detector must expose its COCO label set as availableLabels"
+    )
+    #expect(availableLabels == COCOLabels.coco80)
+    #expect(availableLabels.contains("person"))
+
     let frames = try await decodeFrames(from: clipURL, maximumFrames: 10)
     #expect(frames.count == 10, "Expected to decode 10 frames, got \(frames.count)")
 

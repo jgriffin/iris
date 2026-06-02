@@ -113,6 +113,11 @@ public struct YOLOEnd2EndDecoder: TunableOutputDecoder {
 
     // MARK: - OutputDecoder
 
+    /// The full class set, known up front because it's supplied at
+    /// construction (`labels`). Surfaced as the wrapping detector's
+    /// `DetectorCapabilities.availableLabels` for the M10 per-class roster.
+    public var availableLabels: [String]? { labels }
+
     public func decode(
         _ observations: [any VisionObservation],
         frameSize: CGSize,

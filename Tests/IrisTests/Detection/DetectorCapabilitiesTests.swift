@@ -116,3 +116,33 @@ func capabilitiesAreEquatable() {
     // diffing later.
     #expect(rectangles.capabilities == VisionRectanglesDetector().capabilities)
 }
+
+// MARK: - Available labels (M10·P1)
+
+@Test
+func rectanglesExposeNilAvailableLabels() {
+    // Vision rectangles is class-agnostic — no class set, so no per-class
+    // tuning section. The descriptor must report `nil` (the default).
+    #expect(rectangles.capabilities.availableLabels == nil)
+}
+
+@Test
+func yoloDecoderExposesItsCocoLabelSet() {
+    // The path-B decoder is constructed with its label set, so it surfaces
+    // the full class roster the M10 per-class panel reads — and the wrapping
+    // `CoreMLDetector` projects `decoder.availableLabels` straight through.
+    // Testing the decoder directly keeps this off the Git-LFS model fixture.
+    let decoder = YOLOEnd2EndDecoder(labels: COCOLabels.coco80)
+    let labels = try! #require(decoder.availableLabels)
+    #expect(labels == COCOLabels.coco80)
+    #expect(labels.contains("person"))
+    #expect(labels.contains("sports ball"))
+    #expect(labels.count == 80)
+}
+
+@Test
+func visionObjectDecoderExposesNilAvailableLabels() {
+    // The path-A decoder reads a baked NMS pipeline whose labels only surface
+    // per-detection — it carries no static roster, so `nil` (the default).
+    #expect(VisionObjectDecoder().availableLabels == nil)
+}
