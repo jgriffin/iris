@@ -20,6 +20,7 @@
 		4A6208A458CC66094A8755AA /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891475758A6A13D036F12E8E /* DemoCatalog.swift */; };
 		4BA2D87281F0CCFF46238E56 /* ModeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7013D1D959E30D579C926905 /* ModeSection.swift */; };
 		4F2421A9F1943FF0F9BE93C4 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 53270A4BBE94833D88339CC9 /* Iris */; };
+		592F36F7C4B63B5D614F41F5 /* PerClassControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9979502E83B66E158836A106 /* PerClassControls.swift */; };
 		5C839C2E118D05A9659CA207 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A8F35B723B525FE4E3140423 /* Assets.xcassets */; };
 		5D65BF8223E965CF95ED551A /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A56187D45DA2BD9FBD7D6978 /* PreviewFixtures.swift */; };
 		5FA5C5E28A0F48BADF0B6482 /* FrameExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E0A78EDC0630A9A7AE5B04 /* FrameExportCoordinator.swift */; };
@@ -39,6 +40,7 @@
 		941E87FD9F5701B91EAE8A1C /* DatasetSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07945183CA74C5377EF24C05 /* DatasetSection.swift */; };
 		94E1A4E6C10E6E9327089F31 /* ShellPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A5E148F2FF71AA47276C6C /* ShellPage.swift */; };
 		9AEC23B0DD084D79A0A85211 /* SidebarSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A08C6883B372BD13EB3B9F /* SidebarSection.swift */; };
+		9BA1B74B1A26CC45B5F4179C /* PerClassControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9979502E83B66E158836A106 /* PerClassControls.swift */; };
 		A6FBF03EA2E14FB41043F3D2 /* IrisShell+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */; };
 		A85A3463D6B354B6B5F46DBD /* IrisShell+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8959B2D6D8809BCC1F01894 /* IrisShell+Presentation.swift */; };
 		A882BF2168C8DAAA86746A27 /* yolo12n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */; };
@@ -86,6 +88,7 @@
 		80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */ = {isa = PBXFileReference; path = yolo12n.mlpackage; sourceTree = "<group>"; };
 		891475758A6A13D036F12E8E /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
 		98506DC1073FD4554B23AD45 /* PlaybackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackDetailView.swift; sourceTree = "<group>"; };
+		9979502E83B66E158836A106 /* PerClassControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerClassControls.swift; sourceTree = "<group>"; };
 		9CB3FBD781002591A717199E /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		9FA0B207E093B250ED3745A6 /* CaptureDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDetailView.swift; sourceTree = "<group>"; };
 		A02A8DFDA1D7430D9CBC0BC7 /* IrisShell+Image.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Image.swift"; sourceTree = "<group>"; };
@@ -131,6 +134,7 @@
 			children = (
 				07945183CA74C5377EF24C05 /* DatasetSection.swift */,
 				C35E1845BD604096FD04BDE2 /* ModelSection.swift */,
+				9979502E83B66E158836A106 /* PerClassControls.swift */,
 				F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */,
 				B02C0318871B843D498C3B09 /* SidebarView.swift */,
 				36CA43F758FB8F4A6BA95DA1 /* Components */,
@@ -404,6 +408,7 @@
 				4BA2D87281F0CCFF46238E56 /* ModeSection.swift in Sources */,
 				F84C841C6DA802A41BCFE384 /* ModelSection.swift in Sources */,
 				C46F90D4384D56B620520781 /* ModelSelection.swift in Sources */,
+				9BA1B74B1A26CC45B5F4179C /* PerClassControls.swift in Sources */,
 				DE2E2AD6C911375080FA9322 /* PlaybackDetailView.swift in Sources */,
 				E790B10630BF7BF4E2BF6AF6 /* PreviewFixtures.swift in Sources */,
 				E13B54329CC9AA6AAAD71B6E /* RecentDetectors.swift in Sources */,
@@ -438,6 +443,7 @@
 				6960091A22E9AAE2B4478770 /* ModeSection.swift in Sources */,
 				BDDE1176815E9C47EDACD7C7 /* ModelSection.swift in Sources */,
 				04786C631C8749901B30671F /* ModelSelection.swift in Sources */,
+				592F36F7C4B63B5D614F41F5 /* PerClassControls.swift in Sources */,
 				80C5FD1FBF303FD83FCAD7E3 /* PlaybackDetailView.swift in Sources */,
 				5D65BF8223E965CF95ED551A /* PreviewFixtures.swift in Sources */,
 				8052DCD7FF7092CA9EA28185 /* RecentDetectors.swift in Sources */,

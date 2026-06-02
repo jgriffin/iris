@@ -171,6 +171,7 @@ struct IrisShell: View {
                 modelStore: modelStore,
                 modelSelection: modelSelection,
                 selectedDetectorID: selectedDetectorID,
+                presentLabels: presentLabels,
                 captureAvailable: captureAvailable,
                 recentVideos: recentVideos.resolve(),
                 onOpenVideo: presentVideoPicker,
@@ -354,6 +355,47 @@ struct IrisShell: View {
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// The active mode's `ResultStore` — the one feeding the visible overlay,
+    /// chosen by `page` (M10·P3). The sidebar's per-class controls read present
+    /// labels off this; because `ResultStore` is `@Observable`, deriving labels
+    /// from it in the sidebar body updates the rows as detections arrive.
+    var activeResultStore: ResultStore? {
+        switch page {
+        case .playback: return coordinator.resultStore
+        case .image: return imageCoordinator.resultStore
+        #if os(iOS)
+        case .capture: return capture.resultStore
+        #else
+        case .capture: return nil
+        #endif
+        }
+    }
+
+    /// The distinct, non-empty `Detection.label`s currently visible in the active
+    /// mode's store — the present-only roster the per-class sidebar rows show
+    /// (M10·P3). Sourced via the SAME nearest-neighbor `lookup(at:)` shape the
+    /// overlay + inspector use (matching `displayTimeSource` + staleness per
+    /// page), so the labels track exactly what's drawn. The empty-string label
+    /// (class-agnostic detectors like Vision rectangles stamp `""`) is filtered
+    /// out — no per-class row for those. Reading `lookup` here observes the
+    /// `@Observable` store, so this recomputes as detections change.
+    var presentLabels: Set<String> {
+        guard let store = activeResultStore else { return [] }
+        let detections: [Detection]
+        switch page {
+        case .playback:
+            guard let controller = coordinator.controller else { return [] }
+            let time = MainActor.assumeIsolated { controller.currentTime }
+            detections = store.lookup(at: time, stale: store.playbackStalenessThreshold)
+        case .image:
+            guard let frame = imageCoordinator.frame else { return [] }
+            detections = store.lookup(at: frame.timestamp, stale: store.playbackStalenessThreshold)
+        case .capture:
+            detections = store.lookup(at: .zero, stale: store.liveStalenessThreshold)
+        }
+        return Set(detections.map(\.label).filter { !$0.isEmpty })
     }
 
     /// The active page's session (playback / image; capture has none).

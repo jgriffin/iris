@@ -38,6 +38,12 @@ struct SidebarView: View {
     @Bindable var modelSelection: ModelSelection
     let selectedDetectorID: String
 
+    /// Distinct `Detection.label`s currently visible in the active mode — the
+    /// present-only roster the MODEL section's per-class rows render (M10·P3).
+    /// Empty for class-agnostic detectors (Vision rectangles) and before any
+    /// detection arrives, in which case no per-class section shows.
+    let presentLabels: Set<String>
+
     /// Whether Capture is offered on this platform (false on macOS — no camera).
     let captureAvailable: Bool
 
@@ -70,7 +76,8 @@ struct SidebarView: View {
                 catalog: catalog,
                 recentDetectors: recentDetectors,
                 modelStore: modelStore,
-                modelSelection: modelSelection
+                modelSelection: modelSelection,
+                presentLabels: presentLabels
             )
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -159,6 +166,7 @@ struct SidebarView: View {
         modelStore: store,
         modelSelection: PreviewFixtures.modelSelection,
         selectedDetectorID: "vision.rectangles",
+        presentLabels: [],
         captureAvailable: true,
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
@@ -185,6 +193,7 @@ struct SidebarView: View {
         modelStore: store,
         modelSelection: PreviewFixtures.modelSelection,
         selectedDetectorID: "vision.rectangles",
+        presentLabels: [],
         captureAvailable: true,
         recentVideos: [],
         onOpenVideo: {},
@@ -211,6 +220,7 @@ struct SidebarView: View {
         modelStore: store,
         modelSelection: PreviewFixtures.modelSelection,
         selectedDetectorID: "vision.rectangles",
+        presentLabels: [],
         captureAvailable: true,
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
@@ -237,6 +247,7 @@ struct SidebarView: View {
         modelStore: store,
         modelSelection: PreviewFixtures.modelSelection,
         selectedDetectorID: "vision.rectangles",
+        presentLabels: [],
         captureAvailable: true,
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},

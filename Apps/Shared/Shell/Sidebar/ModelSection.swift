@@ -10,6 +10,11 @@ struct ModelSection: View {
     let modelStore: DemoModelStore
     @Bindable var modelSelection: ModelSelection
 
+    /// Labels currently visible in the active mode — drives the present-only
+    /// per-class rows (M10·P3). Empty for class-agnostic detectors / before any
+    /// detection, in which case `PerClassControls` shows only a faint hint.
+    let presentLabels: Set<String>
+
     var body: some View {
         SidebarSection("MODEL") {
             Picker("Detector", selection: $modelSelection.detectorID) {
@@ -29,6 +34,17 @@ struct ModelSection: View {
             MinConfidenceControl(modelSelection: modelSelection)
                 // Indented to read as a setting nested under the detector picker.
                 .padding(.leading, 16)
+
+            // The per-class Display/filter group (M10·P3): per-label visibility
+            // + confidence floor over the present-only roster. Visually
+            // delineated from the global floor by a divider; gated to nothing
+            // extra (a faint hint) when no labels are present.
+            Divider()
+            PerClassControls(
+                modelSelection: modelSelection,
+                presentLabels: presentLabels
+            )
+            .padding(.leading, 16)
         }
     }
 
@@ -71,7 +87,8 @@ private struct MinConfidenceControl: View {
         catalog: PreviewFixtures.catalog(store: store),
         recentDetectors: PreviewFixtures.recentDetectors,
         modelStore: store,
-        modelSelection: PreviewFixtures.modelSelection
+        modelSelection: PreviewFixtures.modelSelection,
+        presentLabels: ["person", "sports ball", "car", "dog"]
     )
     .padding(.horizontal, 12)
     .padding(.top, 12)
