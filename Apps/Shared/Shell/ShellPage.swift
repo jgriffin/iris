@@ -22,4 +22,12 @@ enum ShellPage: String, CaseIterable, Identifiable, Hashable {
         case .capture: return "camera"
         }
     }
+
+    var activeSystemImage: String {
+        switch self {
+        case .playback: return "play.rectangle.fill"
+        case .image: return "photo.fill"
+        case .capture: return "camera.fill"
+        }
+    }
 }

@@ -26,7 +26,6 @@
 		67061E8022BD363D057BEAA6 /* DatasetSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07945183CA74C5377EF24C05 /* DatasetSection.swift */; };
 		6960091A22E9AAE2B4478770 /* ModeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7013D1D959E30D579C926905 /* ModeSection.swift */; };
 		69EBF3E30A10F5CE92DEB21E /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02C0318871B843D498C3B09 /* SidebarView.swift */; };
-		6D2F3744FE7458685BB9D681 /* SourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263F6C567B82471613BC2AD8 /* SourcePicker.swift */; };
 		749C6ACF62DFF2B567F900D7 /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185675E2E634D70B6C33B219 /* RecentImages.swift */; };
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
 		786AF9497724C07BCC9F00E6 /* IrisShell+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */; };
@@ -48,7 +47,6 @@
 		B20D24960456CAB2B5FCE726 /* IrisShell+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */; };
 		B5C13FDE0680F46FE3060DF8 /* IrisShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C954F3A6D2311B56FEADA34 /* IrisShell.swift */; };
 		BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */; };
-		BDA0D1A2F6C2BBA49BB89E3E /* SourcePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263F6C567B82471613BC2AD8 /* SourcePicker.swift */; };
 		BDDE1176815E9C47EDACD7C7 /* ModelSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35E1845BD604096FD04BDE2 /* ModelSection.swift */; };
 		C46F90D4384D56B620520781 /* ModelSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223647B66EB28506C2F96B97 /* ModelSelection.swift */; };
 		CDB1FA36B54155950B0B0FFE /* IrisShell+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */; };
@@ -79,7 +77,6 @@
 		1B460BBC0A9FF30933C587AA /* IrisDemo-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IrisDemo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		223647B66EB28506C2F96B97 /* ModelSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelection.swift; sourceTree = "<group>"; };
 		25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Playback.swift"; sourceTree = "<group>"; };
-		263F6C567B82471613BC2AD8 /* SourcePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcePicker.swift; sourceTree = "<group>"; };
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		44A08C6883B372BD13EB3B9F /* SidebarSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSection.swift; sourceTree = "<group>"; };
 		4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Capture.swift"; sourceTree = "<group>"; };
@@ -136,7 +133,6 @@
 				C35E1845BD604096FD04BDE2 /* ModelSection.swift */,
 				F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */,
 				B02C0318871B843D498C3B09 /* SidebarView.swift */,
-				263F6C567B82471613BC2AD8 /* SourcePicker.swift */,
 				36CA43F758FB8F4A6BA95DA1 /* Components */,
 			);
 			path = Sidebar;
@@ -417,7 +413,6 @@
 				F19DDEB08BF187E09029D1E6 /* ShellPage.swift in Sources */,
 				271BEBCA6330A96A381AC4BD /* SidebarSection.swift in Sources */,
 				69EBF3E30A10F5CE92DEB21E /* SidebarView.swift in Sources */,
-				6D2F3744FE7458685BB9D681 /* SourcePicker.swift in Sources */,
 				F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */,
 				09FEB1448671C09C039DD333 /* yolo26n.mlpackage in Sources */,
 			);
@@ -452,7 +447,6 @@
 				94E1A4E6C10E6E9327089F31 /* ShellPage.swift in Sources */,
 				9AEC23B0DD084D79A0A85211 /* SidebarSection.swift in Sources */,
 				D7443B83E4A219233875A427 /* SidebarView.swift in Sources */,
-				BDA0D1A2F6C2BBA49BB89E3E /* SourcePicker.swift in Sources */,
 				A882BF2168C8DAAA86746A27 /* yolo12n.mlpackage in Sources */,
 				F460335D8F2655630206C25A /* yolo26n.mlpackage in Sources */,
 			);

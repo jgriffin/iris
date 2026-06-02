@@ -1,76 +1,125 @@
 import SwiftUI
 
 /// A *selectable* sidebar section — the page-section primitive for Playback /
-/// Image / Capture (M9·P6·3). It replaces the old "row-with-inline-expansion":
-/// the section's header IS the selectable mode treatment (icon + title + active
-/// accent tint, rendered by the shared `SidebarSectionHeader`'s `.mode` style),
-/// and its expansion is driven by the page selection as an accordion —
-/// expanded ⇔ `selection == page`. Tapping the header sets `selection = page`,
-/// which collapses every other mode section.
+/// Image / Capture. The active (selected) section renders the M9·P6·4 design:
+/// a square left accent bar, a header band on its own accent tint (a filled,
+/// accent-leaning mode icon + title + an optional trailing "open source" icon
+/// button), flowing into a fainter body that holds the section's content (the
+/// recents list, or "Live camera" for Capture). Inactive sections collapse to a
+/// plain, tappable row (outline icon + title, both `.secondary`).
 ///
-/// When the mode is disabled (e.g. Capture with no camera), the header renders
-/// `.disabled` and the section never expands.
-///
-/// This composes the old `SidebarRow` look (now the header) with the old
-/// `expandedContent` skeleton verbatim, so a `ModeSection` renders identically
-/// to a pre-refactor navigation row.
+/// Selection is an accordion keyed to `page`: tapping an inactive row sets
+/// `selection = page`, activating this section and collapsing the others. A
+/// disabled mode (e.g. Capture with no camera) never activates.
 struct ModeSection<Content: View>: View {
     let page: ShellPage
     @Binding var selection: ShellPage
     var isEnabled: Bool = true
+    /// The trailing "open a source" action shown on the active header (Playback /
+    /// Image). `nil` for modes without a file source (Capture) — no button.
+    var onOpen: (() -> Void)?
+    /// The SF Symbol for that open button.
+    var openSystemImage: String
     @ViewBuilder var content: () -> Content
 
     init(
         page: ShellPage,
         selection: Binding<ShellPage>,
         isEnabled: Bool = true,
+        onOpen: (() -> Void)? = nil,
+        openSystemImage: String = "plus",
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.page = page
         self._selection = selection
         self.isEnabled = isEnabled
+        self.onOpen = onOpen
+        self.openSystemImage = openSystemImage
         self.content = content
     }
 
+    private var isActive: Bool { selection == page && isEnabled }
+
     var body: some View {
-        // Accordion: the section is expanded exactly when it's the selected
-        // page and it's enabled — matching the old `isActive && !disabled`.
-        let isExpanded = (selection == page) && isEnabled
+        if isActive {
+            activeSection
+        } else {
+            inactiveRow
+        }
+    }
 
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                selection = page
-            } label: {
-                SidebarSectionHeader(
-                    page.title,
-                    style: .mode(systemImage: page.systemImage, isActive: selection == page)
-                )
+    // MARK: Inactive — a plain, tappable row.
+
+    private var inactiveRow: some View {
+        Button { selection = page } label: {
+            HStack(spacing: 8) {
+                Image(systemName: page.systemImage)
+                    .frame(width: 20)
+                    .foregroundStyle(.secondary)
+                Text(page.title)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .disabled(!isEnabled)
+            .padding(.vertical, 7)
+            .padding(.leading, 13)
+            .padding(.trailing, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+    }
 
-            if isExpanded {
+    // MARK: Active — accent bar + header band + body.
+
+    private var activeSection: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(width: 3)
+            VStack(alignment: .leading, spacing: 0) {
+                headerBand
                 content()
-                    .padding(.leading, 28)
-                    .padding(.trailing, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.08))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .transition(.opacity)
+    }
+
+    private var headerBand: some View {
+        HStack(spacing: 8) {
+            Image(systemName: page.activeSystemImage)
+                .frame(width: 20)
+                .foregroundStyle(Color.accentColor)
+            Text(page.title)
+                .fontWeight(.semibold)
+            Spacer(minLength: 0)
+            if let onOpen {
+                Button(action: onOpen) {
+                    Image(systemName: openSystemImage)
+                        .font(.body)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Open")
+            }
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.22))
     }
 }
 
 #if DEBUG
-#Preview("Active · expanded") {
+#Preview("Active · Playback") {
     @Previewable @State var page: ShellPage = .playback
-    ModeSection(page: .playback, selection: $page) {
-        SourcePicker(
-            openTitle: "Open Video…",
-            openSystemImage: "folder.badge.plus",
-            onOpen: {},
+    ModeSection(page: .playback, selection: $page, onOpen: {}, openSystemImage: "folder.badge.plus") {
+        RecentList(
             recents: PreviewFixtures.sampleVideoURLs,
-            recentSystemImage: "play.rectangle",
+            systemImage: "film",
             onPick: { _ in },
             emptyHint: "Use Open Video… to pick a clip."
         )
@@ -78,15 +127,12 @@ struct ModeSection<Content: View>: View {
     .frame(width: 280)
 }
 
-#Preview("Inactive · collapsed") {
+#Preview("Inactive · Image") {
     @Previewable @State var page: ShellPage = .playback
-    ModeSection(page: .image, selection: $page) {
-        SourcePicker(
-            openTitle: "Open Image…",
-            openSystemImage: "photo.badge.plus",
-            onOpen: {},
+    ModeSection(page: .image, selection: $page, onOpen: {}, openSystemImage: "photo.badge.plus") {
+        RecentList(
             recents: PreviewFixtures.sampleImageURLs,
-            recentSystemImage: "photo",
+            systemImage: "photo",
             onPick: { _ in },
             emptyHint: "Use Open Image… to pick a still."
         )
@@ -94,12 +140,10 @@ struct ModeSection<Content: View>: View {
     .frame(width: 280)
 }
 
-#Preview("Disabled") {
+#Preview("Disabled · Capture") {
     @Previewable @State var page: ShellPage = .playback
     ModeSection(page: .capture, selection: $page, isEnabled: false) {
-        Text("Live camera")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        Text("Live camera").font(.caption).foregroundStyle(.secondary)
     }
     .frame(width: 280)
 }

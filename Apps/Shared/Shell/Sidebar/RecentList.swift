@@ -1,29 +1,23 @@
 import SwiftUI
 
-/// The `RECENT` list shown inside an expanded navigation row: a `RECENT` header
-/// (routed through the shared `SidebarSectionHeader` style so it matches the
-/// other section labels) followed by the recent entries — icon + filename,
-/// truncated in the middle with the full path in a tooltip — or an empty hint.
+/// The recent-entries list shown inside an active mode section's body: the
+/// recent files — a file glyph + the filename, truncated in the middle with the
+/// full path in a tooltip — or an empty hint. The "RECENT" caption was dropped
+/// in the M9·P6·4 redesign: the rows live visibly inside the selected section's
+/// band, so the label is redundant.
 struct RecentList: View {
     let recents: [URL]
     let systemImage: String
     let onPick: (URL) -> Void
     let emptyHint: String
 
-    // NOTE: emits header + entries inside a `VStack(spacing: 6)` so the
-    // header→entries gap matches the original, where `recentList` was a
-    // @ViewBuilder helper splatted into `pageRow`'s `VStack(spacing: 6)`.
-    // `SourcePicker` likewise places the open button and this list as
-    // siblings at spacing 6, so the assembled column reads identically.
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SidebarSectionHeader("RECENT")
-                .padding(.top, 4)
-
             if recents.isEmpty {
                 Text(emptyHint)
                     .font(.callout)
                     .foregroundStyle(.tertiary)
+                    .padding(.leading, 28)   // align under where filenames sit
             } else {
                 ForEach(recents, id: \.self) { url in
                     Button {
@@ -31,10 +25,9 @@ struct RecentList: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: systemImage)
+                                .frame(width: 20)
                                 .foregroundStyle(.secondary)
-                                .font(.body)
                             Text(url.lastPathComponent)
-                                .font(.body)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             Spacer(minLength: 0)
@@ -52,27 +45,23 @@ struct RecentList: View {
 
 #if DEBUG
 #Preview("Populated") {
-    VStack(alignment: .leading, spacing: 6) {
-        RecentList(
-            recents: PreviewFixtures.sampleVideoURLs,
-            systemImage: "play.rectangle",
-            onPick: { _ in },
-            emptyHint: "Use Open Video… to pick a clip."
-        )
-    }
+    RecentList(
+        recents: PreviewFixtures.sampleVideoURLs,
+        systemImage: "film",
+        onPick: { _ in },
+        emptyHint: "No recent videos"
+    )
     .padding()
     .frame(width: 280)
 }
 
 #Preview("Empty") {
-    VStack(alignment: .leading, spacing: 6) {
-        RecentList(
-            recents: [],
-            systemImage: "play.rectangle",
-            onPick: { _ in },
-            emptyHint: "Use Open Video… to pick a clip."
-        )
-    }
+    RecentList(
+        recents: [],
+        systemImage: "film",
+        onPick: { _ in },
+        emptyHint: "No recent videos"
+    )
     .padding()
     .frame(width: 280)
 }

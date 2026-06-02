@@ -19,7 +19,7 @@ import SwiftUI
 /// `ForEach`): `ModelSection`, then the three selectable `ModeSection`s
 /// (Playback / Image / Capture), then `DatasetSection`. The mode sections are
 /// built from the design-language primitives in `Sidebar/Components/`
-/// (`SidebarSection`/`SidebarSectionHeader`, `ModeSection`) plus `SourcePicker`.
+/// (`SidebarSection`/`SidebarSectionHeader`, `ModeSection`) plus `RecentList`.
 /// The public init is unchanged so the `IrisShell` call site and previews are
 /// untouched.
 ///
@@ -86,28 +86,28 @@ struct SidebarView: View {
             // the original placement; each section owns its own header + content
             // layout.
             ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    ModeSection(page: .playback, selection: $page) {
-                        SourcePicker(
-                            openTitle: "Open Video…",
-                            openSystemImage: "folder.badge.plus",
-                            onOpen: onOpenVideo,
+                VStack(alignment: .leading, spacing: 0) {
+                    ModeSection(
+                        page: .playback, selection: $page,
+                        onOpen: onOpenVideo, openSystemImage: "folder.badge.plus"
+                    ) {
+                        RecentList(
                             recents: recentVideos,
-                            recentSystemImage: "play.rectangle",
+                            systemImage: "film",
                             onPick: onPickVideo,
-                            emptyHint: "Use Open Video… to pick a clip."
+                            emptyHint: "No recent videos"
                         )
                     }
                     Divider().padding(.horizontal, 12)
-                    ModeSection(page: .image, selection: $page) {
-                        SourcePicker(
-                            openTitle: "Open Image…",
-                            openSystemImage: "photo.badge.plus",
-                            onOpen: onOpenImage,
+                    ModeSection(
+                        page: .image, selection: $page,
+                        onOpen: onOpenImage, openSystemImage: "photo.badge.plus"
+                    ) {
+                        RecentList(
                             recents: recentImages,
-                            recentSystemImage: "photo",
+                            systemImage: "photo",
                             onPick: onPickImage,
-                            emptyHint: "Use Open Image… to pick a still."
+                            emptyHint: "No recent images"
                         )
                     }
                     Divider().padding(.horizontal, 12)
