@@ -12,8 +12,15 @@ conversion is handled once, correctly.
 > Swift 6.2 · strict concurrency · iOS / iPadOS 26 · macOS 26 · SwiftUI-first ·
 > a single SwiftPM library with **no external dependencies**.
 
-It's built and used for personal projects, but the library boundary is real:
-everything app-specific lives in the demo, not the package.
+> ⚠️ **Very early — work in progress.** This is the beginning of a personal
+> project, public mostly so the work is out in the open. The foundations are in
+> place and exercised end-to-end by the demo, but the API is unstable, there are
+> rough edges, and breaking changes are expected. The genuinely interesting parts
+> are still ahead — check back as it grows. No releases or stability guarantees
+> yet.
+
+The library boundary is real, though: everything app-specific lives in the demo,
+not the package.
 
 ---
 
@@ -135,9 +142,11 @@ from `Apps/project.yml`, but the generated `IrisDemo.xcodeproj` **is checked in*
 so you don't need xcodegen unless you're changing project settings.
 
 ```bash
-# One-time per clone: your signing config (gitignored).
-cp Apps/Local.xcconfig.template Apps/Local.xcconfig
-#   …then fill in DEVELOPMENT_TEAM + a PRODUCT_BUNDLE_IDENTIFIER prefix.
+# One-time per clone: your signing config (gitignored, one per target).
+cp Apps/IrisDemo-iOS/Local.xcconfig.template   Apps/IrisDemo-iOS/Local.xcconfig
+cp Apps/IrisDemo-macOS/Local.xcconfig.template Apps/IrisDemo-macOS/Local.xcconfig
+#   …then fill in DEVELOPMENT_TEAM (+ a PRODUCT_BUNDLE_IDENTIFIER prefix on iOS).
+#   Each target's Shared.xcconfig does `#include? "Local.xcconfig"`.
 
 open Apps/IrisDemo.xcodeproj   # schemes: IrisDemo-iOS, IrisDemo-macOS
 ```
@@ -196,3 +205,7 @@ under [`plans/`](./plans/):
 
 [`CLAUDE.md`](./CLAUDE.md) is the constitution: stack, conventions, and the
 invariants that constrain how code gets written.
+
+## License
+
+[MIT](./LICENSE) © John Griffin.
