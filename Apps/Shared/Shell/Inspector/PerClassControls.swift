@@ -81,6 +81,7 @@ struct PerClassControls: View {
                 Text("No classes seen yet.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
 
             rosterSection
@@ -101,6 +102,7 @@ struct PerClassControls: View {
                 .textCase(.uppercase)
                 .tracking(0.6)
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
 
             Spacer(minLength: 4)
 
@@ -116,6 +118,7 @@ struct PerClassControls: View {
                     Label("Reset all", systemImage: "arrow.counterclockwise")
                         .font(.caption)
                         .labelStyle(.titleAndIcon)
+                        .lineLimit(1)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -132,6 +135,8 @@ struct PerClassControls: View {
             Text("Full class list unavailable for this detector.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.tail)
         } else if !additionalRosterLabels.isEmpty {
             DisclosureGroup(isExpanded: $showingAll) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -151,6 +156,7 @@ struct PerClassControls: View {
                     .textCase(.uppercase)
                     .tracking(0.6)
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
             .accessibilityLabel("Show all classes")
         }
@@ -306,7 +312,11 @@ struct PerClassRow: View {
             .disabled(isHidden)
             .accessibilityLabel("\(label) minimum confidence \(String(format: "%.2f", floor.wrappedValue)). Activate to tune.")
         }
-        .frame(minHeight: 26)
+        // Exact height (not minHeight): every child is single-line, so pin the
+        // row so its height can NEVER depend on the pane width — width→height
+        // coupling in split-view panes is the classic AppKit
+        // "Update Constraints in Window" layout-loop trigger during divider drags.
+        .frame(height: 26)
         .contentShape(Rectangle())
     }
 }
