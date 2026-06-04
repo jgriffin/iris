@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Iris — Tuning / Inspector redesign mock</title>
+<style>
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --inspector-bg-top: #25262a;
+    --inspector-bg-bot: #1b1c1f;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --text-primary: rgba(255, 255, 255, 0.92);
+    --text-secondary: rgba(255, 255, 255, 0.55);
+    --text-tertiary: rgba(255, 255, 255, 0.32);
+    --tint: #0a84ff;            /* macOS dark accentColor (blue) */
+    --field-bg: rgba(255, 255, 255, 0.06);
+    --field-bg-focus: rgba(10, 132, 255, 0.16);
+    --field-border: rgba(255, 255, 255, 0.10);
+    --row-hover: rgba(255, 255, 255, 0.04);
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0d0e10;
+    color: var(--text-primary);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    padding: 36px 40px 80px;
+  }
+
+  .page > h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 4px;
+    letter-spacing: 0.2px;
+  }
+  .page > p.sub {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin: 0 0 28px;
+    max-width: 720px;
+    line-height: 1.5;
+  }
+
+  .gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  .column {
+    width: 300px;
+    flex: 0 0 auto;
+  }
+
+  .column > .caption {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 2px;
+  }
+  .column > .caption .tag {
+    font-weight: 400;
+    color: var(--text-tertiary);
+  }
+  .column > .note {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin: 0 0 10px 2px;
+    line-height: 1.45;
+    min-height: 30px;
+  }
+
+  /* ---- The inspector panel itself ---- */
+  .inspector {
+    width: 300px;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, var(--inspector-bg-top) 0%, var(--inspector-bg-bot) 100%);
+    border: 0.5px solid var(--hairline);
+    border-radius: 10px;
+    padding: 18px 16px 20px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Detector name — prominent header */
+  .detector-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+    margin: 0 0 14px;
+  }
+
+  /* Single global Min confidence control */
+  .minconf {
+    margin: 0 0 18px;
+  }
+  .minconf .row1 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+  .minconf .label {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .minconf .value {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Slider — full width global */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.16);
+    outline: none;
+    margin: 0;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    margin-top: -5.5px;
+    border-radius: 50%;
+    background: #f5f5f7;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+  /* Filled portion via accent for the global slider */
+  input.tinted[type="range"] {
+    background: linear-gradient(to right, var(--tint) 0 25%, rgba(255,255,255,0.16) 25% 100%);
+  }
+
+  .divider {
+    height: 0.5px;
+    background: var(--hairline);
+    margin: 0 0 14px;
+  }
+
+  /* PER CLASS caption row */
+  .perclass-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 8px;
+  }
+  .perclass-head .title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .perclass-head .reset-all {
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .perclass-head .reset-all:hover { color: var(--text-primary); }
+
+  /* ---- Per-class rows ---- */
+  .rows { display: flex; flex-direction: column; }
+
+  .crow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 4px;
+    border-radius: 5px;
+  }
+  .crow:hover { background: var(--row-hover); }
+
+  .eye {
+    width: 17px;
+    flex: 0 0 17px;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+  }
+  .eye.hide { color: var(--text-tertiary); }
+  .eye.auto { color: var(--text-secondary); }
+  .eye.show { color: var(--tint); }
+
+  .cname {
+    font-size: 13.5px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .crow.dim .cname { color: var(--text-tertiary); }
+
+  .spacer { flex: 1 1 auto; min-width: 6px; }
+
+  /* reset icon — only on overridden rows, immediately left of the value */
+  .reset {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    width: 14px;
+    text-align: center;
+    opacity: 0.85;
+  }
+  .reset:hover { color: var(--text-primary); opacity: 1; }
+
+  /* the value column — fixed width, right aligned, ALWAYS aligned */
+  .val {
+    flex: 0 0 38px;
+    text-align: right;
+    font-size: 12.5px;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+  }
+  .crow.overridden .val { color: var(--text-primary); }
+
+  /* Variant 2 — editable field look */
+  .val-field {
+    flex: 0 0 50px;
+    box-sizing: border-box;
+    text-align: right;
+    font-size: 12.5px;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: 5px;
+    padding: 3px 7px;
+  }
+  .crow.overridden .val-field { color: var(--text-primary); }
+  .val-field.focused {
+    background: var(--field-bg-focus);
+    border-color: var(--tint);
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.25);
+  }
+
+  /* Variant 3 — inline mini slider (only when overridden) */
+  .mini-slider {
+    flex: 0 0 70px;
+  }
+  input.mini[type="range"] {
+    height: 3px;
+    background: linear-gradient(to right, var(--tint) 0 60%, rgba(255,255,255,0.16) 60% 100%);
+  }
+  input.mini[type="range"]::-webkit-slider-thumb {
+    width: 11px; height: 11px; margin-top: -4px;
+  }
+
+  /* Popover (Variant 1 + 2 "popped" state) */
+  .popover {
+    margin: 2px 4px 8px;
+    background: rgba(44, 46, 51, 0.96);
+    border: 0.5px solid var(--field-border);
+    border-radius: 8px;
+    padding: 11px 12px 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .popover::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: 26px;
+    width: 11px; height: 11px;
+    background: rgba(44, 46, 51, 0.96);
+    border-left: 0.5px solid var(--field-border);
+    border-top: 0.5px solid var(--field-border);
+    transform: rotate(45deg);
+  }
+  .popover .pop-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .popover .pop-label {
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .popover .pop-val {
+    font-size: 12px; font-family: var(--mono); color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend {
+    margin-top: 14px;
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+  }
+  .legend code {
+    font-family: var(--mono);
+    color: var(--text-secondary);
+  }
+
+  .roster-scroll {
+    max-height: none;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Iris — Tuning / inspector panel redesign</h1>
+  <p class="sub">
+    Static mock of the redesigned right-inspector (macOS, ~300pt docked). No “Tuning” title, no DETECTOR / DISPLAY
+    sub-headers. Prominent detector name on top, ONE global Min confidence, then a dense one-line-per-class list.
+    The reset icon sits immediately left of the value and appears ONLY on overridden rows, so the value column stays
+    aligned. Three per-class-row interaction variants + a full COCO roster column.
+  </p>
+
+  <div class="gallery">
+
+    <!-- ============ VARIANT 1 — value only, tap to edit ============ -->
+    <div class="column">
+      <div class="caption">Variant 1 <span class="tag">— value only, tap to edit</span></div>
+      <div class="note">Value is plain text. Tapping it reveals a slider popover (shown popped on <code>airplane</code>).</div>
+      <div class="inspector">
+        <div class="detector-name">YOLO26n (Core ML)</div>
+
+        <div class="minconf">
+          <div class="row1">
+            <span class="label">Min confidence</span>
+            <span class="value">0.25</span>
+          </div>
+          <input class="tinted" type="range" min="0" max="1" step="0.05" value="0.25" />
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="perclass-head">
+          <span class="title">Per class</span>
+          <span class="reset-all">↺ Reset all</span>
+        </div>
+
+        <div class="rows">
+          <div class="crow show">
+            <span class="eye show" title="Show (pinned)">&#9673;</span>
+            <span class="cname">person</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow overridden">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">airplane</span>
+            <span class="spacer"></span>
+            <span class="reset" title="Use global floor">↺</span>
+            <span class="val">0.35</span>
+          </div>
+          <div class="popover">
+            <div class="pop-head">
+              <span class="pop-label">airplane · min confidence</span>
+              <span class="pop-val">0.35</span>
+            </div>
+            <input class="tinted" type="range" min="0.25" max="1" step="0.05" value="0.35" />
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">sports ball</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">apple</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow dim hide">
+            <span class="eye hide" title="Hidden">&#10625;</span>
+            <span class="cname">dog</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+        </div>
+
+        <div class="legend">
+          eye states: <span style="color:var(--tint)">&#9673;</span> Show ·
+          <span style="color:var(--text-secondary)">&#9711;</span> Auto ·
+          <span style="color:var(--text-tertiary)">&#10625;</span> Hide
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ VARIANT 2 — editable field ============ -->
+    <div class="column">
+      <div class="caption">Variant 2 <span class="tag">— editable field</span></div>
+      <div class="note">Value sits in a subtle inset field (editable look). Focused field shows a slider popover (<code>airplane</code>).</div>
+      <div class="inspector">
+        <div class="detector-name">YOLO26n (Core ML)</div>
+
+        <div class="minconf">
+          <div class="row1">
+            <span class="label">Min confidence</span>
+            <span class="value">0.25</span>
+          </div>
+          <input class="tinted" type="range" min="0" max="1" step="0.05" value="0.25" />
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="perclass-head">
+          <span class="title">Per class</span>
+          <span class="reset-all">↺ Reset all</span>
+        </div>
+
+        <div class="rows">
+          <div class="crow show">
+            <span class="eye show" title="Show (pinned)">&#9673;</span>
+            <span class="cname">person</span>
+            <span class="spacer"></span>
+            <span class="val-field">0.25</span>
+          </div>
+
+          <div class="crow overridden">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">airplane</span>
+            <span class="spacer"></span>
+            <span class="reset" title="Use global floor">↺</span>
+            <span class="val-field focused">0.35</span>
+          </div>
+          <div class="popover">
+            <div class="pop-head">
+              <span class="pop-label">airplane · min confidence</span>
+              <span class="pop-val">0.35</span>
+            </div>
+            <input class="tinted" type="range" min="0.25" max="1" step="0.05" value="0.35" />
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">sports ball</span>
+            <span class="spacer"></span>
+            <span class="val-field">0.25</span>
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">apple</span>
+            <span class="spacer"></span>
+            <span class="val-field">0.25</span>
+          </div>
+
+          <div class="crow dim hide">
+            <span class="eye hide" title="Hidden">&#10625;</span>
+            <span class="cname">dog</span>
+            <span class="spacer"></span>
+            <span class="val-field">0.25</span>
+          </div>
+        </div>
+
+        <div class="legend">
+          Tap a field to focus + type; slider popover fine-tunes. Reset (↺) clears the override back to the global floor.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ VARIANT 3 — inline mini-slider only when overridden ============ -->
+    <div class="column">
+      <div class="caption">Variant 3 <span class="tag">— inline mini-slider (overridden only)</span></div>
+      <div class="note">Default rows show just the value. An overridden row (<code>airplane</code>) grows a thin inline slider on the SAME line.</div>
+      <div class="inspector">
+        <div class="detector-name">YOLO26n (Core ML)</div>
+
+        <div class="minconf">
+          <div class="row1">
+            <span class="label">Min confidence</span>
+            <span class="value">0.25</span>
+          </div>
+          <input class="tinted" type="range" min="0" max="1" step="0.05" value="0.25" />
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="perclass-head">
+          <span class="title">Per class</span>
+          <span class="reset-all">↺ Reset all</span>
+        </div>
+
+        <div class="rows">
+          <div class="crow show">
+            <span class="eye show" title="Show (pinned)">&#9673;</span>
+            <span class="cname">person</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow overridden">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">airplane</span>
+            <span class="spacer"></span>
+            <span class="mini-slider">
+              <input class="mini" type="range" min="0.25" max="1" step="0.05" value="0.35" />
+            </span>
+            <span class="reset" title="Use global floor">↺</span>
+            <span class="val">0.35</span>
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">sports ball</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow auto">
+            <span class="eye auto" title="Auto">&#9711;</span>
+            <span class="cname">apple</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+
+          <div class="crow dim hide">
+            <span class="eye hide" title="Hidden">&#10625;</span>
+            <span class="cname">dog</span>
+            <span class="spacer"></span>
+            <span class="val">0.25</span>
+          </div>
+        </div>
+
+        <div class="legend">
+          Note: the inline slider shifts the value left on overridden rows. Default rows keep the value hard-right.
+          (Trade density for in-place editing without a popover.)
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ COLUMN 4 — full COCO roster, dense one-line ============ -->
+    <div class="column">
+      <div class="caption">“Show all classes” <span class="tag">— full roster, dense</span></div>
+      <div class="note">How the full COCO list reads at high density (Variant 1 style). One overridden row near the top to test alignment.</div>
+      <div class="inspector">
+        <div class="detector-name">YOLO26n (Core ML)</div>
+
+        <div class="minconf">
+          <div class="row1">
+            <span class="label">Min confidence</span>
+            <span class="value">0.25</span>
+          </div>
+          <input class="tinted" type="range" min="0" max="1" step="0.05" value="0.25" />
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="perclass-head">
+          <span class="title">Per class · all classes</span>
+          <span class="reset-all">↺ Reset all</span>
+        </div>
+
+        <div class="rows roster-scroll">
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">person</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">bicycle</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">car</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">motorcycle</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow overridden"><span class="eye auto">&#9711;</span><span class="cname">airplane</span><span class="spacer"></span><span class="reset" title="Use global floor">↺</span><span class="val">0.35</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">bus</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">train</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">truck</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">boat</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">traffic light</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow show"><span class="eye show">&#9673;</span><span class="cname">fire hydrant</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">stop sign</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">parking meter</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">bench</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">bird</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">cat</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow dim hide"><span class="eye hide">&#10625;</span><span class="cname">dog</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">horse</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow overridden"><span class="eye auto">&#9711;</span><span class="cname">sports ball</span><span class="spacer"></span><span class="reset" title="Use global floor">↺</span><span class="val">0.45</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">bottle</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">apple</span><span class="spacer"></span><span class="val">0.25</span></div>
+          <div class="crow auto"><span class="eye auto">&#9711;</span><span class="cname">chair</span><span class="spacer"></span><span class="val">0.25</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

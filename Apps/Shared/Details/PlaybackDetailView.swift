@@ -10,11 +10,13 @@ import SwiftUI
 // `DetectionLayer` + `Scrubber` rendering is hosted intact (not rewritten).
 
 /// The reusable playback detail: the `PlaybackView` + `DetectionLayer` overlay
-/// stack, the `Scrubber` (with the flag-marker underlay), the bottom status bar,
-/// and the on-frame Inspect + Flag affordances clustered top-right of the video.
+/// stack, the `Scrubber` (with the flag-marker underlay), and the bottom status
+/// bar. The video frame carries NO overlay buttons (redesign) — the Freeze
+/// (camera) + Flag affordances live in the window toolbar (`IrisShell`).
 ///
-/// Hosted by `IrisShell`; the shell owns the coordinator, flagging model,
-/// overlay filter, and the freeze-from-live hand-off (`onInspect`).
+/// Hosted by `IrisShell`; the shell owns the coordinator, flagging model, and
+/// overlay filter. The freeze-from-live hand-off (`inspectFrame`) is fired from
+/// the toolbar's camera button against `coordinator.currentFrame`.
 struct PlaybackDetailView: View {
     let coordinator: PlaybackDetectionCoordinator
     let flaggingModel: FlaggingModel?
@@ -23,8 +25,6 @@ struct PlaybackDetailView: View {
     let errorText: String?
     /// First-launch loading state (iOS auto-loads a bundled fixture).
     let isLoadingFixture: Bool
-    /// Direct freeze-from-live: hand the current frame to the shell.
-    let onInspect: (Frame?) -> Void
     /// Open-video CTA fired from the empty state.
     let onOpenVideo: () -> Void
 
@@ -82,36 +82,10 @@ struct PlaybackDetailView: View {
             )
             .allowsHitTesting(false)
         }
-        .overlay {
-            VideoRectAligned(
-                contentSize: controller.presentationSize,
-                alignment: .topTrailing
-            ) {
-                HStack(spacing: 8) {
-                    inspectButton
-                    if let flaggingModel {
-                        FlagButton(model: flaggingModel)
-                    }
-                }
-                .padding(12)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var inspectButton: some View {
-        Button {
-            onInspect(coordinator.currentFrame)
-        } label: {
-            Image(systemName: "camera.viewfinder")
-                .font(.title3)
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(coordinator.currentFrame == nil)
-        .help("Inspect this frame on the Image page")
-        .accessibilityLabel("Inspect frame")
+        // No on-video overlay buttons (redesign): the Freeze (camera) and Flag
+        // affordances moved into the window toolbar — see `IrisShell.detailToolbar`.
+        // The video frame stays clean; `onInspect` / `coordinator.currentFrame`
+        // are now driven from the toolbar's Freeze button.
     }
 
     @ViewBuilder

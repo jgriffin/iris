@@ -28,13 +28,26 @@ public struct DetectorCatalogEntry: Identifiable {
     public let id: String
     public let displayName: String
     public let makeSession: @MainActor (any DetectionCache) -> ActiveDetectorSession
+
+    /// The detector's full class roster, when statically known (e.g. the COCO-80
+    /// set for a stock YOLO box detector), else `nil`. Surfaced WITHOUT building
+    /// a session so a per-class UI can offer "show all classes" before the
+    /// detector ever runs. `nil` means *no static roster* (a dynamic / class-
+    /// agnostic detector like Vision rectangles) — the consumer falls back to
+    /// the seen-only labels. This mirrors
+    /// ``DetectorCapabilities/availableLabels`` but is reachable at the catalog
+    /// level so the shell needn't instantiate (and warm) a detector to read it.
+    public let availableLabels: [String]?
+
     public init(
         id: String,
         displayName: String,
+        availableLabels: [String]? = nil,
         makeSession: @escaping @MainActor (any DetectionCache) -> ActiveDetectorSession
     ) {
         self.id = id
         self.displayName = displayName
+        self.availableLabels = availableLabels
         self.makeSession = makeSession
     }
 }
@@ -51,13 +64,24 @@ extension DetectorCatalogEntry {
     public static func make<D: TunableDetector>(
         id: String,
         displayName: String,
+        availableLabels: [String]? = nil,
+        hidesConfidenceControl: Bool = false,
         detector: @escaping @MainActor () -> D
     ) -> DetectorCatalogEntry {
-        DetectorCatalogEntry(id: id, displayName: displayName) { cache in
+        DetectorCatalogEntry(
+            id: id,
+            displayName: displayName,
+            availableLabels: availableLabels
+        ) { cache in
             let tuning = TuningModel(detector: detector(), cache: cache)
             return ActiveDetectorSession(
                 router: tuning,
-                settingsView: AnyView(CapabilityTuningView(model: tuning))
+                settingsView: AnyView(
+                    CapabilityTuningView(
+                        model: tuning,
+                        hidesConfidence: hidesConfidenceControl
+                    )
+                )
             )
         }
     }
@@ -79,9 +103,14 @@ extension DetectorCatalogEntry {
     public static func make(
         id: String,
         displayName: String,
+        availableLabels: [String]? = nil,
         detector: @escaping @MainActor () -> any Detector
     ) -> DetectorCatalogEntry {
-        DetectorCatalogEntry(id: id, displayName: displayName) { _ in
+        DetectorCatalogEntry(
+            id: id,
+            displayName: displayName,
+            availableLabels: availableLabels
+        ) { _ in
             ActiveDetectorSession(
                 router: PassthroughRouter(detector: detector()),
                 settingsView: AnyView(EmptyView())
@@ -145,7 +174,11 @@ extension DetectorCatalog {
     /// pre-M5 behavior; the user picks Body Pose to see the skeleton overlay.
     public static var builtInVision: DetectorCatalog {
         DetectorCatalog(entries: [
-            .make(id: "vision.rectangles", displayName: "Rectangles") {
+            .make(
+                id: "vision.rectangles",
+                displayName: "Rectangles",
+                hidesConfidenceControl: true
+            ) {
                 VisionRectanglesDetector(
                     minimumAspectRatio: 0.3,
                     maximumAspectRatio: 1.0,
@@ -153,7 +186,11 @@ extension DetectorCatalog {
                     label: "rect"
                 )
             },
-            .make(id: "vision.bodyPose", displayName: "Body Pose") {
+            .make(
+                id: "vision.bodyPose",
+                displayName: "Body Pose",
+                hidesConfidenceControl: true
+            ) {
                 VisionBodyPoseDetector()
             },
         ])

@@ -60,12 +60,42 @@ public struct CapabilityTuningView<Detector: TunableDetector>: View {
 
     @Bindable public var model: TuningModel<Detector>
 
+    /// When `true`, the detector's own confidence affordance (the
+    /// `minimumConfidence` floor slider / info row / derived-quality row) is
+    /// suppressed entirely — only the non-confidence knobs render. The demo's
+    /// redesigned inspector sets this so the single **global** "Min confidence"
+    /// slider in the Display group is the only confidence control on screen; the
+    /// per-detector floor would be a redundant second knob. Defaults to `false`
+    /// so every other consumer keeps the honest confidence affordance.
+    public let hidesConfidence: Bool
+
     /// Conventional schema key for a confidence-floor knob. See the
     /// type doc comment for why this is a convention rather than a marker.
     public static var confidenceKnobKey: String { "minimumConfidence" }
 
-    public init(model: TuningModel<Detector>) {
+    /// All conventional schema keys a confidence-floor knob may use. The schema
+    /// carries no "this knob is the confidence floor" marker, so the view
+    /// recognizes a confidence knob by its key. Two conventions exist in the
+    /// shipped detectors: Vision detectors key it `"minimumConfidence"`; the
+    /// Core ML YOLO decoders key it `"confidenceThreshold"`
+    /// (``TunableOutputDecoder/confidenceThresholdKey``). A knob matching ANY of
+    /// these is treated as the confidence floor — so `hidesConfidence` suppresses
+    /// it regardless of which convention the detector used (the YOLO26n "Min
+    /// confidence" knob was previously leaking through as a regular knob because
+    /// it uses the `"confidenceThreshold"` key, not `"minimumConfidence"`).
+    nonisolated public static var confidenceKnobKeys: Set<String> {
+        ["minimumConfidence", "confidenceThreshold"]
+    }
+
+    /// Whether `knob` is the detector's confidence-floor knob — matched by key
+    /// against the known conventions, never by a fragile display string.
+    nonisolated static func isConfidenceKnob(_ knob: SettingSchema.Knob) -> Bool {
+        confidenceKnobKeys.contains(knob.key)
+    }
+
+    public init(model: TuningModel<Detector>, hidesConfidence: Bool = false) {
         self.model = model
+        self.hidesConfidence = hidesConfidence
     }
 
     // MARK: Derived data
@@ -100,68 +130,93 @@ public struct CapabilityTuningView<Detector: TunableDetector>: View {
 
     /// Knobs to render in the geometry/limits sections — everything
     /// except the confidence-floor knob (which the confidence section
-    /// owns when shown).
+    /// owns when shown). Matched against ALL confidence-key conventions so a
+    /// YOLO-style `"confidenceThreshold"` knob is excluded here, not just the
+    /// Vision `"minimumConfidence"` one.
     private var nonConfidenceKnobs: [SettingSchema.Knob] {
-        knobs.filter { $0.key != Self.confidenceKnobKey }
+        knobs.filter { !Self.isConfidenceKnob($0) }
     }
 
-    /// The confidence-floor knob, if the schema declares one.
+    /// The confidence-floor knob, if the schema declares one (under any
+    /// confidence-key convention).
     private var confidenceKnob: SettingSchema.Knob? {
-        knobs.first { $0.key == Self.confidenceKnobKey }
+        knobs.first { Self.isConfidenceKnob($0) }
     }
 
-    public var body: some View {
-        Form {
-            confidenceSection
-            Section("Knobs") {
-                ForEach(nonConfidenceKnobs, id: \.key) { knob in
-                    control(for: knob)
-                }
-            }
+    /// Whether ANY row will render — drives the caller's ability to gate out an
+    /// empty knob box (e.g. Vision rectangles with confidence suppressed and no
+    /// remaining geometry knobs). `true` when there's a confidence affordance
+    /// (and it isn't suppressed) OR at least one non-confidence knob.
+    public var hasVisibleControls: Bool {
+        if !hidesConfidence, rendersConfidenceAffordance { return true }
+        return !nonConfidenceKnobs.isEmpty
+    }
+
+    /// Whether the confidence semantics call for *some* affordance at all
+    /// (slider, info row, or derived-quality row) — independent of suppression.
+    private var rendersConfidenceAffordance: Bool {
+        switch confidence {
+        case .none: return false
+        case .probabilistic, .perElement, .derivedScalar: return true
         }
     }
 
-    // MARK: Confidence section
+    public var body: some View {
+        // A clean, left-aligned, uniformly-padded list — no `Form`/`Section`
+        // chrome. Every row is a `VStack(alignment: .leading)`, so labels line
+        // up at the same x whether the control is a slider, toggle, stepper, or
+        // picker (the alignment variance the redesign called out). Section
+        // headers ("Confidence"/"Knobs") and the per-detection-ratio caption are
+        // intentionally dropped — the caller frames this with its own group
+        // header, so repeating it here was noise.
+        VStack(alignment: .leading, spacing: 12) {
+            if !hidesConfidence {
+                confidenceRow
+            }
+            ForEach(nonConfidenceKnobs, id: \.key) { knob in
+                control(for: knob)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
+    // MARK: Confidence affordance
+
+    /// The confidence control as a bare row (no section header). Suppressed
+    /// entirely by `hidesConfidence`. Honest per semantics: a tunable floor
+    /// slider when one is declared, an info caption when confidence is real but
+    /// has no floor knob, a read-only derived-quality row for `.derivedScalar`,
+    /// nothing for `.none`.
     @ViewBuilder
-    private var confidenceSection: some View {
+    private var confidenceRow: some View {
         switch confidence {
         case .none:
-            // No section — the model has no meaningful confidence.
             EmptyView()
 
         case .probabilistic, .perElement:
             if let knob = confidenceKnob, case .float(let range, let step, _) = knob.kind {
-                Section("Confidence") {
-                    TuningSlider(
-                        label: knob.label,
-                        value: floatBinding(forKey: knob.key),
-                        range: range,
-                        step: step
-                    )
-                }
+                TuningSlider(
+                    label: knob.label,
+                    value: floatBinding(forKey: knob.key),
+                    range: range,
+                    step: step
+                )
             } else {
                 // Real confidence, but no tunable floor knob declared.
-                // Surface the fact honestly without inventing a control.
-                Section("Confidence") {
-                    Text(confidenceKindDescription)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                Text(confidenceKindDescription)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         case .derivedScalar(let label):
-            // A labeled quality ratio — read-only, never an editable
-            // "confidence" knob.
-            Section("Quality") {
-                HStack {
-                    Text(label)
-                        .font(.callout)
-                    Spacer()
-                    Text("derived")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+            HStack {
+                Text(label)
+                    .font(.callout)
+                Spacer()
+                Text("derived")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -360,6 +415,14 @@ public enum CapabilityTuningProjection {
 
     static var confidenceKnobKey: String { "minimumConfidence" }
 
+    /// All conventional confidence-floor knob keys — mirrors
+    /// ``CapabilityTuningView/confidenceKnobKeys`` so the testable derivation
+    /// and the view recognize the same set (Vision's `"minimumConfidence"` and
+    /// the Core ML decoders' `"confidenceThreshold"`).
+    static var confidenceKnobKeys: Set<String> {
+        ["minimumConfidence", "confidenceThreshold"]
+    }
+
     /// Derive the control list for a capability descriptor. Order matches
     /// the view: confidence affordance first, then the remaining knobs in
     /// schema order.
@@ -369,7 +432,7 @@ public enum CapabilityTuningProjection {
         var out: [DerivedControl] = []
 
         let knobs = capabilities.tunableKnobs.knobs
-        let confidenceKnob = knobs.first { $0.key == confidenceKnobKey }
+        let confidenceKnob = knobs.first { confidenceKnobKeys.contains($0.key) }
 
         switch capabilities.confidence {
         case .none:
@@ -384,7 +447,7 @@ public enum CapabilityTuningProjection {
             out.append(.derivedQuality(label: label))
         }
 
-        for knob in knobs where knob.key != confidenceKnobKey {
+        for knob in knobs where !confidenceKnobKeys.contains(knob.key) {
             switch knob.kind {
             case .float: out.append(.slider(key: knob.key))
             case .int: out.append(.stepper(key: knob.key))
@@ -519,6 +582,27 @@ private struct MockPoseDetector: TunableDetector {
         model: TuningModel(detector: MockPoseDetector())
     )
     .frame(width: 360, height: 480)
+}
+
+#Preview("CapabilityTuningView · mock pose · confidence SUPPRESSED") {
+    // The redesign's per-detector knob view: confidence floor hidden (a single
+    // global "Min confidence" lives elsewhere), only the other knobs remain,
+    // left-aligned with no Form/Section chrome.
+    CapabilityTuningView(
+        model: TuningModel(detector: MockPoseDetector()),
+        hidesConfidence: true
+    )
+    .padding()
+    .frame(width: 360, height: 240)
+}
+
+#Preview("CapabilityTuningView · rectangles · suppressed (geometry knobs only)") {
+    CapabilityTuningView(
+        model: TuningModel(detector: VisionRectanglesDetector()),
+        hidesConfidence: true
+    )
+    .padding()
+    .frame(width: 360, height: 360)
 }
 
 #Preview("CapabilityTuningView · both profiles side-by-side") {

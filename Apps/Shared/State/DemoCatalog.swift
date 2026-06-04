@@ -306,7 +306,9 @@ enum DemoCatalog {
             // The tunable overload needs the concrete type, which we have.
             return DetectorCatalogEntry.make(
                 id: yolo26nEntryID,
-                displayName: "YOLO26n (Core ML)"
+                displayName: "YOLO26n (Core ML)",
+                availableLabels: COCOLabels.coco80,
+                hidesConfidenceControl: true
             ) { () -> CoreMLDetector<YOLOEnd2EndDecoder> in warmed }
         } else {
             warmedModel = loadBundledModelSync(named: "yolo26n")
@@ -329,7 +331,9 @@ enum DemoCatalog {
 
         return DetectorCatalogEntry.make(
             id: yolo26nEntryID,
-            displayName: "YOLO26n (Core ML)"
+            displayName: "YOLO26n (Core ML)",
+            availableLabels: COCOLabels.coco80,
+            hidesConfidenceControl: true
         ) { () -> CoreMLDetector<YOLOEnd2EndDecoder> in
             try! CoreMLDetector(
                 model: model,

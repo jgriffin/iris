@@ -171,7 +171,6 @@ struct IrisShell: View {
                 modelStore: modelStore,
                 modelSelection: modelSelection,
                 selectedDetectorID: selectedDetectorID,
-                presentLabels: presentLabels,
                 captureAvailable: captureAvailable,
                 recentVideos: recentVideos.resolve(),
                 onOpenVideo: presentVideoPicker,
@@ -191,12 +190,18 @@ struct IrisShell: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 280)
             .fileImporting(self)
         } detail: {
+            // The app toolbar is attached HERE, on the detail content (not the
+            // split-view container), so `.primaryAction` items render on the
+            // DETAIL toolbar's trailing edge (top-right, adjacent to the right
+            // inspector) on macOS instead of clustering over the left pane. The
+            // system sidebar toggle stays leading; the iOS compact drawer toggle
+            // (`.topBarLeading`) and sheet path are unaffected.
             detailPane
+                .toolbar { detailToolbar }
         }
         #if os(macOS)
         .frame(minWidth: 880, minHeight: 480)
         #endif
-        .toolbar { detailToolbar }
         .inspectorPresentation(self)
         .onChange(of: selectedDetectorID) { onDetectorChanged() }
         .onChange(of: page) { _, newPage in onPageChanged(to: newPage) }
@@ -314,17 +319,26 @@ struct IrisShell: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                inspectorSection("Tuning") {
-                    if let session = activeSession {
-                        session.settingsView
-                    } else {
-                        Text("Open a source to start tuning.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                // One unified Tuning panel split into two delineated groups
+                // (`TuningGroups`): a **Detector** group (name + input knobs,
+                // confidence suppressed) and a **Display** group (the global
+                // "Min confidence" floor + per-class tri-state rows). Rendered
+                // when EITHER a session OR present labels exist — Capture has no
+                // session but still surfaces the Display group. Gated out
+                // entirely when both are absent so there's no empty "Tuning" box.
+                if activeSession != nil || !presentLabels.isEmpty {
+                    // No "Tuning" section title (redesign): the panel leads with
+                    // the prominent detector-name callout itself.
+                    TuningGroups(
+                        detectorName: resolvedEntry?.displayName,
+                        settingsView: activeSession?.settingsView,
+                        modelSelection: modelSelection,
+                        presentLabels: presentLabels,
+                        availableLabels: resolvedEntry?.availableLabels
+                    )
 
-                Divider()
+                    Divider()
+                }
 
                 inspectorSection("Live detections") {
                     liveDetectionsInspector
@@ -374,8 +388,8 @@ struct IrisShell: View {
     }
 
     /// The distinct, non-empty `Detection.label`s currently visible in the active
-    /// mode's store — the present-only roster the per-class sidebar rows show
-    /// (M10·P3). Sourced via the SAME nearest-neighbor `lookup(at:)` shape the
+    /// mode's store — the present-only roster the inspector's per-class Tuning
+    /// rows show (M10·P3/P4). Sourced via the SAME nearest-neighbor `lookup(at:)` shape the
     /// overlay + inspector use (matching `displayTimeSource` + staleness per
     /// page), so the labels track exactly what's drawn. The empty-string label
     /// (class-agnostic detectors like Vision rectangles stamp `""`) is filtered
@@ -502,10 +516,30 @@ struct IrisShell: View {
         }
         #endif
 
-        // Bookmark affordance, top-right of the detail on EVERY size class
-        // (M9·P3 mock). Toggles the current playback frame's flag — the
-        // toolbar sibling of the on-frame FlagButton. Shown on the playback
-        // page once a flagging asset is loaded.
+        // ONE trailing cluster in the main window toolbar, ordered left→right
+        // [Freeze (frame)][Flag (bookmark)][Tune (panel)] — user call, locked:
+        // all three live HERE, in this order, never split across a second
+        // detail-scoped toolbar (splitting let macOS regroup them
+        // unpredictably). Freeze + Flag are playback-page-only.
+
+        // Freeze this frame onto the Image page. Fires the freeze-from-live
+        // hand-off (`inspectFrame`) against the live `currentFrame`; disabled
+        // when there's no frame to freeze.
+        ToolbarItem(placement: .primaryAction) {
+            if page == .playback {
+                Button {
+                    inspectFrame(coordinator.currentFrame)
+                } label: {
+                    Label("Freeze frame", systemImage: "camera.viewfinder")
+                }
+                .disabled(coordinator.currentFrame == nil)
+                .help("Freeze this frame on the Image page")
+                .accessibilityLabel("Freeze frame")
+            }
+        }
+
+        // Flag / unflag the current playback frame. Shown once a flagging
+        // asset is loaded.
         ToolbarItem(placement: .primaryAction) {
             if page == .playback, let flaggingModel, flaggingModel.asset != nil {
                 Button {

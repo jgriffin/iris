@@ -38,10 +38,12 @@ extension IrisShell {
             activeLabel: activeLabel,
             errorText: errorText,
             isLoadingFixture: loadingFixture,
-            onInspect: { inspectFrame($0) },
             onOpenVideo: presentVideoPicker,
             chromeBackground: chrome
         )
+        // No detail-scoped toolbar here: ALL playback actions (Freeze + Flag)
+        // live in the single main-window cluster, `IrisShell.detailToolbar`,
+        // ordered [Freeze][Flag][Tune] (user call — never split them out).
     }
 
     // MARK: Lifecycle
