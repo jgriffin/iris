@@ -10,6 +10,20 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-04 — M11 ships without accumulation; label accumulation redefined as a penciled multi-level milestone (user)
+
+Q: Is present-label accumulation in M11, or does M11 ship as-is — and what does "accumulation" actually become?
+
+**M11 ships as-is.** Present-label accumulation is **OUT** of M11; remaining close-out is the user's hands-on smoke + the merge to `main`. Separately, the old backlog one-liner ("per-class present-label accumulation", in-memory L1 only) **grows into a penciled next milestone** (number assigned at pickup, per the naming convention — in practice M12, right after M11 merges). The settled shape:
+- **A scope ladder, each level strictly containing the one below** — **L0 Frame** (current frame; today's flickering default) → **L1 Video** (union since this video opened; the original item) → **L2 Detector** (union across ALL videos/images/captures run with this detector) → **L3 Roster** (`availableLabels`, the full class list). **L0 and L3 already ship** (L3 = M11's "show all classes"); **L1 and L2 are the new ground.**
+- **One mechanism — a per-detector label ledger.** A small app-side append-only record `(detectorID, sourceKey, label, lastSeen)`; every level is a union query over it (L1 = current detector + current source; L2 = current detector; L0/L3 bypass it). `sourceKey` = the M7 `AssetFingerprint` for videos (content-keyed, rename-stable), an image fingerprint for stills, an ephemeral marker for live capture (no durable identity → capture feeds L2 only). **Keyed by detector by construction** (different models have different categories — a YOLO `person` and another model's `person` never share history). **Persisted** (UserDefaults/JSON; label strings are tiny → reopening a video pre-seeds its rows).
+- **Roster-only.** The ledger is a pure sighting history — "what has this detector seen, where." **Per-class settings stay global as today** (floors/visibility in `ModelSelection`); **per-scope settings stay deferred to config profiles.** Clean seam: profiles = settings bundles, ledger = sighting history.
+- **UI:** default roster = L1 (kills the flicker); the M11 "show all" expander generalizes from binary to a scope step (This video ▸ All videos ▸ Full roster).
+- **Explicit non-goal: NO automatic video-similarity grouping** — L2 is the cheap 90%, and explicit grouping already has a home in the config-profiles backlog item (a profile = a named grouping over `sourceKey`s).
+- **All app-side** (`Apps/Shared/`); the `Iris` library should not need to change.
+
+→ [`features/label-accumulation.md`](./features/label-accumulation.md)
+
 ### 2026-06-01 — M10 Per-class tuning: unified settings *presentation*, render-side *data*, profiles deferred (user)
 
 Q: How does per-class tuning relate to the two settings roles — and where does its UI live?
