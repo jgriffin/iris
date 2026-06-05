@@ -194,7 +194,7 @@ struct PerClassRow: View {
     /// Toggle the inline slider open/closed for this row.
     let onToggleTuning: () -> Void
 
-    private var visibility: ModelSelection.LabelVisibility {
+    private var visibility: LabelVisibility {
         modelSelection.visibility(of: label)
     }
     private var isHidden: Bool { visibility == .hide }

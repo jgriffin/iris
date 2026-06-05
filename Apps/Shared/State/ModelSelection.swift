@@ -11,11 +11,20 @@ import Observation
 /// longer silently flips its detector on re-appear.
 ///
 /// **Render-time overlay filter (M9·P3 + M10).** `minConfidence` is the global
-/// confidence floor; `perLabelMinConfidence` overrides it per `Detection.label`,
-/// and `hiddenLabels` drops labels outright. The three combine into
-/// ``overlayFilter``, the library ``OverlayFilter`` the demos thread into
-/// `DetectionLayer` across Playback / Image / Capture. All three persist so a
-/// tuning setup survives relaunch.
+/// confidence floor — the **global** render floor every per-label floor clamps
+/// to. It stays here. The per-class state (per-label floors + tri-state
+/// show/hide) is **per-detector** and now lives on ``DetectorLabelStore``
+/// (M12·P1), keyed by ``detectorID``. The combined library ``OverlayFilter`` the
+/// demos thread into `DetectionLayer` across Playback / Image / Capture is
+/// assembled by the store for the active detector.
+///
+/// **M12·P1 bridge.** The per-class accessors that used to live here
+/// (`visibility(of:)`, `setVisibility`, `cycleVisibility`, `setPerLabelFloor`,
+/// `overlayFilter`, and the `perLabelMinConfidence` / `hiddenLabels` /
+/// `pinnedLabels` properties) are now thin forwarders onto ``labelStore`` keyed
+/// by the active ``detectorID``, so the panel UI keeps compiling unchanged until
+/// P3 re-points it at the store directly. The stored state moved off this object;
+/// these are computed views over the store's active slice.
 ///
 /// Persistence mirrors `RecentDetectors`: a `UserDefaults`-backed `@Observable`
 /// that loads in `init` and writes on every set via `didSet`. The `.v1` key
@@ -30,9 +39,11 @@ final class ModelSelection {
     /// Storage keys. `.v1` lets future schema bumps migrate cleanly.
     static let detectorIDKey = "iris.model.selectedDetectorID.v1"
     static let minConfidenceKey = "iris.model.minConfidence.v1"
-    static let perLabelMinConfidenceKey = "iris.model.perLabelMinConfidence.v1"
-    static let hiddenLabelsKey = "iris.model.hiddenLabels.v1"
-    static let pinnedLabelsKey = "iris.model.pinnedLabels.v1"
+
+    /// The per-detector per-class store (M12·P1). Owns floors + tri-state
+    /// visibility, keyed by detector id. The per-class accessors below forward
+    /// to it using the active ``detectorID``.
+    let labelStore: DetectorLabelStore
 
     /// Default launch detector — preserved from the prior per-page defaults so
     /// behavior is unchanged until the user picks something else.
@@ -55,108 +66,122 @@ final class ModelSelection {
         didSet { defaults.set(minConfidence, forKey: Self.minConfidenceKey) }
     }
 
-    /// Per-label confidence floors keyed on `Detection.label`, overriding the
-    /// global `minConfidence` for those labels (M10). Persisted on set.
+    // MARK: - Per-class bridge (M12·P1 — P3 re-points the panel)
+    //
+    // The three per-class collections, the tri-state helpers, and `overlayFilter`
+    // moved onto `DetectorLabelStore`, keyed per-detector. These forwarders keep
+    // the panel UI (`PerClassControls` / `PerClassRow`) and previews compiling
+    // unchanged against `modelSelection.<x>` until P3 re-points them at the store
+    // + the active detector id directly. Each computed view reads/writes the
+    // store's slice for the *active* `detectorID`. Reading them in a view body
+    // observes `labelStore.detectors`, so the rows still update live.
+
+    /// Per-label confidence floors for the **active detector**, as a flat map
+    /// (bridge view of the store's slice). Setting reconciles the whole map into
+    /// the store (clamped to the global floor on the store side).
+    // M12·P1 bridge — P3 re-points the panel.
     var perLabelMinConfidence: [String: Double] {
-        didSet { defaults.set(perLabelMinConfidence, forKey: Self.perLabelMinConfidenceKey) }
+        get {
+            var out: [String: Double] = [:]
+            for label in labelStore.labels(for: detectorID) {
+                if let floor = labelStore.floor(of: label, for: detectorID) {
+                    out[label] = floor
+                }
+            }
+            return out
+        }
+        set {
+            let current = perLabelMinConfidence
+            for label in current.keys where newValue[label] == nil {
+                labelStore.clearPerLabelFloor(of: label, for: detectorID)
+            }
+            for (label, value) in newValue where current[label] != value {
+                labelStore.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: minConfidence)
+            }
+        }
     }
 
-    /// Labels hidden outright — dropped from the overlay regardless of
-    /// confidence (M10). Persisted on set as an array (`UserDefaults` has no
-    /// native `Set`), re-hydrated to a `Set` in `init`.
-    ///
-    /// **Tri-state.** A label is in at most one of {`hiddenLabels`,
-    /// `pinnedLabels`}; in neither it is *Auto* (drawn when present, default for
-    /// a newly-seen label). `setVisibility` enforces the mutual exclusion.
+    /// Labels hidden outright for the **active detector** (bridge view of the
+    /// store). Setting reconciles which labels are `.hide` into the store.
+    // M12·P1 bridge — P3 re-points the panel.
     var hiddenLabels: Set<String> {
-        didSet { defaults.set(Array(hiddenLabels), forKey: Self.hiddenLabelsKey) }
+        get { labelSet(matching: .hide) }
+        set { reconcileVisibility(newValue, target: .hide) }
     }
 
-    /// Labels **pinned** ("Show") — always LISTED in the per-class UI (and drawn
-    /// when present, even before they first appear). Pinning is purely app-side
-    /// UI/listing state: drawing-wise Show == Auto (both draw when present), so
-    /// `OverlayFilter` needs no "pinned" field — only `hiddenLabels` affects
-    /// what's drawn. Persisted like `hiddenLabels`. Mutually exclusive with it.
+    /// Labels **pinned** ("Show") for the **active detector** (bridge view of the
+    /// store). Setting reconciles which labels are `.show` into the store.
+    // M12·P1 bridge — P3 re-points the panel.
     var pinnedLabels: Set<String> {
-        didSet { defaults.set(Array(pinnedLabels), forKey: Self.pinnedLabelsKey) }
+        get { labelSet(matching: .show) }
+        set { reconcileVisibility(newValue, target: .show) }
     }
 
-    /// The library render-time filter assembled from the app-side knobs
-    /// (`Double` → `Float`). Read by `DetectionLayer` across Playback / Image /
-    /// Capture; observing it re-runs each overlay `body` when any knob moves.
-    ///
-    /// **Pinned doesn't enter the filter** — Show == Auto for drawing, so only
-    /// `hiddenLabels` suppresses. **Per-label floors are clamped to ≥ the global
-    /// floor** here too (belt-and-suspenders with the UI clamp), so a stale
-    /// stored override below a raised global floor can never *loosen* below it.
+    /// The library render-time filter for the **active detector**, assembled by
+    /// the store (clamped to the global `minConfidence`). Read by `DetectionLayer`
+    /// across Playback / Image / Capture; observing the store's slice re-runs each
+    /// overlay `body` when any knob moves.
     var overlayFilter: OverlayFilter {
-        OverlayFilter(
-            globalMinConfidence: Float(minConfidence),
-            perLabelMinConfidence: perLabelMinConfidence.mapValues {
-                Float(max($0, minConfidence))
-            },
-            hiddenLabels: hiddenLabels
-        )
+        labelStore.overlayFilter(for: detectorID, globalFloor: minConfidence)
     }
 
-    // MARK: - Per-class tri-state visibility
+    // MARK: - Per-class tri-state visibility (forwarders)
 
-    /// The drawing/listing state of a single class label.
-    ///
-    /// - ``hide``: never drawn, even when detected (`hiddenLabels`).
-    /// - ``auto``: drawn when present; the DEFAULT for a newly-seen label
-    ///   (in neither `hiddenLabels` nor `pinnedLabels`).
-    /// - ``show``: pinned — always listed in the per-class UI + drawn when
-    ///   present, even before it first appears (`pinnedLabels`).
-    enum LabelVisibility: Sendable, CaseIterable {
-        case hide, auto, show
-    }
-
-    /// The current tri-state for `label`. Hidden takes precedence over pinned
-    /// (the two sets are kept mutually exclusive, so this is just a lookup).
+    /// The current tri-state for `label` under the active detector.
     func visibility(of label: String) -> LabelVisibility {
-        if hiddenLabels.contains(label) { return .hide }
-        if pinnedLabels.contains(label) { return .show }
-        return .auto
+        labelStore.visibility(of: label, for: detectorID)
     }
 
-    /// Set a label's tri-state, enforcing the {hidden, pinned} mutual exclusion.
+    /// Set a label's tri-state under the active detector.
     func setVisibility(_ visibility: LabelVisibility, for label: String) {
-        switch visibility {
-        case .hide:
-            pinnedLabels.remove(label)
-            hiddenLabels.insert(label)
-        case .auto:
-            hiddenLabels.remove(label)
-            pinnedLabels.remove(label)
-        case .show:
-            hiddenLabels.remove(label)
-            pinnedLabels.insert(label)
-        }
+        labelStore.setVisibility(visibility, of: label, for: detectorID)
     }
 
-    /// Cycle a label Hide → Auto → Show → Hide (the eye-tap affordance order).
+    /// Cycle a label Hide → Auto → Show → Hide under the active detector.
     func cycleVisibility(of label: String) {
-        switch visibility(of: label) {
-        case .hide: setVisibility(.auto, for: label)
-        case .auto: setVisibility(.show, for: label)
-        case .show: setVisibility(.hide, for: label)
+        labelStore.cycleVisibility(of: label, for: detectorID)
+    }
+
+    /// Set a per-label confidence floor under the active detector, clamped to
+    /// ≥ the global floor (the clamp lives in the store).
+    func setPerLabelFloor(_ value: Double, for label: String) {
+        labelStore.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: minConfidence)
+    }
+
+    // MARK: - Bridge helpers
+
+    /// Labels under the active detector whose stored visibility matches `target`.
+    private func labelSet(matching target: DetectorLabelStore.Visibility) -> Set<String> {
+        let triState: LabelVisibility = target == .hide ? .hide : .show
+        return labelStore.labels(for: detectorID).filter {
+            labelStore.visibility(of: $0, for: detectorID) == triState
         }
     }
 
-    /// Set a per-label confidence floor, clamped to ≥ the global floor. A
-    /// per-class floor can be stricter than the global one, never looser — the
-    /// global `minConfidence` is a hard render-side floor everything sits above.
-    func setPerLabelFloor(_ value: Double, for label: String) {
-        perLabelMinConfidence[label] = max(value, minConfidence)
+    /// Reconcile the active detector's `target`-visibility labels to exactly
+    /// `desired`: labels gaining `target` are set to it; labels losing it drop to
+    /// Auto. (Bridge semantics for whole-set assignment / `removeAll()`.)
+    private func reconcileVisibility(_ desired: Set<String>, target: DetectorLabelStore.Visibility) {
+        let triState: LabelVisibility = target == .hide ? .hide : .show
+        let current = labelSet(matching: target)
+        for label in current.subtracting(desired) {
+            labelStore.setVisibility(.auto, of: label, for: detectorID)
+        }
+        for label in desired.subtracting(current) {
+            labelStore.setVisibility(triState, of: label, for: detectorID)
+        }
     }
 
     private let defaults: UserDefaults
 
-    /// - Parameter defaults: `UserDefaults` instance to read/write. Override for
-    ///   tests.
-    init(defaults: UserDefaults = .standard) {
+    /// - Parameters:
+    ///   - defaults: `UserDefaults` instance to read/write. Override for tests.
+    ///   - labelStore: the per-detector per-class store (M12·P1). Defaults to a
+    ///     store on the same `defaults` so the demo wires one automatically;
+    ///     tests / previews can inject a hermetic one.
+    init(defaults: UserDefaults = .standard, labelStore: DetectorLabelStore? = nil) {
         self.defaults = defaults
+        self.labelStore = labelStore ?? DetectorLabelStore(defaults: defaults)
         self.detectorID =
             defaults.string(forKey: Self.detectorIDKey) ?? Self.defaultDetectorID
         // `object(forKey:)` distinguishes "never set" (nil → default) from a
@@ -164,12 +189,5 @@ final class ModelSelection {
         self.minConfidence =
             (defaults.object(forKey: Self.minConfidenceKey) as? Double)
             ?? Self.defaultMinConfidence
-        self.perLabelMinConfidence =
-            (defaults.dictionary(forKey: Self.perLabelMinConfidenceKey) as? [String: Double])
-            ?? [:]
-        self.hiddenLabels =
-            Set((defaults.array(forKey: Self.hiddenLabelsKey) as? [String]) ?? [])
-        self.pinnedLabels =
-            Set((defaults.array(forKey: Self.pinnedLabelsKey) as? [String]) ?? [])
     }
 }

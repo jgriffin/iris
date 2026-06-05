@@ -16,11 +16,13 @@
 		271BEBCA6330A96A381AC4BD /* SidebarSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A08C6883B372BD13EB3B9F /* SidebarSection.swift */; };
 		2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA38233F14BA878271417160 /* DocumentPicker.swift */; };
 		34581B8526A16B7F9CADBCBC /* ImageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B6AB26769A968BB0926015 /* ImageDetailView.swift */; };
+		3476E01CC96F683FE8256666 /* DetectorLabelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A55DA133C8B42EF03C4C0B /* DetectorLabelStore.swift */; };
 		364F7FE5B24B9AEE305936FD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A8F35B723B525FE4E3140423 /* Assets.xcassets */; };
 		3C1197B034159E4842BA47AD /* IrisShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C954F3A6D2311B56FEADA34 /* IrisShell.swift */; };
 		4A6208A458CC66094A8755AA /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891475758A6A13D036F12E8E /* DemoCatalog.swift */; };
 		4BA2D87281F0CCFF46238E56 /* ModeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7013D1D959E30D579C926905 /* ModeSection.swift */; };
 		4F2421A9F1943FF0F9BE93C4 /* Iris in Frameworks */ = {isa = PBXBuildFile; productRef = 53270A4BBE94833D88339CC9 /* Iris */; };
+		58EA19D8ADCED16BCC3927B7 /* tuning-panel-redesign.html in Resources */ = {isa = PBXBuildFile; fileRef = BA6AF6D429AEF7978A2A02B8 /* tuning-panel-redesign.html */; };
 		58F5A886F02053AF1D6F05E3 /* MinConfidenceControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72357249B46ABBFAA962E8E0 /* MinConfidenceControl.swift */; };
 		5A207B6F060DD3E82DEC5F4B /* PerClassControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFEB80F6C9410E676B77385 /* PerClassControls.swift */; };
 		5C839C2E118D05A9659CA207 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A8F35B723B525FE4E3140423 /* Assets.xcassets */; };
@@ -38,6 +40,7 @@
 		8052DCD7FF7092CA9EA28185 /* RecentDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D1B473D9FB8CF8AD9A9B85 /* RecentDetectors.swift */; };
 		80C5FD1FBF303FD83FCAD7E3 /* PlaybackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98506DC1073FD4554B23AD45 /* PlaybackDetailView.swift */; };
 		80FFD62CD539847D349D137F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A587AE78D1FFDDAF10F8CB1 /* ContentView.swift */; };
+		8DDB67F5792C8CCE81109A03 /* DetectorLabelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A55DA133C8B42EF03C4C0B /* DetectorLabelStore.swift */; };
 		92AF20B06E358BCC7E3C64BF /* RecentList.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */; };
 		941E87FD9F5701B91EAE8A1C /* DatasetSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07945183CA74C5377EF24C05 /* DatasetSection.swift */; };
 		94E1A4E6C10E6E9327089F31 /* ShellPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A5E148F2FF71AA47276C6C /* ShellPage.swift */; };
@@ -63,6 +66,7 @@
 		E50F7620C5B62FDDBB863303 /* IrisShell+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8959B2D6D8809BCC1F01894 /* IrisShell+Presentation.swift */; };
 		E790B10630BF7BF4E2BF6AF6 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A56187D45DA2BD9FBD7D6978 /* PreviewFixtures.swift */; };
 		E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBFEBA74E1FFC963C6B19D /* IrisDemoApp.swift */; };
+		EAB920E1F4D8C5DBF0A14CC7 /* tuning-panel-redesign.html in Resources */ = {isa = PBXBuildFile; fileRef = BA6AF6D429AEF7978A2A02B8 /* tuning-panel-redesign.html */; };
 		ED38E7175D290823980AC822 /* CaptureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FA0B207E093B250ED3745A6 /* CaptureDetailView.swift */; };
 		F19DDEB08BF187E09029D1E6 /* ShellPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A5E148F2FF71AA47276C6C /* ShellPage.swift */; };
 		F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 80E8D4EA21F94EA1D6889BC4 /* yolo12n.mlpackage */; };
@@ -101,6 +105,8 @@
 		A8F35B723B525FE4E3140423 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B02C0318871B843D498C3B09 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		B4D1B473D9FB8CF8AD9A9B85 /* RecentDetectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentDetectors.swift; sourceTree = "<group>"; };
+		B8A55DA133C8B42EF03C4C0B /* DetectorLabelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectorLabelStore.swift; sourceTree = "<group>"; };
+		BA6AF6D429AEF7978A2A02B8 /* tuning-panel-redesign.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "tuning-panel-redesign.html"; sourceTree = "<group>"; };
 		C0A5E148F2FF71AA47276C6C /* ShellPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellPage.swift; sourceTree = "<group>"; };
 		C35E1845BD604096FD04BDE2 /* ModelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSection.swift; sourceTree = "<group>"; };
 		C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IrisDemoApp.swift; sourceTree = "<group>"; };
@@ -162,6 +168,7 @@
 				72357249B46ABBFAA962E8E0 /* MinConfidenceControl.swift */,
 				3EFEB80F6C9410E676B77385 /* PerClassControls.swift */,
 				F326F2B7FA99109F51EFBCE3 /* TuningGroups.swift */,
+				8E0B7DEFF1C78921D254820F /* mocks */,
 			);
 			path = Inspector;
 			sourceTree = "<group>";
@@ -201,6 +208,7 @@
 			isa = PBXGroup;
 			children = (
 				891475758A6A13D036F12E8E /* DemoCatalog.swift */,
+				B8A55DA133C8B42EF03C4C0B /* DetectorLabelStore.swift */,
 				E6E0A78EDC0630A9A7AE5B04 /* FrameExportCoordinator.swift */,
 				223647B66EB28506C2F96B97 /* ModelSelection.swift */,
 				B4D1B473D9FB8CF8AD9A9B85 /* RecentDetectors.swift */,
@@ -244,6 +252,14 @@
 				DBE7BA6B4109B5C17A746975 /* IrisDemo-macOS.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8E0B7DEFF1C78921D254820F /* mocks */ = {
+			isa = PBXGroup;
+			children = (
+				BA6AF6D429AEF7978A2A02B8 /* tuning-panel-redesign.html */,
+			);
+			path = mocks;
 			sourceTree = "<group>";
 		};
 		B0C20A0AFED1D905E6FB0249 /* Details */ = {
@@ -391,6 +407,7 @@
 			files = (
 				5C839C2E118D05A9659CA207 /* Assets.xcassets in Resources */,
 				AF3E084114A5809143253FAE /* clipboard-blank-page.mp4 in Resources */,
+				58EA19D8ADCED16BCC3927B7 /* tuning-panel-redesign.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -399,6 +416,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				364F7FE5B24B9AEE305936FD /* Assets.xcassets in Resources */,
+				EAB920E1F4D8C5DBF0A14CC7 /* tuning-panel-redesign.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +431,7 @@
 				80FFD62CD539847D349D137F /* ContentView.swift in Sources */,
 				941E87FD9F5701B91EAE8A1C /* DatasetSection.swift in Sources */,
 				B17BBD5AC676728A9FC2EA90 /* DemoCatalog.swift in Sources */,
+				8DDB67F5792C8CCE81109A03 /* DetectorLabelStore.swift in Sources */,
 				5FA5C5E28A0F48BADF0B6482 /* FrameExportCoordinator.swift in Sources */,
 				34581B8526A16B7F9CADBCBC /* ImageDetailView.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
@@ -449,6 +468,7 @@
 				BCBD5E8F7D7CC43FF8CBA170 /* ContentView.swift in Sources */,
 				67061E8022BD363D057BEAA6 /* DatasetSection.swift in Sources */,
 				4A6208A458CC66094A8755AA /* DemoCatalog.swift in Sources */,
+				3476E01CC96F683FE8256666 /* DetectorLabelStore.swift in Sources */,
 				2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */,
 				071359DC767091E46E0EC0EC /* FrameExportCoordinator.swift in Sources */,
 				7CBFEAEBD64ACDEF63FC340F /* ImageDetailView.swift in Sources */,
