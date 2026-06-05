@@ -69,6 +69,20 @@ final class CaptureModel {
     /// selection (set by `start(initialEntry:)`); defaults to Vision rectangles.
     private var detector: any Detector = CaptureModel.defaultDetector
 
+    /// The catalog id of the detector currently installed in `detector` — the id
+    /// to **attribute sightings to** (M12·P2). Set in lockstep with `detector`
+    /// (`start` / `updateDetector`), both on `@MainActor`, so a frame's results
+    /// and this id can't disagree: the loop reads `detector` + `installedDetectorID`
+    /// in the same synchronous step, attributing each frame's labels to the exact
+    /// detector that produced them across an in-place live swap. `nil` until the
+    /// shared selection resolves (then the default detector has no catalog id).
+    private(set) var installedDetectorID: String?
+
+    /// Records the given labels as sightings for a detector id (M12·P2). Injected
+    /// by the shell in `start` so `CaptureModel` stays decoupled from
+    /// `DetectorLabelStore`; mirrors the `minConfidence` closure pattern.
+    private var recordSightings: ((Set<String>, String) -> Void)?
+
     private var loopTask: Task<Void, Never>?
 
     static let defaultDetector: any Detector = VisionRectanglesDetector(
@@ -96,9 +110,15 @@ final class CaptureModel {
     /// selection, resolved by the shell) so a model swapped while NOT on the
     /// Capture page is reflected when capture next starts; falls back to the
     /// default Vision detector if the entry is unresolvable / not ready.
-    func start(initialEntry: DetectorCatalogEntry?, minConfidence: @escaping () -> Float) {
+    func start(
+        initialEntry: DetectorCatalogEntry?,
+        minConfidence: @escaping () -> Float,
+        recordSightings: @escaping (Set<String>, String) -> Void
+    ) {
         guard Self.cameraAvailable, session == nil else { return }
         detector = Self.resolveDetector(for: initialEntry)
+        installedDetectorID = initialEntry?.id
+        self.recordSightings = recordSightings
         let new = CaptureSession()
         Task { @MainActor in
             do {
@@ -113,15 +133,25 @@ final class CaptureModel {
             loopTask = Task { @MainActor in
                 for await frame in new.frames {
                     lastFrame = frame
-                    // Read the CURRENT detector each iteration so a live swap
-                    // (updateDetector) takes effect on the next frame — no
-                    // snapshot capture, no session restart.
+                    // Read the CURRENT detector + its id each iteration so a live
+                    // swap (updateDetector) takes effect on the next frame — no
+                    // snapshot capture, no session restart. Reading both in one
+                    // synchronous step ties each frame's results to the exact
+                    // detector that produced them (M12·P2 attribution).
                     let active = detector
+                    let attributedID = installedDetectorID
                     do {
                         let detections = try await active.detect(in: frame)
                         resultStore.append(
                             TimestampedDetections(timestamp: frame.timestamp, detections: detections)
                         )
+                        // M12·P2: record sightings for the detector that ran this
+                        // frame. `recordSightings` is idempotent + write-on-change,
+                        // so the hot loop only touches the store on a new label.
+                        if let attributedID, let recordSightings = self.recordSightings {
+                            let labels = Set(detections.map(\.label).filter { !$0.isEmpty })
+                            if !labels.isEmpty { recordSightings(labels, attributedID) }
+                        }
                     } catch {
                         Self.logger.error("detect failed: \(String(describing: error), privacy: .public)")
                     }
@@ -136,6 +166,7 @@ final class CaptureModel {
     /// only while running; `start` re-resolves the shared selection anyway).
     func updateDetector(for entry: DetectorCatalogEntry?) {
         detector = Self.resolveDetector(for: entry)
+        installedDetectorID = entry?.id
     }
 
     /// Resolve a catalog entry into the concrete detector to run. Mirrors the

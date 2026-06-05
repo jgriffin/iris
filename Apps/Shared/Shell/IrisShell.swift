@@ -205,6 +205,7 @@ struct IrisShell: View {
         .inspectorPresentation(self)
         .onChange(of: selectedDetectorID) { onDetectorChanged() }
         .onChange(of: page) { _, newPage in onPageChanged(to: newPage) }
+        .onChange(of: presentLabels) { _, labels in recordPresentSightings(labels) }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background, .inactive: exportCoordinator?.triggerSweep()
@@ -295,7 +296,10 @@ struct IrisShell: View {
         if newPage == .capture {
             capture.start(
                 initialEntry: resolvedEntry,
-                minConfidence: { Float(modelSelection.minConfidence) }
+                minConfidence: { Float(modelSelection.minConfidence) },
+                recordSightings: { [modelSelection] labels, detectorID in
+                    modelSelection.labelStore.recordSightings(labels, for: detectorID)
+                }
             )
         } else {
             capture.teardown()
@@ -410,6 +414,41 @@ struct IrisShell: View {
             detections = store.lookup(at: .zero, stale: store.liveStalenessThreshold)
         }
         return Set(detections.map(\.label).filter { !$0.isEmpty })
+    }
+
+    /// Feed the active page's present labels into the ``DetectorLabelStore`` as
+    /// sightings for the detector that **produced** them (M12·P2). Driven off
+    /// `.onChange(of: presentLabels)` — the same shell-level derivation the
+    /// per-class panel already watches — so the single seam covers Playback and
+    /// Image without new per-mode plumbing. `recordSightings` is idempotent +
+    /// write-on-change, so a re-fire with an unchanged set is a no-op.
+    ///
+    /// **Attribution (the model-swap edge).** Sightings are keyed to the id last
+    /// *installed* into the page's coordinator (`syncedVideoDetectorID` /
+    /// `syncedImageDetectorID`), NOT the live `modelSelection.detectorID` the
+    /// picker may have already moved on. This can't race the swap: both
+    /// coordinators' `selectDetector` invalidate the cache before re-running, and
+    /// the synced id is set synchronously at install — so by the time labels
+    /// reappear in the store they were produced by the synced detector, and the
+    /// synced id already matches it. A stale frame's labels can't land in the new
+    /// detector's slice.
+    ///
+    /// **Capture is handled at its production point instead** (`CaptureModel`'s
+    /// loop, keyed by the detector that ran that frame). Capture swaps the live
+    /// detector *in place* with no cache clear, so a shell-level read here could
+    /// attribute lingering stale frames to the new id — the loop is the only
+    /// race-free seam for it. Capture is therefore skipped here.
+    @MainActor
+    private func recordPresentSightings(_ labels: Set<String>) {
+        guard !labels.isEmpty else { return }
+        let attributedDetectorID: String?
+        switch page {
+        case .playback: attributedDetectorID = syncedVideoDetectorID
+        case .image: attributedDetectorID = syncedImageDetectorID
+        case .capture: attributedDetectorID = nil  // recorded in CaptureModel's loop
+        }
+        guard let detectorID = attributedDetectorID else { return }
+        modelSelection.labelStore.recordSightings(labels, for: detectorID)
     }
 
     /// The active page's session (playback / image; capture has none).
