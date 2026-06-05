@@ -10,7 +10,24 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-04 — M12 pivot: one per-detector store IS the panel state; sources dropped (user)
+
+Q: The per-source ledger — does it survive contact with a concrete example?
+
+**No.** The user reviewed a worked example of the morning's per-source ledger and rejected the source layer outright — "the sources bit gets in the way… makes everything unreadable." **This supersedes the source-layer / scope-ladder / video-first specifics of the morning entries below** (the two 2026-06-04 entries: the "opens settled + phases drafted" board note and the redefinition entry); it does **not** change the milestone's existence, number (M12), goal (steady + widen the per-class roster), per-detector keying, persistence, app-side-only / no-library-change, or the clear affordance. New design:
+
+- **One per-detector store that IS the whole panel's per-class state** — `detector id → label → LabelState{ visibility: Visibility?, floor: Float? }`. **Key membership = accumulation** (a label enters the map the first time the detector emits it; `{}` = "seen, no opinion" → tri-state **Auto**); **values = the user's opinions** (show / hide / per-label floor). Sightings and settings are **one store** — no separate ledger + settings pair that must agree. Accepted blur: pinning/hiding/flooring a not-yet-seen label (via the full-roster expander) creates its entry → membership = "seen OR opined-on."
+- **No source identity anywhere.** `sourceKey` / `AssetFingerprint` exit M12; no per-video union, no scope stepper. The panel keeps M11's **binary** expander (accumulated seen labels ▸ full roster `availableLabels`). The L0–L3 ladder collapses to frame → detector-wide → roster, detector-wide the default. Per-video scoping → backlog stub (a `sourceKey → seen-labels` layer over this store, if it ever earns its UI).
+- **All three modes feed it** — Playback, Image, **and** Capture write sightings (idempotent key-insert; dedupe = membership check). The video-first restriction existed only because of per-video identity, now gone.
+- **Per-class settings go per-detector** (reverses morning's "settings stay global"): `perLabelMinConfidence` + `hiddenLabels`/`pinnedLabels` are **absorbed off `ModelSelection`** into the store, keyed by detector. `ModelSelection` keeps only `detectorID` (the key) and the **global** `minConfidence` (the render floor every per-label `floor` clamps to). The tri-state helpers + `overlayFilter` assembly move onto the store.
+- **Clear = forget sightings only** — the per-detector clear drops empty/default entries; explicit opinions survive a roster reset.
+- **Persisted** UserDefaults/JSON with a `version` field. Working type name **`DetectorLabelStore`** (P1 confirms). Phases redrafted: **P1** the store (+ absorb/migrate the per-class state — the integration-heavy bit) · **P2** feed it (all three modes) · **P3** panel rewiring · **P4** polish + static preview.
+
+→ [`features/label-accumulation.md`](./features/label-accumulation.md)
+
 ### 2026-06-04 — M11 ships without accumulation; label accumulation redefined as a penciled multi-level milestone (user)
+
+> ⚠️ **Partially superseded** by the 2026-06-04 M12-pivot entry above: the **scope ladder (L0–L3)**, the **per-source ledger** (`sourceKey` / `AssetFingerprint`), the **default-L1/L2 + scope-step UI**, and **"roster-only / settings stay global"** are obsolete — replaced by one per-detector store that holds sightings *and* settings, with no source layer. The rest (M11 ships as-is; M12 picked up; per-detector keying; persistence; presence-only membership; app-side only; the clear affordance) stands.
 
 Q: Is present-label accumulation in M11, or does M11 ship as-is — and what does "accumulation" actually become?
 
