@@ -34,6 +34,7 @@
 		6960091A22E9AAE2B4478770 /* ModeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7013D1D959E30D579C926905 /* ModeSection.swift */; };
 		69EBF3E30A10F5CE92DEB21E /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02C0318871B843D498C3B09 /* SidebarView.swift */; };
 		6C5D4F61F5E42A8005009E7B /* RecentBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B593CA6CE6A3ABCFB65C9AA /* RecentBookmarks.swift */; };
+		6D1693BE92DE48CF7E17FF30 /* FolderListing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431917A73269F303FD814E76 /* FolderListing.swift */; };
 		749C6ACF62DFF2B567F900D7 /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185675E2E634D70B6C33B219 /* RecentImages.swift */; };
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
 		786AF9497724C07BCC9F00E6 /* IrisShell+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */; };
@@ -47,6 +48,7 @@
 		92AF20B06E358BCC7E3C64BF /* RecentList.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */; };
 		941E87FD9F5701B91EAE8A1C /* DatasetSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07945183CA74C5377EF24C05 /* DatasetSection.swift */; };
 		94E1A4E6C10E6E9327089F31 /* ShellPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A5E148F2FF71AA47276C6C /* ShellPage.swift */; };
+		98B00F36758829D1C1A3B65B /* FolderListing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431917A73269F303FD814E76 /* FolderListing.swift */; };
 		9AEC23B0DD084D79A0A85211 /* SidebarSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A08C6883B372BD13EB3B9F /* SidebarSection.swift */; };
 		A6FBF03EA2E14FB41043F3D2 /* IrisShell+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */; };
 		A85A3463D6B354B6B5F46DBD /* IrisShell+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8959B2D6D8809BCC1F01894 /* IrisShell+Presentation.swift */; };
@@ -93,6 +95,7 @@
 		25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Playback.swift"; sourceTree = "<group>"; };
 		34C48BF0EE7FC8EB6C913BBA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		3EFEB80F6C9410E676B77385 /* PerClassControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerClassControls.swift; sourceTree = "<group>"; };
+		431917A73269F303FD814E76 /* FolderListing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderListing.swift; sourceTree = "<group>"; };
 		44A08C6883B372BD13EB3B9F /* SidebarSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSection.swift; sourceTree = "<group>"; };
 		4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Capture.swift"; sourceTree = "<group>"; };
 		5FE11DED63C51AD082CD66F7 /* iris */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iris; path = ..; sourceTree = SOURCE_ROOT; };
@@ -215,6 +218,7 @@
 			children = (
 				891475758A6A13D036F12E8E /* DemoCatalog.swift */,
 				B8A55DA133C8B42EF03C4C0B /* DetectorLabelStore.swift */,
+				431917A73269F303FD814E76 /* FolderListing.swift */,
 				E6E0A78EDC0630A9A7AE5B04 /* FrameExportCoordinator.swift */,
 				223647B66EB28506C2F96B97 /* ModelSelection.swift */,
 				9B593CA6CE6A3ABCFB65C9AA /* RecentBookmarks.swift */,
@@ -440,6 +444,7 @@
 				941E87FD9F5701B91EAE8A1C /* DatasetSection.swift in Sources */,
 				B17BBD5AC676728A9FC2EA90 /* DemoCatalog.swift in Sources */,
 				8DDB67F5792C8CCE81109A03 /* DetectorLabelStore.swift in Sources */,
+				6D1693BE92DE48CF7E17FF30 /* FolderListing.swift in Sources */,
 				5FA5C5E28A0F48BADF0B6482 /* FrameExportCoordinator.swift in Sources */,
 				34581B8526A16B7F9CADBCBC /* ImageDetailView.swift in Sources */,
 				E7C000CEFB66F55AD98E12BD /* IrisDemoApp.swift in Sources */,
@@ -480,6 +485,7 @@
 				4A6208A458CC66094A8755AA /* DemoCatalog.swift in Sources */,
 				3476E01CC96F683FE8256666 /* DetectorLabelStore.swift in Sources */,
 				2EEB0BE2C1463EB9B83BA4F7 /* DocumentPicker.swift in Sources */,
+				98B00F36758829D1C1A3B65B /* FolderListing.swift in Sources */,
 				071359DC767091E46E0EC0EC /* FrameExportCoordinator.swift in Sources */,
 				7CBFEAEBD64ACDEF63FC340F /* ImageDetailView.swift in Sources */,
 				77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */,

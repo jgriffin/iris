@@ -46,6 +46,11 @@ struct IrisShell: View {
     @State var recentVideos = RecentVideos()
     @State var recentImages = RecentImages()
     @State var recentDetectors = RecentDetectors()
+    // ONE shared folders MRU (M13·P2): a folder of clips and a folder of stills
+    // are both just folders; the per-mode movie/image filter is applied at
+    // enumeration time (`folderListing`), not at storage time. Not yet surfaced
+    // — the sidebar FOLDER block is M13·P3.
+    @State var recentFolders = RecentFolders()
 
     // M7: flagging + export (shared FlagStore between writer + reader).
     @State var flaggingModel: FlaggingModel?

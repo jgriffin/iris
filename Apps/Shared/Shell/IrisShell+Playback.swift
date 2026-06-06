@@ -118,6 +118,51 @@ extension IrisShell {
         presentImporter(for: .video)
     }
 
+    /// Present the folder picker for Playback (movies). Mirrors
+    /// `presentVideoPicker`; the `[.folder]` content type makes both pickers
+    /// return a directory URL with security scope. Not yet called from any
+    /// surface — the sidebar FOLDER block is M13·P3.
+    func presentVideoFolderPicker() {
+        presentImporter(for: .videoFolder)
+    }
+
+    /// Present the folder picker for Image (stills). Sibling of
+    /// `presentVideoFolderPicker`; differs only in how children are filtered
+    /// at enumeration time. Surface lands in M13·P3.
+    func presentImageFolderPicker() {
+        presentImporter(for: .imageFolder)
+    }
+
+    /// Handle a picked **folder**: register it in the shared folders MRU and
+    /// enumerate its matching children once, end-to-end, to exercise the
+    /// listing helper on a real pick (the live sidebar surface is M13·P3).
+    ///
+    /// Scope discipline mirrors `swapToExternal` / `pickImage`: acquire the
+    /// folder's security scope, do the scoped work (MRU bookmark creation reads
+    /// the URL; `folderListing` reads the directory), then release. Both folder
+    /// kinds share ONE MRU — a folder of clips and a folder of stills are both
+    /// just folders; the per-mode filter (`kind`) is applied here at
+    /// enumeration time, not at storage time.
+    @MainActor
+    func pickFolder(url: URL, kind: FolderContentKind) {
+        guard url.startAccessingSecurityScopedResource() else {
+            Logger.shell.error(
+                "startAccessingSecurityScopedResource failed for folder \(url.path, privacy: .public)"
+            )
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        recentFolders.addOrPromote(url)
+        let children = folderListing(of: url, kind: kind)
+        Logger.shell.notice(
+            """
+            folder picked: \(url.lastPathComponent, privacy: .public) \
+            (\(children.count) matching \(String(describing: kind), privacy: .public) children)
+            """
+        )
+    }
+
     /// Load a file-picked Core ML model, then re-select the custom entry so the
     /// swap flow runs the freshly-loaded detector across both coordinators.
     @MainActor
@@ -175,8 +220,14 @@ extension IrisShell {
 /// (M9·P5). Generalizes the P1 macOS movie+model `ActiveImporter` so the
 /// shell carries one importer state and one dispatch instead of five flags and
 /// two parallel modifiers.
+//
+// M13·P2 adds two **folder** cases (`videoFolder` / `imageFolder`), both with
+// `contentTypes = [.folder]` — separate cases rather than a folder axis on the
+// existing ones because the two kinds filter their children differently (movies
+// vs. stills) and route to a folder handler, not to the single-file open flow.
 enum ImportTarget: String, Identifiable, CaseIterable {
     case video, image, model
+    case videoFolder, imageFolder
     var id: String { rawValue }
 
     var contentTypes: [UTType] {
@@ -184,6 +235,7 @@ enum ImportTarget: String, Identifiable, CaseIterable {
         case .video: return IrisShell.movieContentTypes
         case .image: return IrisShell.imageContentTypes
         case .model: return IrisShell.modelContentTypes
+        case .videoFolder, .imageFolder: return [.folder]
         }
     }
 }
@@ -197,6 +249,8 @@ extension IrisShell {
         case .video: swapToExternal(url: url)
         case .image: pickImage(url: url)
         case .model: loadPickedModel(at: url)
+        case .videoFolder: pickFolder(url: url, kind: .movie)
+        case .imageFolder: pickFolder(url: url, kind: .image)
         }
     }
 
