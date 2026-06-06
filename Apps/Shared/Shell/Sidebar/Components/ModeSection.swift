@@ -44,14 +44,47 @@ struct ModeSection<Content: View>: View {
         if isActive {
             activeSection
         } else {
-            inactiveRow
+            ModeInactiveRow(page: page, isEnabled: isEnabled) { selection = page }
         }
     }
 
-    // MARK: Inactive — a plain, tappable row.
+    // MARK: Active — accent bar + header band + body (composed form).
+    //
+    // Used by the gallery + previews. The LIVE sidebar does not use this; it
+    // flattens the header band and the body's sub-blocks into the pinning
+    // `LazyVStack` (see `SidebarView`), reusing `ModeHeaderBand` so the band
+    // look stays one source of truth.
 
-    private var inactiveRow: some View {
-        Button { selection = page } label: {
+    private var activeSection: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(width: SidebarBand.accentBarWidth)
+            VStack(alignment: .leading, spacing: 0) {
+                ModeHeaderBand(page: page, onOpen: onOpen, openSystemImage: openSystemImage)
+                    .background(SidebarBand.headerTint)
+                content()
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SidebarBand.bodyTint)
+            }
+        }
+        .transition(.opacity)
+    }
+}
+
+/// The inactive (collapsed) mode row — a plain, tappable label. Extracted from
+/// `ModeSection` (M13·P4) so the live sidebar can emit it as a bare, non-pinned
+/// row in the scroll `LazyVStack` while the active section's pieces flatten into
+/// pinnable `Section`s alongside it.
+struct ModeInactiveRow: View {
+    let page: ShellPage
+    var isEnabled: Bool = true
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
             HStack(spacing: 8) {
                 Image(systemName: page.systemImage)
                     .frame(width: 20)
@@ -68,27 +101,21 @@ struct ModeSection<Content: View>: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
     }
+}
 
-    // MARK: Active — accent bar + header band + body.
+/// The active mode section's accent header band — the filled mode icon + title +
+/// optional trailing "open source" button on the 0.22 accent tint. Extracted
+/// (M13·P4) so it can serve as the *pinned* `Section` header of the flattened
+/// active section in the live sidebar AND the composed `ModeSection` form for
+/// the gallery. The 3-pt accent bar + opaque pinned underlay are applied by the
+/// caller (the live sidebar adds them; the composed `activeSection` draws the
+/// bar itself and needs no opaque underlay).
+struct ModeHeaderBand: View {
+    let page: ShellPage
+    var onOpen: (() -> Void)?
+    var openSystemImage: String = "plus"
 
-    private var activeSection: some View {
-        HStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.accentColor)
-                .frame(width: 3)
-            VStack(alignment: .leading, spacing: 0) {
-                headerBand
-                content()
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.primary.opacity(0.08))
-            }
-        }
-        .transition(.opacity)
-    }
-
-    private var headerBand: some View {
+    var body: some View {
         HStack(spacing: 8) {
             Image(systemName: page.activeSystemImage)
                 .frame(width: 20)
@@ -109,7 +136,6 @@ struct ModeSection<Content: View>: View {
         .padding(.vertical, 7)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.22))
     }
 }
 

@@ -10,6 +10,9 @@ struct RecentList: View {
     let systemImage: String
     let onPick: (URL) -> Void
     let emptyHint: String
+    /// Forget a recent entry from the MRU (right-click / long-press →
+    /// "Remove from Recents"). `nil` in previews/gallery where there's no MRU.
+    var onRemove: ((URL) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -37,8 +40,31 @@ struct RecentList: View {
                     }
                     .buttonStyle(.plain)
                     .help(url.path)
+                    .modifier(RemoveRecentMenu(url: url, onRemove: onRemove))
                 }
             }
+        }
+    }
+}
+
+/// Attaches the "Remove from Recents" destructive context-menu when a removal
+/// callback is supplied; a no-op otherwise. Right-click (macOS) / long-press
+/// (iOS) both surface `.contextMenu`.
+private struct RemoveRecentMenu: ViewModifier {
+    let url: URL
+    let onRemove: ((URL) -> Void)?
+
+    func body(content: Content) -> some View {
+        if let onRemove {
+            content.contextMenu {
+                Button(role: .destructive) {
+                    onRemove(url)
+                } label: {
+                    Label("Remove from Recents", systemImage: "trash")
+                }
+            }
+        } else {
+            content
         }
     }
 }

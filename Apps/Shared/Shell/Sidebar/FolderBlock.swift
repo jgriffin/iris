@@ -26,16 +26,25 @@ struct ItemCount: View {
 /// above them. An empty folder shows a quiet "no matching files" caption in the
 /// same indented slot.
 ///
+/// **Section-split for native pinning (M13·P4).** The folder is no longer one
+/// `VStack`; it exposes its header row (`folderRow`) and its children
+/// (`childRows`) separately so the FOLDERS wrapper can wrap the open folder in a
+/// `Section { childRows } header: { folderRow }`, letting the open folder's row
+/// pin atop a long child list (the deepest pin, replacing the FOLDERS header).
+/// The pieces are still preview-drivable directly via `body`, which recomposes
+/// them into the original stacked look for the gallery.
+///
 /// **Plain data in, callbacks out — no state lookups.** The block takes the
 /// folder name/URL, the already-enumerated `children`, an external expansion
-/// `Binding`, and tap callbacks. It never reads `RecentFolders`, never calls
-/// `folderListing` — that wiring lives in the parent (`SourcesPanel` →
+/// `Binding`, and tap / remove callbacks. It never reads `RecentFolders`, never
+/// calls `folderListing` — that wiring lives in the parent (`SourcesPanel` →
 /// `IrisShell`). This keeps it fully preview-drivable (the gallery feeds it
 /// fixture URLs that need not exist on disk) and keeps one-expanded-at-a-time
 /// possible: the parent owns the expansion state and collapses siblings.
 struct FolderBlock: View {
     let folderName: String
-    /// The folder's own URL — used only for the header tooltip (full path).
+    /// The folder's own URL — used for the header tooltip (full path) and the
+    /// "Remove Folder" context-menu callback.
     let folderURL: URL
     /// The matching children, already enumerated + filtered by the caller.
     let children: [URL]
@@ -47,6 +56,9 @@ struct FolderBlock: View {
     @Binding var isExpanded: Bool
     /// Load a child (→ RECENT promotion happens at the wiring layer).
     let onPickChild: (URL) -> Void
+    /// Forget this folder from the folders MRU (never touches disk). `nil` in the
+    /// gallery where there's no MRU to mutate.
+    var onRemoveFolder: ((URL) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -60,7 +72,11 @@ struct FolderBlock: View {
 
     // MARK: Folder header row — glyph + name + count + disclosure chevron.
 
-    private var folderRow: some View {
+    /// The tappable folder row. Carries a "Remove Folder" destructive
+    /// context-menu (right-click on macOS / long-press on iOS) that forgets the
+    /// MRU entry — only when `onRemoveFolder` is supplied.
+    @ViewBuilder
+    var folderRow: some View {
         Button {
             isExpanded.toggle()
         } label: {
@@ -83,12 +99,13 @@ struct FolderBlock: View {
         }
         .buttonStyle(.plain)
         .help(folderURL.path)
+        .modifier(RemoveFolderMenu(folderURL: folderURL, onRemoveFolder: onRemoveFolder))
     }
 
     // MARK: Expanded children — RecentList's idiom, one indent deeper.
 
     @ViewBuilder
-    private var childRows: some View {
+    var childRows: some View {
         if children.isEmpty {
             Text("No matching files")
                 .font(.callout)
@@ -115,8 +132,32 @@ struct FolderBlock: View {
                     }
                     .buttonStyle(.plain)
                     .help(url.path)
+                    // Children are NOT MRU entries — no remove menu (a folder's
+                    // contents aren't individually tracked).
                 }
             }
+        }
+    }
+}
+
+/// Attaches the "Remove Folder" destructive context-menu when a removal callback
+/// is supplied; a no-op modifier otherwise. Right-click (macOS) / long-press
+/// (iOS) both surface `.contextMenu` — one modifier serves both platforms.
+private struct RemoveFolderMenu: ViewModifier {
+    let folderURL: URL
+    let onRemoveFolder: ((URL) -> Void)?
+
+    func body(content: Content) -> some View {
+        if let onRemoveFolder {
+            content.contextMenu {
+                Button(role: .destructive) {
+                    onRemoveFolder(folderURL)
+                } label: {
+                    Label("Remove Folder", systemImage: "trash")
+                }
+            }
+        } else {
+            content
         }
     }
 }
@@ -138,10 +179,16 @@ struct FolderBlock: View {
 /// - **Counts everywhere** — the FOLDERS header carries the folder count; each
 ///   `FolderBlock` row carries its matching-child count.
 ///
+/// **Composed look only (M13·P4).** This `View` form draws the FOLDERS block as
+/// one self-contained `SidebarSection` — used by the *gallery* (and any future
+/// non-pinned context). In the live sidebar, the section is flattened into the
+/// pinning `LazyVStack`: `SourcesPanel` emits the FOLDERS header and each open
+/// folder as their own `Section`s rather than nesting them here, so they pin
+/// natively. The two share `FoldersBlockHeaderAccessory` + `FolderBlock` so the
+/// look stays one source of truth.
+///
 /// Like `FolderBlock`, this is fully data-driven for the gallery: it takes a
-/// list of folders + callbacks; no `RecentFolders` reads. The live wiring
-/// (`SourcesPanel`) feeds it the real folders MRU and the enumerate-on-expand
-/// child listing.
+/// list of folders + callbacks; no `RecentFolders` reads.
 struct FoldersBlock: View {
     /// One folder's worth of plain data for the wrapper to render.
     struct Folder: Identifiable {
@@ -161,24 +208,15 @@ struct FoldersBlock: View {
     /// Present the add-folder picker for this mode (`folder.badge.plus`).
     let onAddFolder: () -> Void
     let onPickChild: (URL) -> Void
+    /// Forget a folder from the MRU. `nil` in the gallery.
+    var onRemoveFolder: ((URL) -> Void)?
 
     var body: some View {
         SidebarSection("FOLDERS", isExpanded: $isExpanded) {
-            HStack(spacing: 10) {
-                ItemCount(count: folders.count)
-                Button(action: onAddFolder) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.body)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Add a folder")
-            }
+            FoldersBlockHeaderAccessory(count: folders.count, onAddFolder: onAddFolder)
         } content: {
             if folders.isEmpty {
-                Text("Add a folder to browse its contents here.")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
+                FoldersBlockEmpty()
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(folders) { folder in
@@ -188,7 +226,8 @@ struct FoldersBlock: View {
                             children: folder.children,
                             childSystemImage: childSystemImage,
                             isExpanded: binding(for: folder.url),
-                            onPickChild: onPickChild
+                            onPickChild: onPickChild,
+                            onRemoveFolder: onRemoveFolder
                         )
                     }
                 }
@@ -207,6 +246,37 @@ struct FoldersBlock: View {
             get: { openFolder == url },
             set: { open in openFolder = open ? url : nil }
         )
+    }
+}
+
+/// The FOLDERS header's trailing accessory: the folder count + the
+/// `folder.badge.plus` add button. Shared by the composed `FoldersBlock` and the
+/// flattened `SourcesPanel` so the header look is one source of truth.
+struct FoldersBlockHeaderAccessory: View {
+    let count: Int
+    let onAddFolder: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ItemCount(count: count)
+            Button(action: onAddFolder) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.body)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Add a folder")
+        }
+    }
+}
+
+/// The quiet zero-folders hint shown under the FOLDERS header. Shared by the
+/// composed + flattened forms.
+struct FoldersBlockEmpty: View {
+    var body: some View {
+        Text("Add a folder to browse its contents here.")
+            .font(.callout)
+            .foregroundStyle(.tertiary)
     }
 }
 

@@ -255,6 +255,39 @@ class RecentBookmarks {
         return resolved
     }
 
+    /// Remove the single MRU entry whose bookmark resolves to `url`, if present.
+    /// Persists when something is dropped (no-op write avoided otherwise).
+    ///
+    /// Matching uses the same resolved-path discipline as `addOrPromote`'s
+    /// dedup: each existing bookmark is resolved and its standardized file path
+    /// compared to `url`'s. Bookmark-blob byte equality would miss an entry
+    /// bookmarked with a slightly different flag combination. Entries that fail
+    /// to resolve are left in place here (a no-op for them) — `resolve()` is the
+    /// pruner of unresolvable bookmarks, not this method, which targets one
+    /// user-named entry.
+    ///
+    /// This never touches the filesystem — for `RecentFolders` it forgets a
+    /// picked folder, it does not delete the directory.
+    func remove(_ url: URL) {
+        let targetPath = url.standardizedFileURL.path
+        let next = bookmarks.filter { existing in
+            guard let resolved = Self.tryResolve(existing) else { return true }
+            return resolved.standardizedFileURL.path != targetPath
+        }
+        let dropped = bookmarks.count - next.count
+        guard dropped > 0 else {
+            logger.notice(
+                "remove: no MRU entry matched \(url.lastPathComponent, privacy: .public)"
+            )
+            return
+        }
+        logger.notice(
+            "remove: dropped \(dropped, privacy: .public) entr\(dropped == 1 ? "y" : "ies") for \(url.lastPathComponent, privacy: .public)"
+        )
+        bookmarks = next
+        persist()
+    }
+
     /// Empty the MRU. Persists immediately.
     func clear() {
         bookmarks = []

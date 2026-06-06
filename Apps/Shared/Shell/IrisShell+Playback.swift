@@ -264,6 +264,25 @@ extension IrisShell {
         }
     }
 
+    // MARK: MRU entry removal (M13·P4)
+
+    /// Forget a recent video from the videos MRU (sidebar "Remove from
+    /// Recents"). Animated with the `.snappy` idiom used by `addOrPromote` so the
+    /// row animates out and the RECENT count updates; never touches disk.
+    @MainActor
+    func removeRecentVideo(url: URL) {
+        withAnimation(.snappy) { recentVideos.remove(url) }
+    }
+
+    /// Forget a folder from the shared folders MRU (sidebar "Remove Folder").
+    /// Removes the MRU entry ONLY — it does not delete the directory. Animated so
+    /// the folder row animates out and the FOLDERS count updates. Serves both
+    /// modes (one shared folders MRU).
+    @MainActor
+    func removeFolder(url: URL) {
+        withAnimation(.snappy) { recentFolders.remove(url) }
+    }
+
     /// Load a file-picked Core ML model, then re-select the custom entry so the
     /// swap flow runs the freshly-loaded detector across both coordinators.
     @MainActor

@@ -80,6 +80,14 @@ extension IrisShell {
         }
     }
 
+    /// Forget a recent image from the images MRU (sidebar "Remove from
+    /// Recents"). Animated with the `.snappy` idiom used by `addOrPromote` so the
+    /// row animates out and the RECENT count updates; never touches disk.
+    @MainActor
+    func removeRecentImage(url: URL) {
+        withAnimation(.snappy) { recentImages.remove(url) }
+    }
+
     /// Re-run the held image under the shared selection.
     @MainActor
     func selectImageDetector() {

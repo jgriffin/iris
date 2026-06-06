@@ -45,6 +45,8 @@ struct SidebarView: View {
     let recentVideos: [URL]
     let onOpenVideo: () -> Void
     let onPickVideo: (URL) -> Void
+    /// Forget a recent video from the MRU (context-menu).
+    let onRemoveVideo: (URL) -> Void
     /// The picked video folders (MRU order) with their currently-enumerated
     /// matching children. The shell re-enumerates a folder on expand (see
     /// `onExpandVideoFolder`); children are empty until first opened.
@@ -55,15 +57,22 @@ struct SidebarView: View {
     /// which must NOT touch the folders MRU on a plain recents tap).
     let onPickVideoChild: (URL) -> Void
     let onExpandVideoFolder: (URL) -> Void
+    /// Forget a video folder from the shared folders MRU (context-menu; never
+    /// deletes the directory on disk).
+    let onRemoveVideoFolder: (URL) -> Void
 
     // Image page.
     let recentImages: [URL]
     let onOpenImage: () -> Void
     let onPickImage: (URL) -> Void
+    /// Forget a recent image from the MRU (context-menu).
+    let onRemoveImage: (URL) -> Void
     let imageFolders: [FoldersBlock.Folder]
     let onAddImageFolder: () -> Void
     let onPickImageChild: (URL) -> Void
     let onExpandImageFolder: (URL) -> Void
+    /// Forget an image folder from the shared folders MRU (context-menu).
+    let onRemoveImageFolder: (URL) -> Void
 
     // DATASET strip. macOS-only export controls (iOS exposes Documents via
     // Files.app and never had this footer); the count line shows everywhere.
@@ -93,52 +102,73 @@ struct SidebarView: View {
             Divider()
 
             // The page-sections scroll between the pinned MODEL header and the
-            // DATASET footer. The three selectable `ModeSection`s form an
-            // accordion keyed to `page`: expanding a section IS selecting it,
-            // and the others collapse. The expansion animation lives here
-            // (keyed on `page`) so it drives the whole scroll block — matching
-            // the original placement; each section owns its own header + content
-            // layout.
+            // DATASET footer. The three selectable modes form an accordion keyed
+            // to `page`: selecting a mode activates it and collapses the others.
+            //
+            // Sequential native pinning (M13·P4): the scroll content is a
+            // `LazyVStack(pinnedViews: .sectionHeaders)`. The ACTIVE mode section
+            // is flattened into sibling `Section`s — the accent header band, then
+            // RECENT / FOLDERS / each open folder (emitted by `SourcesPanel`) —
+            // so their headers pin sequentially, each deeper one replacing the
+            // shallower as you scroll, and tapping a pinned header collapses it
+            // (escape). INACTIVE modes + Capture render as bare, non-pinned rows.
+            // The expansion animation stays keyed on `page` so activating a mode
+            // animates the whole block as before.
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ModeSection(
-                        page: .playback, selection: $page,
-                        onOpen: onOpenVideo, openSystemImage: "folder.badge.plus"
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                    modeBlock(
+                        page: .playback, openSystemImage: "folder.badge.plus", onOpen: onOpenVideo
                     ) {
                         SourcesPanel(
                             recents: recentVideos,
                             recentSystemImage: "film",
                             onPickRecent: onPickVideo,
                             recentEmptyHint: "No recent videos",
+                            onRemoveRecent: onRemoveVideo,
                             folders: videoFolders,
                             folderChildSystemImage: "film",
                             onAddFolder: onAddVideoFolder,
                             onPickChild: onPickVideoChild,
-                            onExpandFolder: onExpandVideoFolder
+                            onExpandFolder: onExpandVideoFolder,
+                            onRemoveFolder: onRemoveVideoFolder
                         )
                     }
                     Divider().padding(.horizontal, 12)
-                    ModeSection(
-                        page: .image, selection: $page,
-                        onOpen: onOpenImage, openSystemImage: "photo.badge.plus"
+                    modeBlock(
+                        page: .image, openSystemImage: "photo.badge.plus", onOpen: onOpenImage
                     ) {
                         SourcesPanel(
                             recents: recentImages,
                             recentSystemImage: "photo",
                             onPickRecent: onPickImage,
                             recentEmptyHint: "No recent images",
+                            onRemoveRecent: onRemoveImage,
                             folders: imageFolders,
                             folderChildSystemImage: "photo",
                             onAddFolder: onAddImageFolder,
                             onPickChild: onPickImageChild,
-                            onExpandFolder: onExpandImageFolder
+                            onExpandFolder: onExpandImageFolder,
+                            onRemoveFolder: onRemoveImageFolder
                         )
                     }
                     Divider().padding(.horizontal, 12)
-                    ModeSection(page: .capture, selection: $page, isEnabled: captureAvailable) {
-                        Text("Live camera")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    // Capture: no file source. Active → bare "Live camera" inside
+                    // a pinned header band; inactive/disabled → bare row.
+                    if page == .capture && captureAvailable {
+                        Section {
+                            Text("Live camera")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .sourcesContent()
+                        } header: {
+                            ModeHeaderBand(page: .capture)
+                                .sidebarAccentBar()
+                                .pinnedHeaderBackground(SidebarBand.headerTint)
+                        }
+                    } else {
+                        ModeInactiveRow(page: .capture, isEnabled: captureAvailable) {
+                            page = .capture
+                        }
                     }
                 }
                 .padding(.vertical, 8)
@@ -160,6 +190,37 @@ struct SidebarView: View {
             )
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
+        }
+    }
+
+    /// Emit one selectable mode into the pinning `LazyVStack`. When active, the
+    /// mode's accent header band is a pinnable `Section` header (the top-level
+    /// context pin — it stays put as you scroll, replaced only by the deeper
+    /// RECENT/FOLDERS/open-folder pins), followed by the `sources` sub-block's own
+    /// flattened `Section`s. When inactive, a bare non-pinned row that selects the
+    /// mode on tap. The flattened pieces land as direct siblings of the LazyVStack
+    /// so they pin sequentially. (The band itself has no collapse-tap — a mode is
+    /// selected, not collapsed; the `onOpen` button is its only action. The
+    /// tap-to-escape behavior lives on the deeper pins: the RECENT/FOLDERS
+    /// chevrons and the open-folder row.)
+    @ViewBuilder
+    private func modeBlock(
+        page modePage: ShellPage,
+        openSystemImage: String,
+        onOpen: @escaping () -> Void,
+        @ViewBuilder sources: () -> some View
+    ) -> some View {
+        if page == modePage {
+            Section {
+                EmptyView()
+            } header: {
+                ModeHeaderBand(page: modePage, onOpen: onOpen, openSystemImage: openSystemImage)
+                    .sidebarAccentBar()
+                    .pinnedHeaderBackground(SidebarBand.headerTint)
+            }
+            sources()
+        } else {
+            ModeInactiveRow(page: modePage) { page = modePage }
         }
     }
 }
@@ -187,17 +248,21 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
         onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
+        onRemoveVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
         onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
+        onRemoveImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: false,
         lastSummaryText: nil,
@@ -221,17 +286,21 @@ struct SidebarView: View {
         recentVideos: [],
         onOpenVideo: {},
         onPickVideo: { _ in },
+        onRemoveVideo: { _ in },
         videoFolders: [],
         onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
+        onRemoveVideoFolder: { _ in },
         recentImages: [],
         onOpenImage: {},
         onPickImage: { _ in },
+        onRemoveImage: { _ in },
         imageFolders: [],
         onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
+        onRemoveImageFolder: { _ in },
         exportedFrameCountText: "No frames exported yet",
         isSweeping: false,
         lastSummaryText: nil,
@@ -255,17 +324,21 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
         onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
+        onRemoveVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
         onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
+        onRemoveImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: false,
         lastSummaryText: nil,
@@ -289,17 +362,21 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
         onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
+        onRemoveVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
         onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
+        onRemoveImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: true,
         lastSummaryText: "Last sweep: 8 frames → ~/Datasets/iris (3.2 MB)",

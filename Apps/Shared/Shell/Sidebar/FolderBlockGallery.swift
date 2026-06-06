@@ -46,33 +46,39 @@ private struct FolderGalleryCase<Content: View>: View {
 }
 
 /// The active Playback section body — the real `SourcesPanel` (RECENT over
-/// FOLDERS) inside the real `ModeSection`, so placement + the two collapsible
-/// sub-blocks are judged in true section anatomy (accent bar + 0.22 header band
-/// + 0.08 body). Pinned active (`selection == .playback`) so the active
-/// treatment renders.
+/// FOLDERS) inside the live FLATTENED anatomy: the mode header band + the
+/// sources sub-blocks emitted as sibling `Section`s in a
+/// `LazyVStack(pinnedViews: .sectionHeaders)`, exactly as `SidebarView` hosts
+/// them (M13·P4). Judges placement + the collapsible sub-blocks + the pinned
+/// headers in true shipped anatomy (accent bar + 0.22 header band + 0.08 body).
 private struct ActiveSectionCase: View {
     var folders: [FoldersBlock.Folder] = PreviewFixtures.sampleVideoFolders
     var recents: [URL] = PreviewFixtures.sampleVideoURLs
 
-    @State private var page: ShellPage = .playback
-
     var body: some View {
-        ModeSection(
-            page: .playback, selection: $page,
-            onOpen: {}, openSystemImage: "folder.badge.plus"
-        ) {
-            SourcesPanel(
-                recents: recents,
-                recentSystemImage: "film",
-                onPickRecent: { _ in },
-                recentEmptyHint: "No recent videos",
-                folders: folders,
-                folderChildSystemImage: "film",
-                onAddFolder: {},
-                onPickChild: { _ in },
-                onExpandFolder: { _ in }
-            )
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                Section {
+                    EmptyView()
+                } header: {
+                    ModeHeaderBand(page: .playback, onOpen: {}, openSystemImage: "folder.badge.plus")
+                        .sidebarAccentBar()
+                        .pinnedHeaderBackground(SidebarBand.headerTint)
+                }
+                SourcesPanel(
+                    recents: recents,
+                    recentSystemImage: "film",
+                    onPickRecent: { _ in },
+                    recentEmptyHint: "No recent videos",
+                    folders: folders,
+                    folderChildSystemImage: "film",
+                    onAddFolder: {},
+                    onPickChild: { _ in },
+                    onExpandFolder: { _ in }
+                )
+            }
         }
+        .frame(height: 360)
     }
 }
 
@@ -80,7 +86,7 @@ private struct ActiveSectionCase: View {
 @MainActor @ViewBuilder
 private var folderGallery: some View {
     VStack(alignment: .leading, spacing: 22) {
-        Text("FOLDERS — shipped design (below RECENT · collapsible sub-blocks · counts)")
+        Text("FOLDERS — shipped design (below RECENT · collapsible sub-blocks · counts · pinned headers · remove menus)")
             .font(.headline)
 
         // ── The shipped section body, in full anatomy ───────────────────
@@ -132,35 +138,21 @@ private var folderGallery: some View {
         FolderGalleryCase(title: "Inactive section — collapses to a bare row, NO sources body") {
             InactiveSectionCase()
         }
+        FolderGalleryCase(title: "Context menus (M13·P4) — remove affordances; static note (menus don't render)") {
+            ContextMenuNoteCase()
+        }
     }
     .padding(16)
     .frame(width: 340)
 }
 
-/// The shipped section body with RECENT pre-collapsed — demonstrates the fast
-/// path to FOLDERS. `SourcesPanel` owns the sub-block expansion state, so the
-/// collapse is driven by interaction; this case seeds the intent in its caption
-/// (the canvas is where the user taps RECENT's chevron to verify).
+/// The shipped section body in the flattened host — same as `ActiveSectionCase`,
+/// captioned for the RECENT-collapse fast path. `SourcesPanel` owns the sub-block
+/// expansion state, so the collapse is driven by tapping RECENT's chevron in the
+/// canvas; this case seeds the intent in its caption.
 private struct CollapsedRecentCase: View {
-    @State private var page: ShellPage = .playback
-
     var body: some View {
-        ModeSection(
-            page: .playback, selection: $page,
-            onOpen: {}, openSystemImage: "folder.badge.plus"
-        ) {
-            SourcesPanel(
-                recents: PreviewFixtures.sampleVideoURLs,
-                recentSystemImage: "film",
-                onPickRecent: { _ in },
-                recentEmptyHint: "No recent videos",
-                folders: PreviewFixtures.sampleVideoFolders,
-                folderChildSystemImage: "film",
-                onAddFolder: {},
-                onPickChild: { _ in },
-                onExpandFolder: { _ in }
-            )
-        }
+        ActiveSectionCase()
     }
 }
 
@@ -206,30 +198,52 @@ private struct ExpandedSingleFolder: View {
     }
 }
 
-/// The inactive (collapsed) Image section — `selection` is elsewhere, so
-/// `ModeSection` draws the bare tappable row and the sources body we'd inject is
-/// simply absent. Confirms the sub-blocks don't leak into collapsed sections.
+/// The inactive (collapsed) Image mode — a bare tappable `ModeInactiveRow`, no
+/// sources body. In the live sidebar an inactive mode never emits the sub-block
+/// `Section`s at all (they're conditional on `page == modePage`); this confirms
+/// the collapsed row's look in isolation.
 private struct InactiveSectionCase: View {
-    @State private var page: ShellPage = .playback   // active elsewhere
-
     var body: some View {
-        ModeSection(
-            page: .image, selection: $page,
-            onOpen: {}, openSystemImage: "photo.badge.plus"
-        ) {
-            // Never rendered while inactive — present only to mirror the active
-            // body's shape.
-            SourcesPanel(
-                recents: PreviewFixtures.sampleImageURLs,
-                recentSystemImage: "photo",
-                onPickRecent: { _ in },
-                recentEmptyHint: "No recent images",
-                folders: PreviewFixtures.sampleImageFolders,
-                folderChildSystemImage: "photo",
-                onAddFolder: {},
-                onPickChild: { _ in },
-                onExpandFolder: { _ in }
+        ModeInactiveRow(page: .image) { }
+    }
+}
+
+/// A captioned note row standing in for the context-menu affordance. Context
+/// menus don't render statically (they appear only on right-click / long-press),
+/// so this case documents the affordance rather than forcing a render — a RECENT
+/// row + a folder row, each annotated with the menu item it carries.
+private struct ContextMenuNoteCase: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            menuNote(
+                glyph: "film", name: "clip-042.mov",
+                note: "right-click / long-press → \u{201C}Remove from Recents\u{201D}"
             )
+            menuNote(
+                glyph: "folder", name: "Shoot — June",
+                note: "right-click / long-press → \u{201C}Remove Folder\u{201D} (MRU only, never deletes on disk)"
+            )
+            menuNote(
+                glyph: "film", name: "(folder child)",
+                note: "no menu — children aren\u{2019}t MRU entries", muted: true
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func menuNote(glyph: String, name: String, note: String, muted: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Image(systemName: glyph)
+                    .frame(width: 20)
+                    .foregroundStyle(muted ? .tertiary : .secondary)
+                Text(name)
+                    .foregroundStyle(muted ? .secondary : .primary)
+            }
+            Text(note)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.leading, 28)
         }
     }
 }
