@@ -112,6 +112,14 @@ struct PerClassControls: View {
 
             rosterSection
         }
+        // The controls follow the active detector's slice; the transient view
+        // state (an open inline slider, the expanded roster) is positional
+        // `@State` and would otherwise survive the switch and apply to the new
+        // detector's rows (M12·P4).
+        .onChange(of: detectorID) {
+            tuningLabel = nil
+            showingAll = false
+        }
     }
 
     /// Reveal / hide the inline slider for `label`. Tapping a row's value opens
@@ -480,98 +488,107 @@ private func previewSelection(
     .preferredColorScheme(.dark)
 }
 
-/// The favorite-pattern gallery: per-class controls with a mix of
-/// hidden / pinned / overridden / auto rows + accumulated-but-not-live rows +
-/// the show-all roster, light + dark.
-#Preview("Per-class · mixed · light") {
-    PerClassControls(
-        labelStore: previewStore(
-            globalFloor: 0.30,
-            seen: ["person", "sports ball", "car", "dog"],
-            overrides: ["sports ball": 0.65, "car": 0.40],
-            hidden: ["dog"],
-            pinned: ["bicycle"]
-        ),
-        detectorID: previewDetectorID,
-        globalFloor: 0.30,
-        presentLabels: ["person", "sports ball"],
-        availableLabels: previewRoster
-    )
-    .padding(.horizontal, 12)
-    .padding(.top, 12)
-    .frame(width: 300)
-    .preferredColorScheme(.light)
+// MARK: - Static preview gallery (M12·P4 — the favorite pattern)
+//
+// Every per-class panel state the store can produce, as ONE stacked gallery
+// rendered twice (light + dark previews below), so a visual regression in any
+// state shows up in a single canvas without running the demo.
+
+/// One labeled gallery entry: a caption + the panel in a boxed, fixed-width
+/// frame so cases align vertically and read as a matrix.
+private struct PerClassGalleryCase: View {
+    let title: String
+    let store: DetectorLabelStore
+    var globalFloor: Double = 0.30
+    var presentLabels: Set<String> = []
+    var availableLabels: [String]?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            PerClassControls(
+                labelStore: store,
+                detectorID: previewDetectorID,
+                globalFloor: globalFloor,
+                presentLabels: presentLabels,
+                availableLabels: availableLabels
+            )
+            .padding(10)
+            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
 }
 
-#Preview("Per-class · mixed · dark") {
-    PerClassControls(
-        labelStore: previewStore(
-            globalFloor: 0.30,
-            seen: ["person", "sports ball", "car", "dog"],
-            overrides: ["sports ball": 0.65, "car": 0.40],
-            hidden: ["dog"],
-            pinned: ["bicycle"]
-        ),
-        detectorID: previewDetectorID,
-        globalFloor: 0.30,
-        presentLabels: ["person", "sports ball"],
-        availableLabels: previewRoster
-    )
-    .padding(.horizontal, 12)
-    .padding(.top, 12)
-    .frame(width: 300)
-    .preferredColorScheme(.dark)
-}
+/// The five spec'd states (label-accumulation.md §P4), top to bottom:
+/// accumulated-only · mixed-opinion · cleared (opinions only) · no static
+/// roster · empty (fresh detector).
+@MainActor @ViewBuilder
+private var perClassGallery: some View {
+    VStack(alignment: .leading, spacing: 18) {
+        // Accumulated only: bare sightings, no opinions, nothing live —
+        // every row Auto + secondary (dimmed), "Reset all" absent,
+        // "Clear seen" enabled.
+        PerClassGalleryCase(
+            title: "Accumulated only — seen, no opinions, none live",
+            store: previewStore(seen: ["person", "car", "dog", "bottle"]),
+            availableLabels: previewRoster
+        )
 
-/// Cleared state: opinions survive a sightings clear, so only the pinned / hidden
-/// / overridden rows remain — no bare-seen rows. "Clear seen" is disabled.
-#Preview("Per-class · cleared (opinions only)") {
-    PerClassControls(
-        labelStore: previewStore(
-            globalFloor: 0.30,
-            seen: [],
-            overrides: ["sports ball": 0.65],
-            hidden: ["dog"],
-            pinned: ["bicycle"]
-        ),
-        detectorID: previewDetectorID,
-        globalFloor: 0.30,
-        presentLabels: [],
-        availableLabels: previewRoster
-    )
-    .padding(.horizontal, 12)
-    .padding(.top, 12)
-    .frame(width: 300)
-    .preferredColorScheme(.dark)
-}
+        // Mixed opinions: live + accumulated rows, overrides, a hidden, a
+        // pinned-never-seen, the show-all roster.
+        PerClassGalleryCase(
+            title: "Mixed — live ⊂ seen, overrides, hidden, pinned",
+            store: previewStore(
+                seen: ["person", "sports ball", "car", "dog"],
+                overrides: ["sports ball": 0.65, "car": 0.40],
+                hidden: ["dog"],
+                pinned: ["bicycle"]
+            ),
+            presentLabels: ["person", "sports ball"],
+            availableLabels: previewRoster
+        )
 
-#Preview("Per-class · no static roster") {
-    PerClassControls(
-        labelStore: previewStore(
+        // Cleared: opinions survive a sightings clear — only pinned / hidden /
+        // overridden rows remain; "Clear seen" disabled (nothing bare left).
+        PerClassGalleryCase(
+            title: "Cleared — opinions only, Clear seen disabled",
+            store: previewStore(
+                overrides: ["sports ball": 0.65],
+                hidden: ["dog"],
+                pinned: ["bicycle"]
+            ),
+            availableLabels: previewRoster
+        )
+
+        // No static roster (class-agnostic / dynamic detector): the expander
+        // is replaced by the unavailable caption; Clear seen stays reachable.
+        PerClassGalleryCase(
+            title: "No static roster — caption fallback",
+            store: previewStore(seen: ["rect"]),
             globalFloor: 0.45,
-            seen: ["rect"]
-        ),
-        detectorID: previewDetectorID,
-        globalFloor: 0.45,
-        presentLabels: ["rect"],
-        availableLabels: nil
-    )
-    .padding(.horizontal, 12)
-    .padding(.top, 12)
-    .frame(width: 300)
+            presentLabels: ["rect"]
+        )
+
+        // Fresh detector: nothing seen, no roster — just the empty caption.
+        PerClassGalleryCase(
+            title: "Empty — fresh detector, no sightings",
+            store: previewStore()
+        )
+    }
+    .padding(16)
+    .frame(width: 320)
 }
 
-#Preview("Per-class · empty (fresh detector, no sightings)") {
-    PerClassControls(
-        labelStore: previewStore(),
-        detectorID: previewDetectorID,
-        globalFloor: 0.30,
-        presentLabels: [],
-        availableLabels: nil
-    )
-    .padding(.horizontal, 12)
-    .padding(.top, 12)
-    .frame(width: 300)
+#Preview("Per-class gallery · light") {
+    ScrollView { perClassGallery }
+        .preferredColorScheme(.light)
+}
+
+#Preview("Per-class gallery · dark") {
+    ScrollView { perClassGallery }
+        .preferredColorScheme(.dark)
 }
 
 // MARK: - Tri-state icon decision aid (Part 4)
