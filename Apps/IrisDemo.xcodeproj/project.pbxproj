@@ -36,6 +36,7 @@
 		69EBF3E30A10F5CE92DEB21E /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02C0318871B843D498C3B09 /* SidebarView.swift */; };
 		6C5D4F61F5E42A8005009E7B /* RecentBookmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B593CA6CE6A3ABCFB65C9AA /* RecentBookmarks.swift */; };
 		6D1693BE92DE48CF7E17FF30 /* FolderListing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431917A73269F303FD814E76 /* FolderListing.swift */; };
+		6EF1CAE38BFF11B1F84F3165 /* SourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D30937A076C6D52AA31320 /* SourcesPanel.swift */; };
 		749C6ACF62DFF2B567F900D7 /* RecentImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185675E2E634D70B6C33B219 /* RecentImages.swift */; };
 		77623275553FCB4C1D6A9DE9 /* IrisDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40CF74D772D566618A4CA0B /* IrisDemoApp.swift */; };
 		786AF9497724C07BCC9F00E6 /* IrisShell+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E6F408EB6CD4EDD63A3D09 /* IrisShell+Playback.swift */; };
@@ -69,6 +70,7 @@
 		CDB1FA36B54155950B0B0FFE /* IrisShell+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4B771510A0EBB4DCBF5B7F /* IrisShell+Capture.swift */; };
 		D4A46F5826D722F52CDCAED9 /* RecentList.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */; };
 		D7443B83E4A219233875A427 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02C0318871B843D498C3B09 /* SidebarView.swift */; };
+		DCD00F0CA866843EF86CDDED /* SourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D30937A076C6D52AA31320 /* SourcesPanel.swift */; };
 		DE2E2AD6C911375080FA9322 /* PlaybackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98506DC1073FD4554B23AD45 /* PlaybackDetailView.swift */; };
 		E13B54329CC9AA6AAAD71B6E /* RecentDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D1B473D9FB8CF8AD9A9B85 /* RecentDetectors.swift */; };
 		E3B9534C39F4C78F2C9E8C29 /* PerClassControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFEB80F6C9410E676B77385 /* PerClassControls.swift */; };
@@ -130,6 +132,7 @@
 		D8959B2D6D8809BCC1F01894 /* IrisShell+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IrisShell+Presentation.swift"; sourceTree = "<group>"; };
 		DBE7BA6B4109B5C17A746975 /* IrisDemo-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "IrisDemo-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6E0A78EDC0630A9A7AE5B04 /* FrameExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameExportCoordinator.swift; sourceTree = "<group>"; };
+		E9D30937A076C6D52AA31320 /* SourcesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcesPanel.swift; sourceTree = "<group>"; };
 		F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentList.swift; sourceTree = "<group>"; };
 		F326F2B7FA99109F51EFBCE3 /* TuningGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TuningGroups.swift; sourceTree = "<group>"; };
 		FA38233F14BA878271417160 /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 				C35E1845BD604096FD04BDE2 /* ModelSection.swift */,
 				F1D1F01565FC5D9A7C0DACB3 /* RecentList.swift */,
 				B02C0318871B843D498C3B09 /* SidebarView.swift */,
+				E9D30937A076C6D52AA31320 /* SourcesPanel.swift */,
 				36CA43F758FB8F4A6BA95DA1 /* Components */,
 			);
 			path = Sidebar;
@@ -479,6 +483,7 @@
 				F19DDEB08BF187E09029D1E6 /* ShellPage.swift in Sources */,
 				271BEBCA6330A96A381AC4BD /* SidebarSection.swift in Sources */,
 				69EBF3E30A10F5CE92DEB21E /* SidebarView.swift in Sources */,
+				DCD00F0CA866843EF86CDDED /* SourcesPanel.swift in Sources */,
 				BEA75F2461530DF89A23BBA5 /* TuningGroups.swift in Sources */,
 				F2BE26B70983A67FBF3EB126 /* yolo12n.mlpackage in Sources */,
 				09FEB1448671C09C039DD333 /* yolo26n.mlpackage in Sources */,
@@ -522,6 +527,7 @@
 				94E1A4E6C10E6E9327089F31 /* ShellPage.swift in Sources */,
 				9AEC23B0DD084D79A0A85211 /* SidebarSection.swift in Sources */,
 				D7443B83E4A219233875A427 /* SidebarView.swift in Sources */,
+				6EF1CAE38BFF11B1F84F3165 /* SourcesPanel.swift in Sources */,
 				FA5338A302E9EAA38236D3B9 /* TuningGroups.swift in Sources */,
 				A882BF2168C8DAAA86746A27 /* yolo12n.mlpackage in Sources */,
 				F460335D8F2655630206C25A /* yolo26n.mlpackage in Sources */,

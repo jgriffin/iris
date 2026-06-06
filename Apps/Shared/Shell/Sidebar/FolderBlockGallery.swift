@@ -1,27 +1,31 @@
 #if DEBUG
 import SwiftUI
 
-// MARK: - FOLDER-block design gallery (M13·P3a — the favorite pattern)
+// MARK: - FOLDER-block design gallery (M13·P3 — the favorite pattern)
 //
-// A throwaway canvas (this whole file is deleted-or-trimmed in the P3 wiring
-// half) that makes the two ⚖️ opens comparable at a glance — settle them HERE,
-// in the canvas, not on paper (folder-sources.md §Opens):
+// The regression surface for the shipped FOLDERS design. The P3a canvas pass
+// settled the two ⚖️ opens; the losers are gone:
 //
-//   • PLACEMENT — the FOLDERS block ABOVE vs BELOW the RECENT list, shown in
-//     real `ModeSection` anatomy (accent bar + 0.22 header band + 0.08 body) so
-//     the surrounding section is visible while judging.
-//   • PRESENTATION — `.independent` disclosure (open many) vs `.oneExpanded`
-//     (accordion: opening one collapses the rest).
+//   • PLACEMENT — FOLDERS sits BELOW RECENT (a picked video lands at the top of
+//     RECENT anyway, so RECENT is the hot zone). The above-RECENT variant is
+//     deleted.
+//   • PRESENTATION — one-expanded-at-a-time only (opening a folder collapses its
+//     siblings). The `.independent` candidate + its `FolderPresentation` switch
+//     are deleted.
 //
-// …plus the edge cases that might swing either call: an empty folder, a
-// ~12-child folder (P4's cap target), a folder block while RECENT is empty, and
-// the inactive (collapsed) section — where the folder block should NOT render.
+// Shipped additions these cases exercise: RECENT and FOLDERS are each their own
+// collapsible sub-block (header + chevron) inside the active section body; a
+// quiet monospaced count rides every collapsible heading (RECENT, FOLDERS, each
+// folder row); the FOLDERS header carries an `folder.badge.plus` add button and
+// renders even with zero folders. Captions are statements of intended look (no
+// longer questions to judge).
 //
-// `FolderBlock`/`FoldersBlock`/`PreviewFixtures.sample*Folders` survive; only
-// the gallery scaffolding below is throwaway.
+// `SourcesPanel` (the composed RECENT-over-FOLDERS body), `FoldersBlock`,
+// `FolderBlock`, and `PreviewFixtures.sample*Folders` survive; only the gallery
+// scaffolding below is throwaway.
 
-/// One labeled gallery entry: a caption (what the case asks the user to judge) +
-/// the content boxed in a fixed-width frame so cases align and read as a matrix.
+/// One labeled gallery entry: a caption stating what the case demonstrates + the
+/// content boxed in a fixed-width frame so cases align and read as a matrix.
 /// Mirrors `PerClassGalleryCase` (M12·P4) so the house gallery idiom stays one
 /// shape.
 private struct FolderGalleryCase<Content: View>: View {
@@ -41,14 +45,12 @@ private struct FolderGalleryCase<Content: View>: View {
     }
 }
 
-/// The active Playback section body, fixture-fed, with the FOLDERS block placed
-/// either above or below the RECENT list. Built from the real `ModeSection` so
-/// the placement judgement happens inside the true section anatomy. The page is
-/// pinned active (`selection == .playback`) so the active treatment renders.
-private struct PlacementCase: View {
-    enum Placement { case above, below }
-    let placement: Placement
-    let presentation: FolderPresentation
+/// The active Playback section body — the real `SourcesPanel` (RECENT over
+/// FOLDERS) inside the real `ModeSection`, so placement + the two collapsible
+/// sub-blocks are judged in true section anatomy (accent bar + 0.22 header band
+/// + 0.08 body). Pinned active (`selection == .playback`) so the active
+/// treatment renders.
+private struct ActiveSectionCase: View {
     var folders: [FoldersBlock.Folder] = PreviewFixtures.sampleVideoFolders
     var recents: [URL] = PreviewFixtures.sampleVideoURLs
 
@@ -59,95 +61,75 @@ private struct PlacementCase: View {
             page: .playback, selection: $page,
             onOpen: {}, openSystemImage: "folder.badge.plus"
         ) {
-            VStack(alignment: .leading, spacing: 12) {
-                if placement == .above { foldersBlock }
-                RecentList(
-                    recents: recents,
-                    systemImage: "film",
-                    onPick: { _ in },
-                    emptyHint: "No recent videos"
-                )
-                if placement == .below { foldersBlock }
-            }
+            SourcesPanel(
+                recents: recents,
+                recentSystemImage: "film",
+                onPickRecent: { _ in },
+                recentEmptyHint: "No recent videos",
+                folders: folders,
+                folderChildSystemImage: "film",
+                onAddFolder: {},
+                onPickChild: { _ in },
+                onExpandFolder: { _ in }
+            )
         }
-    }
-
-    private var foldersBlock: some View {
-        FoldersBlock(
-            folders: folders,
-            childSystemImage: "film",
-            presentation: presentation,
-            onPickChild: { _ in }
-        )
     }
 }
 
-/// The whole decision matrix as one stacked column. Rendered light + dark below.
+/// The whole shipped-design matrix as one stacked column. Rendered light + dark.
 @MainActor @ViewBuilder
 private var folderGallery: some View {
     VStack(alignment: .leading, spacing: 22) {
-        Text("FOLDER block — placement × presentation")
+        Text("FOLDERS — shipped design (below RECENT · collapsible sub-blocks · counts)")
             .font(.headline)
 
-        // ── Placement fork, in full section anatomy ──────────────────────
-        // Same folders + RECENT either side, so the only variable is order.
-        FolderGalleryCase(title: "Placement: FOLDERS above RECENT (section anatomy)") {
-            PlacementCase(placement: .above, presentation: .independent)
+        // ── The shipped section body, in full anatomy ───────────────────
+        FolderGalleryCase(title: "Active section: RECENT over FOLDERS, both expanded, counts on every heading") {
+            ActiveSectionCase()
         }
-        FolderGalleryCase(title: "Placement: FOLDERS below RECENT (section anatomy)") {
-            PlacementCase(placement: .below, presentation: .independent)
+        FolderGalleryCase(title: "RECENT collapsed to reach FOLDERS — the fast path the collapse exists for") {
+            CollapsedRecentCase()
         }
-
-        // ── Presentation fork ────────────────────────────────────────────
-        // The folder stack on its own (no section chrome) so the disclosure
-        // behavior is the only thing in frame. Tap folders in the canvas to
-        // feel the difference: independent keeps siblings open; one-expanded
-        // collapses them. Both start with the first folder open.
-        FolderGalleryCase(title: "Presentation: INDEPENDENT — open many at once") {
-            FoldersBlock(
-                folders: PreviewFixtures.sampleVideoFolders,
-                childSystemImage: "film",
-                presentation: .independent,
-                onPickChild: { _ in }
-            )
+        FolderGalleryCase(title: "Empty FOLDERS — header + add button still render so the first folder can be added") {
+            ActiveSectionCase(folders: [])
         }
-        FolderGalleryCase(title: "Presentation: ONE-EXPANDED — opening one collapses the rest") {
-            FoldersBlock(
-                folders: PreviewFixtures.sampleVideoFolders,
-                childSystemImage: "film",
-                presentation: .oneExpanded,
-                onPickChild: { _ in }
-            )
+        FolderGalleryCase(title: "FOLDERS present while RECENT is empty (quiet recents hint)") {
+            ActiveSectionCase(recents: [])
         }
 
-        // ── Edge cases that might swing the call ─────────────────────────
-        FolderGalleryCase(title: "Edge: empty folder — quiet 'no matching files'") {
+        // ── One-expanded presentation, folder stack alone ────────────────
+        // Tap folders in the canvas: opening one collapses its sibling with the
+        // 0.22 snappy animation. First folder starts open.
+        FolderGalleryCase(title: "One-expanded accordion — opening a folder collapses the sibling (animated)") {
+            OneExpandedFoldersCase(folders: PreviewFixtures.sampleVideoFolders)
+        }
+
+        // ── Folder-row + child edge cases ────────────────────────────────
+        FolderGalleryCase(title: "Folder row expanded — child rows subordinate, child count on the row") {
+            ExpandedSingleFolder(
+                folder: PreviewFixtures.sampleVideoFolders[0],
+                childSystemImage: "film"
+            )
+        }
+        FolderGalleryCase(title: "Empty folder — quiet 'no matching files', count reads 0") {
             ExpandedSingleFolder(
                 folder: PreviewFixtures.sampleEmptyVideoFolder,
                 childSystemImage: "film"
             )
         }
-        FolderGalleryCase(title: "Edge: many files (~12) — P4 cap target, no cap today") {
+        FolderGalleryCase(title: "Many files (~12) — no cap today (scroll-inside vs. cap backlogged)") {
             ExpandedSingleFolder(
                 folder: PreviewFixtures.sampleManyVideoFolder,
                 childSystemImage: "film"
             )
         }
-        FolderGalleryCase(title: "Edge: FOLDERS present while RECENT empty (section anatomy)") {
-            PlacementCase(
-                placement: .above, presentation: .independent,
-                recents: []
-            )
-        }
-        FolderGalleryCase(title: "Edge: image kind — photo child glyph") {
-            FoldersBlock(
+        FolderGalleryCase(title: "Image kind — photo child glyph, image-folder fixtures") {
+            OneExpandedFoldersCase(
                 folders: PreviewFixtures.sampleImageFolders,
-                childSystemImage: "photo",
-                presentation: .independent,
-                onPickChild: { _ in }
+                childSystemImage: "photo"
             )
         }
-        FolderGalleryCase(title: "Inactive section — collapses to a bare row, NO folder block") {
+        FolderGalleryCase(title: "Inactive section — collapses to a bare row, NO sources body") {
             InactiveSectionCase()
         }
     }
@@ -155,8 +137,58 @@ private var folderGallery: some View {
     .frame(width: 340)
 }
 
-/// A single folder pinned open — for the empty / many-files edge cases where the
-/// children themselves are what's being judged.
+/// The shipped section body with RECENT pre-collapsed — demonstrates the fast
+/// path to FOLDERS. `SourcesPanel` owns the sub-block expansion state, so the
+/// collapse is driven by interaction; this case seeds the intent in its caption
+/// (the canvas is where the user taps RECENT's chevron to verify).
+private struct CollapsedRecentCase: View {
+    @State private var page: ShellPage = .playback
+
+    var body: some View {
+        ModeSection(
+            page: .playback, selection: $page,
+            onOpen: {}, openSystemImage: "folder.badge.plus"
+        ) {
+            SourcesPanel(
+                recents: PreviewFixtures.sampleVideoURLs,
+                recentSystemImage: "film",
+                onPickRecent: { _ in },
+                recentEmptyHint: "No recent videos",
+                folders: PreviewFixtures.sampleVideoFolders,
+                folderChildSystemImage: "film",
+                onAddFolder: {},
+                onPickChild: { _ in },
+                onExpandFolder: { _ in }
+            )
+        }
+    }
+}
+
+/// The FOLDERS sub-block on its own (no section chrome) with the one-expanded
+/// accordion live — for feeling the sibling-collapse animation. Owns the
+/// sub-block + open-folder state the way `SourcesPanel` does, first folder open.
+private struct OneExpandedFoldersCase: View {
+    let folders: [FoldersBlock.Folder]
+    var childSystemImage: String = "film"
+
+    @State private var expanded = true
+    @State private var openFolder: URL?
+
+    var body: some View {
+        FoldersBlock(
+            folders: folders,
+            childSystemImage: childSystemImage,
+            isExpanded: $expanded,
+            openFolder: $openFolder,
+            onAddFolder: {},
+            onPickChild: { _ in }
+        )
+        .onAppear { openFolder = folders.first?.url }
+    }
+}
+
+/// A single folder pinned open — for the row / child edge cases where the
+/// children + the child count on the row are what's being judged.
 private struct ExpandedSingleFolder: View {
     let folder: FoldersBlock.Folder
     let childSystemImage: String
@@ -175,8 +207,8 @@ private struct ExpandedSingleFolder: View {
 }
 
 /// The inactive (collapsed) Image section — `selection` is elsewhere, so
-/// `ModeSection` draws the bare tappable row and the folder block we'd inject is
-/// simply absent. Confirms the block doesn't leak into collapsed sections.
+/// `ModeSection` draws the bare tappable row and the sources body we'd inject is
+/// simply absent. Confirms the sub-blocks don't leak into collapsed sections.
 private struct InactiveSectionCase: View {
     @State private var page: ShellPage = .playback   // active elsewhere
 
@@ -187,20 +219,17 @@ private struct InactiveSectionCase: View {
         ) {
             // Never rendered while inactive — present only to mirror the active
             // body's shape.
-            VStack(alignment: .leading, spacing: 12) {
-                FoldersBlock(
-                    folders: PreviewFixtures.sampleImageFolders,
-                    childSystemImage: "photo",
-                    presentation: .independent,
-                    onPickChild: { _ in }
-                )
-                RecentList(
-                    recents: PreviewFixtures.sampleImageURLs,
-                    systemImage: "photo",
-                    onPick: { _ in },
-                    emptyHint: "No recent images"
-                )
-            }
+            SourcesPanel(
+                recents: PreviewFixtures.sampleImageURLs,
+                recentSystemImage: "photo",
+                onPickRecent: { _ in },
+                recentEmptyHint: "No recent images",
+                folders: PreviewFixtures.sampleImageFolders,
+                folderChildSystemImage: "photo",
+                onAddFolder: {},
+                onPickChild: { _ in },
+                onExpandFolder: { _ in }
+            )
         }
     }
 }

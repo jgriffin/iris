@@ -48,9 +48,19 @@ struct IrisShell: View {
     @State var recentDetectors = RecentDetectors()
     // ONE shared folders MRU (M13·P2): a folder of clips and a folder of stills
     // are both just folders; the per-mode movie/image filter is applied at
-    // enumeration time (`folderListing`), not at storage time. Not yet surfaced
-    // — the sidebar FOLDER block is M13·P3.
+    // enumeration time (`folderListing`), not at storage time. Surfaced in the
+    // sidebar FOLDERS sub-block (M13·P3).
     @State var recentFolders = RecentFolders()
+
+    /// Per-folder enumerated children, populated lazily on expand and keyed by
+    /// `(folder URL, content kind)` (M13·P3). The freshness model is
+    /// re-enumerate-on-expand: `onExpandFolder` recomputes the open folder's
+    /// listing under its security scope and overwrites this entry, so a folder
+    /// shows empty until first opened and refreshes every time it reopens. The
+    /// `kind` is part of the key because ONE shared folders MRU serves both
+    /// modes — the same folder can appear under Playback (movies) and Image
+    /// (stills), and each mode must see its own filtered listing.
+    @State var folderChildren: [FolderChildKey: [URL]] = [:]
 
     // M7: flagging + export (shared FlagStore between writer + reader).
     @State var flaggingModel: FlaggingModel?
@@ -203,9 +213,17 @@ struct IrisShell: View {
                 recentVideos: recentVideos.resolve(),
                 onOpenVideo: presentVideoPicker,
                 onPickVideo: { swapToExternal(url: $0) },
+                videoFolders: folderBlocks(kind: .movie),
+                onAddVideoFolder: presentVideoFolderPicker,
+                onPickVideoChild: { pickFolderChild(url: $0, load: swapToExternal(url:)) },
+                onExpandVideoFolder: { enumerateFolderOnExpand(url: $0, kind: .movie) },
                 recentImages: recentImages.resolve(),
                 onOpenImage: presentImagePicker,
                 onPickImage: { pickImage(url: $0) },
+                imageFolders: folderBlocks(kind: .image),
+                onAddImageFolder: presentImageFolderPicker,
+                onPickImageChild: { pickFolderChild(url: $0, load: pickImage(url:)) },
+                onExpandImageFolder: { enumerateFolderOnExpand(url: $0, kind: .image) },
                 exportedFrameCountText: exportedFrameCountText,
                 isSweeping: exportCoordinator?.isSweeping ?? false,
                 lastSummaryText: exportCoordinator?.lastSummary?.demoStatusLine,

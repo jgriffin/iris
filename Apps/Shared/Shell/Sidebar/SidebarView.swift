@@ -45,11 +45,25 @@ struct SidebarView: View {
     let recentVideos: [URL]
     let onOpenVideo: () -> Void
     let onPickVideo: (URL) -> Void
+    /// The picked video folders (MRU order) with their currently-enumerated
+    /// matching children. The shell re-enumerates a folder on expand (see
+    /// `onExpandVideoFolder`); children are empty until first opened.
+    let videoFolders: [FoldersBlock.Folder]
+    let onAddVideoFolder: () -> Void
+    /// Load a folder *child* — same load path as a RECENT tap, plus the parent
+    /// folder is promoted in the folders MRU (distinct from `onPickVideo`,
+    /// which must NOT touch the folders MRU on a plain recents tap).
+    let onPickVideoChild: (URL) -> Void
+    let onExpandVideoFolder: (URL) -> Void
 
     // Image page.
     let recentImages: [URL]
     let onOpenImage: () -> Void
     let onPickImage: (URL) -> Void
+    let imageFolders: [FoldersBlock.Folder]
+    let onAddImageFolder: () -> Void
+    let onPickImageChild: (URL) -> Void
+    let onExpandImageFolder: (URL) -> Void
 
     // DATASET strip. macOS-only export controls (iOS exposes Documents via
     // Files.app and never had this footer); the count line shows everywhere.
@@ -91,11 +105,16 @@ struct SidebarView: View {
                         page: .playback, selection: $page,
                         onOpen: onOpenVideo, openSystemImage: "folder.badge.plus"
                     ) {
-                        RecentList(
+                        SourcesPanel(
                             recents: recentVideos,
-                            systemImage: "film",
-                            onPick: onPickVideo,
-                            emptyHint: "No recent videos"
+                            recentSystemImage: "film",
+                            onPickRecent: onPickVideo,
+                            recentEmptyHint: "No recent videos",
+                            folders: videoFolders,
+                            folderChildSystemImage: "film",
+                            onAddFolder: onAddVideoFolder,
+                            onPickChild: onPickVideoChild,
+                            onExpandFolder: onExpandVideoFolder
                         )
                     }
                     Divider().padding(.horizontal, 12)
@@ -103,11 +122,16 @@ struct SidebarView: View {
                         page: .image, selection: $page,
                         onOpen: onOpenImage, openSystemImage: "photo.badge.plus"
                     ) {
-                        RecentList(
+                        SourcesPanel(
                             recents: recentImages,
-                            systemImage: "photo",
-                            onPick: onPickImage,
-                            emptyHint: "No recent images"
+                            recentSystemImage: "photo",
+                            onPickRecent: onPickImage,
+                            recentEmptyHint: "No recent images",
+                            folders: imageFolders,
+                            folderChildSystemImage: "photo",
+                            onAddFolder: onAddImageFolder,
+                            onPickChild: onPickImageChild,
+                            onExpandFolder: onExpandImageFolder
                         )
                     }
                     Divider().padding(.horizontal, 12)
@@ -163,9 +187,17 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        videoFolders: PreviewFixtures.sampleVideoFolders,
+        onAddVideoFolder: {},
+        onPickVideoChild: { _ in },
+        onExpandVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        imageFolders: PreviewFixtures.sampleImageFolders,
+        onAddImageFolder: {},
+        onPickImageChild: { _ in },
+        onExpandImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: false,
         lastSummaryText: nil,
@@ -189,9 +221,17 @@ struct SidebarView: View {
         recentVideos: [],
         onOpenVideo: {},
         onPickVideo: { _ in },
+        videoFolders: [],
+        onAddVideoFolder: {},
+        onPickVideoChild: { _ in },
+        onExpandVideoFolder: { _ in },
         recentImages: [],
         onOpenImage: {},
         onPickImage: { _ in },
+        imageFolders: [],
+        onAddImageFolder: {},
+        onPickImageChild: { _ in },
+        onExpandImageFolder: { _ in },
         exportedFrameCountText: "No frames exported yet",
         isSweeping: false,
         lastSummaryText: nil,
@@ -215,9 +255,17 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        videoFolders: PreviewFixtures.sampleVideoFolders,
+        onAddVideoFolder: {},
+        onPickVideoChild: { _ in },
+        onExpandVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        imageFolders: PreviewFixtures.sampleImageFolders,
+        onAddImageFolder: {},
+        onPickImageChild: { _ in },
+        onExpandImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: false,
         lastSummaryText: nil,
@@ -241,9 +289,17 @@ struct SidebarView: View {
         recentVideos: PreviewFixtures.sampleVideoURLs,
         onOpenVideo: {},
         onPickVideo: { _ in },
+        videoFolders: PreviewFixtures.sampleVideoFolders,
+        onAddVideoFolder: {},
+        onPickVideoChild: { _ in },
+        onExpandVideoFolder: { _ in },
         recentImages: PreviewFixtures.sampleImageURLs,
         onOpenImage: {},
         onPickImage: { _ in },
+        imageFolders: PreviewFixtures.sampleImageFolders,
+        onAddImageFolder: {},
+        onPickImageChild: { _ in },
+        onExpandImageFolder: { _ in },
         exportedFrameCountText: "12 frames exported",
         isSweeping: true,
         lastSummaryText: "Last sweep: 8 frames → ~/Datasets/iris (3.2 MB)",

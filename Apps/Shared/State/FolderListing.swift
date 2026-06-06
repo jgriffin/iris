@@ -18,7 +18,7 @@ import os
 /// movies, Image wants stills; the per-mode filter is applied here at
 /// enumeration time, not baked into storage (one shared folders MRU lists
 /// folders regardless of what they hold).
-enum FolderContentKind {
+enum FolderContentKind: Hashable {
     case movie
     case image
 
@@ -75,8 +75,9 @@ func folderListing(of folder: URL, kind: FolderContentKind) -> [URL] {
         return []
     }
 
-    // M13·P4: no cap on the listed children yet. A shoot folder can hold
-    // hundreds of clips; the large-folder cap + "N more…" lands in P4.
+    // Large-list handling (scroll-inside vs. a cap + "N more…") is backlogged —
+    // deferred at P3 per the user ("push that out for now"); see BOARD §Backlog.
+    // No cap today: a shoot folder can hold hundreds of clips and they all list.
     let matching = children.filter { child in
         guard
             let values = try? child.resourceValues(forKeys: [.contentTypeKey]),
@@ -91,6 +92,15 @@ func folderListing(of folder: URL, kind: FolderContentKind) -> [URL] {
         $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
             == .orderedAscending
     }
+}
+
+/// Cache key for the shell's per-folder child listing (M13·P3): the folder URL
+/// plus the content kind. ONE shared folders MRU serves both modes, so the same
+/// folder can be enumerated as movies (Playback) and as stills (Image); the kind
+/// keeps those two filtered listings distinct in the cache.
+struct FolderChildKey: Hashable {
+    let folder: URL
+    let kind: FolderContentKind
 }
 
 extension Logger {

@@ -163,6 +163,107 @@ extension IrisShell {
         )
     }
 
+    // MARK: Sidebar FOLDERS sub-block wiring (M13·P3)
+
+    /// Build the FOLDERS sub-block's data for a mode from the shared folders MRU
+    /// + the lazily-enumerated child cache. The MRU is one shared list (both
+    /// modes); children are filtered per `kind` at enumeration time, so the same
+    /// folder can show movies under Playback and stills under Image. Children are
+    /// empty until the folder is first expanded (`enumerateFolderOnExpand`); the
+    /// quiet zero count is honest until then.
+    @MainActor
+    func folderBlocks(kind: FolderContentKind) -> [FoldersBlock.Folder] {
+        recentFolders.resolve().map { url in
+            FoldersBlock.Folder(
+                url: url,
+                children: folderChildren[FolderChildKey(folder: url, kind: kind)] ?? []
+            )
+        }
+    }
+
+    /// Re-enumerate a folder's matching children when its disclosure opens
+    /// (M13·P3) — the freshness model is re-enumerate-on-expand, so every open
+    /// picks up files added/removed since last time. Wrapped in the folder's
+    /// security scope (start/stop around the read), matching the house
+    /// discipline in `pickFolder` / `swapToExternal`. The resolved URL carries a
+    /// latent macOS scope; `folderListing` reads the directory while it's open.
+    @MainActor
+    func enumerateFolderOnExpand(url: URL, kind: FolderContentKind) {
+        let key = FolderChildKey(folder: url, kind: kind)
+        guard url.startAccessingSecurityScopedResource() else {
+            Logger.shell.error(
+                "startAccessingSecurityScopedResource failed for folder \(url.path, privacy: .public)"
+            )
+            folderChildren[key] = []
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        folderChildren[key] = folderListing(of: url, kind: kind)
+    }
+
+    /// Load a folder *child* and promote its parent folder in the folders MRU.
+    /// Routes through the SAME load path as a RECENT tap (`load` is
+    /// `swapToExternal` for movies, `pickImage` for stills) so navigation,
+    /// RECENT promotion, and detector swap all behave identically — the child
+    /// reuses the exact recents-tap plumbing.
+    ///
+    /// **Scope hand-off (macOS).** A child URL enumerated from a folder is a
+    /// plain `file://` URL — it carries no bookmark scope of its own, so the
+    /// load path's `startAccessingSecurityScopedResource()` on it would return
+    /// `false` and the load would fail "security scope denied". The fix: under
+    /// the parent folder's resolved (scoped) URL, mint a security-scoped
+    /// bookmark for the child and resolve it back to a *scoped* child URL; the
+    /// load path then acquires and holds the child's own scope for the session
+    /// (AVAssetReader / decode read it lazily over time). On iOS this is a
+    /// no-op transform (minimal bookmarks, no security scope) and the plain URL
+    /// works either way. We also promote the parent folder so a freshly-used
+    /// folder sorts up the MRU.
+    @MainActor
+    func pickFolderChild(url child: URL, load: (URL) -> Void) {
+        // Find the parent among the resolved (scoped) MRU folders so we hold a
+        // real scope while bookmarking the child. Fall back to the plain parent
+        // path if it isn't in the MRU (shouldn't happen — the child came from
+        // enumerating an MRU folder).
+        let parentPath = child.deletingLastPathComponent().standardizedFileURL.path
+        let scopedParent = recentFolders.resolve().first {
+            $0.standardizedFileURL.path == parentPath
+        }
+
+        recentFolders.addOrPromote(scopedParent ?? child.deletingLastPathComponent())
+        load(scopedChild(child, under: scopedParent) ?? child)
+    }
+
+    /// Promote a plain enumerated child URL to a security-scoped one by minting
+    /// + resolving a bookmark while the parent folder's scope is held. Returns
+    /// `nil` (caller falls back to the plain URL) if the parent has no scope or
+    /// bookmarking fails. iOS uses minimal (unscoped) bookmarks, so the round
+    /// trip is harmless there.
+    @MainActor
+    private func scopedChild(_ child: URL, under scopedParent: URL?) -> URL? {
+        guard let scopedParent else { return nil }
+        guard scopedParent.startAccessingSecurityScopedResource() else { return nil }
+        defer { scopedParent.stopAccessingSecurityScopedResource() }
+
+        #if os(macOS)
+        let options: URL.BookmarkCreationOptions = [.withSecurityScope, .securityScopeAllowOnlyReadAccess]
+        let resolveOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+        #else
+        let options: URL.BookmarkCreationOptions = [.minimalBookmark]
+        let resolveOptions: URL.BookmarkResolutionOptions = []
+        #endif
+
+        do {
+            let blob = try child.bookmarkData(options: options, includingResourceValuesForKeys: nil, relativeTo: nil)
+            var stale = false
+            return try URL(resolvingBookmarkData: blob, options: resolveOptions, relativeTo: nil, bookmarkDataIsStale: &stale)
+        } catch {
+            Logger.shell.error(
+                "scopedChild: bookmark round-trip failed for \(child.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)"
+            )
+            return nil
+        }
+    }
+
     /// Load a file-picked Core ML model, then re-select the custom entry so the
     /// swap flow runs the freshly-loaded detector across both coordinators.
     @MainActor
