@@ -54,5 +54,57 @@ enum PreviewFixtures {
         URL(fileURLWithPath: "/tmp/Frame-00421.png"),
         URL(fileURLWithPath: "/tmp/Court-Still.jpg"),
     ]
+
+    // MARK: Fixture folders (M13·P3 design-gallery)
+    //
+    // Plain `FoldersBlock.Folder` data for the FOLDER-block gallery. The URLs
+    // point at paths that needn't exist — `FolderBlock`/`FoldersBlock` take the
+    // already-enumerated children directly, so nothing is read from disk.
+
+    private static func folder(_ path: String, _ names: [String]) -> FoldersBlock.Folder {
+        let dir = URL(fileURLWithPath: path, isDirectory: true)
+        return FoldersBlock.Folder(
+            url: dir,
+            children: names.map { dir.appendingPathComponent($0) }
+        )
+    }
+
+    /// A realistic shoot dump (~6 clips), an exports folder (2), and an empty
+    /// one — the video-side folder fixtures for the placement/presentation
+    /// gallery.
+    static let sampleVideoFolders: [FoldersBlock.Folder] = [
+        folder("/Volumes/Shoots/2026-06-04 capture", [
+            "GX010012.mov", "GX010013.mov", "GX010014.mov",
+            "GX010015.mov", "GX010016.mov", "GX010017.mov",
+        ]),
+        folder("/Volumes/Shoots/renders", [
+            "Highlight-Reel-v3.mp4", "Slow-Mo-Export.mov",
+        ]),
+        emptyVideoFolderData,
+    ]
+
+    /// An empty video folder on its own — drives the "no matching files" case.
+    static let sampleEmptyVideoFolder = emptyVideoFolderData
+    private static let emptyVideoFolderData =
+        folder("/Volumes/Shoots/empty-dump", [])
+
+    /// A ~12-child folder — exercises the large-folder shape that P4's cap will
+    /// target (no cap yet; the block lists them all today).
+    static let sampleManyVideoFolder: FoldersBlock.Folder =
+        folder("/Volumes/Shoots/2026-05-31 marathon", (1...12).map {
+            String(format: "GX0100%02d.mov", $0)
+        })
+
+    /// The image-side fixtures: a frame-grab dump (~6 stills) and a small
+    /// renders folder.
+    static let sampleImageFolders: [FoldersBlock.Folder] = [
+        folder("/Volumes/Shoots/frame-grabs", [
+            "Frame-00001.png", "Frame-00128.png", "Frame-00421.png",
+            "Frame-00640.png", "Frame-00777.png", "Frame-01024.png",
+        ]),
+        folder("/Volumes/Shoots/edited", [
+            "Court-Still.jpg", "Net-Closeup.heic",
+        ]),
+    ]
 }
 #endif
