@@ -82,11 +82,22 @@ struct IrisShell: View {
     /// The detector id last installed into the playback coordinator (drift guard).
     @State var syncedVideoDetectorID: String?
 
-    /// The single file-importer state for the whole shell. One enum-routed
-    /// importer per platform presents off this and dispatches by case (M9·P5) —
-    /// replaces the prior five per-platform `show*Picker` / `activeImporter`
-    /// flags.
+    /// The single file-importer **payload** for the whole shell. One enum-routed
+    /// importer per platform dispatches by case (M9·P5) — replaces the prior
+    /// five per-platform `show*Picker` / `activeImporter` flags.
+    ///
+    /// Deliberately NOT the presentation state: macOS dismisses the importer
+    /// (flipping `isPresented` to false) *before* delivering the completion,
+    /// so deriving presentation from this value and clearing it on dismissal
+    /// raced the completion's read — every pick arrived with a nil target and
+    /// was silently dropped. Presentation lives in `importerPresented`; this
+    /// stays set until the completion consumes it (a cancelled panel leaves it
+    /// set, which is harmless — the next `presentImporter(for:)` overwrites).
     @State var importTarget: ImportTarget?
+
+    /// Whether the enum-routed importer is presented. See `importTarget` for
+    /// why presentation is a separate Bool.
+    @State var importerPresented = false
 
     // MARK: - Image chrome state
 
@@ -272,7 +283,7 @@ struct IrisShell: View {
         if selectedDetectorID == DemoCatalog.customEntryID,
             modelStore.availability(forEntryID: DemoCatalog.customEntryID) == .modelNotReady
         {
-            importTarget = .model
+            presentImporter(for: .model)
         }
         recentDetectors.addOrPromote(id: selectedDetectorID)
         // One shared selection drives BOTH coordinators; each no-ops if its
@@ -617,7 +628,17 @@ struct IrisShell: View {
     // presentation extension)
 
     var importTargetValue: ImportTarget? { importTarget }
+    var importerPresentedBinding: Binding<Bool> { $importerPresented }
     func clearImportTarget() { importTarget = nil }
+    func dismissImporter() { importerPresented = false }
+
+    /// Present the enum-routed importer for `target`. Payload first, then the
+    /// presentation flag — the importer reads `allowedContentTypes` off the
+    /// payload when it comes up.
+    func presentImporter(for target: ImportTarget) {
+        importTarget = target
+        importerPresented = true
+    }
 }
 
 extension Logger {

@@ -104,6 +104,6 @@ extension IrisShell {
     }
 
     func presentImagePicker() {
-        importTarget = .image
+        presentImporter(for: .image)
     }
 }

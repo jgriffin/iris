@@ -30,21 +30,25 @@ extension IrisShell {
 
     // MARK: File importer (M9·P5)
     //
-    // ONE importer per platform, driven by `importTarget` and dispatched by
-    // case through `handlePicked(_:for:)`. The iOS `DocumentPicker` vs. macOS
-    // `.fileImporter` divergence is a real platform seam (DocumentPicker keeps
-    // the original URL + scope; `.fileImporter` on iOS copies into the sandbox
-    // and breaks MRU bookmarks — see `DocumentPicker.swift`), so the *dispatch*
-    // is unified even though the SwiftUI surface legitimately differs.
+    // ONE importer per platform: `importerPresented` presents it,
+    // `importTarget` carries WHICH pick flow is up, and the completion
+    // dispatches by case through `handlePicked(_:for:)`. Presentation and
+    // payload are separate state on purpose — macOS flips `isPresented` to
+    // false *before* delivering the completion, so a presentation binding
+    // derived from the payload (clearing it on dismissal) races the
+    // completion's read and silently drops the pick. See `importTarget`'s doc.
+    //
+    // The iOS `DocumentPicker` vs. macOS `.fileImporter` divergence is a real
+    // platform seam (DocumentPicker keeps the original URL + scope;
+    // `.fileImporter` on iOS copies into the sandbox and breaks MRU bookmarks
+    // — see `DocumentPicker.swift`), so the *dispatch* is unified even though
+    // the SwiftUI surface legitimately differs.
 
     @ViewBuilder
     func attachFileImporter(to content: some View) -> some View {
         #if os(macOS)
         content.fileImporter(
-            isPresented: Binding(
-                get: { importTargetValue != nil },
-                set: { if !$0 { clearImportTarget() } }
-            ),
+            isPresented: importerPresentedBinding,
             allowedContentTypes: importTargetValue?.contentTypes ?? [],
             allowsMultipleSelection: false
         ) { result in
@@ -52,21 +56,20 @@ extension IrisShell {
             clearImportTarget()
             switch result {
             case .success(let urls):
-                guard let url = urls.first, let target else { return }
+                guard let url = urls.first, let target else {
+                    Logger.shell.error("importer dropped pick: \(urls.count) url(s), target=\(target?.rawValue ?? "nil", privacy: .public)")
+                    return
+                }
                 handlePicked(url, for: target)
             case .failure(let error):
                 Logger.shell.error("file picker failed: \(error.localizedDescription, privacy: .public)")
             }
         }
         #else
-        content.sheet(
-            isPresented: Binding(
-                get: { importTargetValue != nil },
-                set: { if !$0 { clearImportTarget() } }
-            )
-        ) {
+        content.sheet(isPresented: importerPresentedBinding) {
             if let target = importTargetValue {
                 DocumentPicker(contentTypes: target.contentTypes) { url in
+                    dismissImporter()
                     clearImportTarget()
                     handlePicked(url, for: target)
                 }

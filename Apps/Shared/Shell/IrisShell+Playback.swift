@@ -111,10 +111,11 @@ extension IrisShell {
     // MARK: File pickers
 
     /// Present the video picker. One enum-routed importer per platform
-    /// (`importTarget`) drives both the macOS `.fileImporter` and the iOS
-    /// `DocumentPicker` sheet — see `IrisShell+Presentation`.
+    /// (`importerPresented` + the `importTarget` payload) drives both the
+    /// macOS `.fileImporter` and the iOS `DocumentPicker` sheet — see
+    /// `IrisShell+Presentation`.
     func presentVideoPicker() {
-        importTarget = .video
+        presentImporter(for: .video)
     }
 
     /// Load a file-picked Core ML model, then re-select the custom entry so the
@@ -169,8 +170,9 @@ extension IrisShell {
 
 /// The single demo importer target. Every file-pick flow — pick a video, pick
 /// an image, load a custom Core ML model — routes through ONE importer per
-/// platform driven by `IrisShell.importTarget`; the completion dispatches by
-/// case (M9·P5). Generalizes the P1 macOS movie+model `ActiveImporter` so the
+/// platform, presented by `IrisShell.importerPresented` with this enum as the
+/// payload (`IrisShell.importTarget`); the completion dispatches by case
+/// (M9·P5). Generalizes the P1 macOS movie+model `ActiveImporter` so the
 /// shell carries one importer state and one dispatch instead of five flags and
 /// two parallel modifiers.
 enum ImportTarget: String, Identifiable, CaseIterable {
