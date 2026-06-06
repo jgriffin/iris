@@ -944,3 +944,13 @@
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; fix verified hands-on by the user.
 - Did: **merged `m12-label-accumulation` → `main`** through P3 (user call — the panel works; P4 polish continues on the branch).
 - 👉 Next: **M12·P4 — polish + static preview gallery** (empty / mixed / cleared / no-roster, light + dark; empty-state + detector-switch behavior; full test pass + both schemes green). → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (later) — M12·P4: polish + static preview gallery; folder sources penciled
+
+- Did: **penciled folder sources** (user request, mid-block): Playback + Image gain "pick an entire folder" — collapsible per-section sidebar block of the folder's matching files, child picks promote into RECENT; **MRU of folders** (pulls the shared-MRU-generic backlog item in as `RecentFolders`). Opens at capture: block placement + multi-folder presentation (settle in-canvas), right-click MRU removal (maybe), large-folder cap. Sequenced after M12 → [`features/folder-sources.md`](./features/folder-sources.md). Committed `e7f8055`.
+- Did: **built + committed M12·P4** (`098d8b4`):
+  - **Detector-switch reset.** `tuningLabel` (open inline slider) + `showingAll` (expanded roster) are positional `@State` and survived a detector swap, applying stale view state to the new detector's slice — `.onChange(of: detectorID)` now resets both.
+  - **Gallery.** The per-case previews consolidated into one stacked `perClassGallery` rendered as TWO previews (light + dark): **accumulated-only** (new case — bare sightings, no opinions, none live), mixed-opinion, cleared (opinions only; Clear seen disabled), no-static-roster, fresh-detector empty. Each case boxed + captioned (`PerClassGalleryCase`) so all states read in one canvas. Full-panel `TuningGroups` preview + tri-state icon decision aid kept.
+- Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED** (the 4 concurrency warnings are pre-existing). The gallery itself compiles under DEBUG; eyeballing it in the Xcode canvas is the one owed look.
+- 🧭 M12 is **feature-complete** — all four phases ✅ on `m12-label-accumulation`; `main` carries through P3.
+- 👉 Next: **M12 close-out** — merge → `main`, retire the branch; then pick up **folder sources** (milestone number at pickup) → [`BOARD.md`](./BOARD.md)
