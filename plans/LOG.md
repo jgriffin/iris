@@ -954,3 +954,14 @@
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED** (the 4 concurrency warnings are pre-existing). The gallery itself compiles under DEBUG; eyeballing it in the Xcode canvas is the one owed look.
 - 🧭 M12 is **feature-complete** — all four phases ✅ on `m12-label-accumulation`; `main` carries through P3.
 - 👉 Next: **M12 close-out** — merge → `main`, retire the branch; then pick up **folder sources** (milestone number at pickup) → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (evening) — M12·P5: hidden classes leave the working list (user call)
+
+- Did: **built + committed M12·P5** (`032a349`) — the user flagged that a hidden class lingering in the main per-class list is "goofy" ("we just decided this thing was unimportant"). New shape:
+  - **Working list = Auto + Show rows only** (store keys minus hidden).
+  - **HIDDEN group at the top of the expander** — every hidden label, the quick-unhide surface; hidden labels **repeat** in the remaining roster below it (user call — the roster stays complete; both rows bind the same store entry).
+  - **Unhide → Auto** returns the row to the working list (dimmed until live); **Show** pins as before.
+  - **No-roster detectors:** the expander now exists whenever something is hidden, titled **"Hidden classes"** ("Show all classes" would be a lie there); with nothing hidden, the unavailable-caption row is unchanged. All-hidden working list reads "All seen classes are hidden."
+  - `PerClassControls` gained an explicit init (`initiallyExpanded`, default false) so the static gallery renders the expander open; gallery updated + a **no-roster-plus-hidden** case added. Row construction deduped into `row(for:)`. Store + `OverlayFilter` untouched.
+- Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**.
+- 👉 Next: **M12 close-out** — hands-on look at the new hidden flow + gallery, merge → `main`, retire the branch; then **folder sources** → [`BOARD.md`](./BOARD.md)
