@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M13 — Folder sources** (P1–P4 ✅ + smoke round 1 applied, on `m13-folder-sources`) — per-mode folder MRUs, file-or-folder open button, whole-row sub-header taps, pinned context headers, MRU removal.
-👉 Next: **M13 close-out** — user re-smoke of the round-1 fixes → merge `m13-folder-sources` → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
+✅ **M13 — Folder sources** shipped to `main` (fast-forward; branch retired). M1–M13 done; clean boundary.
+👉 Next: **pick the next milestone** — no penciled candidate; see [`BOARD.md`](./BOARD.md) §Backlog.
 <!-- /STATUS -->
 
 ---
@@ -1036,3 +1036,10 @@
   - **Whole-row sub-header taps** — `SourcesSubHeader` is now one Button over the full row (`contentShape`), chevron + count decorative.
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; only the 4 known pre-existing warnings; library + plans untouched by the agent.
 - 👉 Next: **user re-smoke** (row taps · file-or-folder pick on both modes · folders staying per-mode · pinning · removal · folder→child→RECENT) → merge → `main`. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (close) — M13 closed: smoke passed, merged to `main`, pushed
+
+- Did: **closed M13** — user re-smoke of the round-1 fixes passed ("smoke passed, merge it"). Board: M13 collapsed to its ✅ one-liner (four phases + one smoke round; two in-milestone reversals — per-mode folder MRUs, double-duty open button).
+- Did: **merged `m13-folder-sources` → `main`** (fast-forward), retired the branch, **pushed `main` to origin**.
+- ℹ️ One-day milestone: pickup → phases → built (P1–P4, four build agents) → in-canvas design session → smoke → shipped, all 2026-06-05.
+- 👉 Next: **pick the next milestone** — boundary; candidates in [`BOARD.md`](./BOARD.md) §Backlog (no penciled front-runner).

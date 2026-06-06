@@ -2,7 +2,7 @@
 
 <!-- M13 working plan: definition, settled forks, phases, opens. Status vocab
      per WORKFLOW.md. -->
-_Captured · 2026-06-05 · picked up as **M13** 2026-06-05_ · **📋 defined — phases drafted, P1 next** · branch `m13-folder-sources`
+_Captured · 2026-06-05 · picked up as **M13** 2026-06-05_ · **✅ shipped — merged to `main` 2026-06-05** (branch retired; smoke round 1 folded in: per-mode folder MRUs, double-duty open button, whole-row header taps)
 
 ## What & why (user, 2026-06-05)
 
@@ -91,7 +91,6 @@ items from it to load — without losing the existing RECENT behavior.
 
 ## Opens (close-out)
 
-- 👀 **Hands-on smoke** (the merge gate) — pinning while scrolling a long
-  folder; remove menus both platforms (right-click / long-press); the
-  pick-folder → expand → child → RECENT-promotion flow end to end;
-  re-enumerate-on-expand freshness in real use.
+- ✅ **Hands-on smoke passed** (2026-06-05) — round 1 surfaced three fixes
+  (per-mode folder MRUs · double-duty open button · whole-row header taps,
+  see [DECISIONS.md](../DECISIONS.md)); re-smoke confirmed. Merged to `main`.
