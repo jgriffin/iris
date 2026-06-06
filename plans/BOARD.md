@@ -25,11 +25,11 @@ _Snapshot · 2026-06-05_
 
 └─ 🌱 M13 — Folder sources — pick a folder in Playback/Image; collapsible sidebar block of its matching files; MRU of folders · branch `m13-folder-sources` → `main`
    ├─ ✅ P1 — shared MRU generic + `RecentFolders` — `RecentBookmarks` base; videos/images now thin subclasses (308/266 → 41/42 lines), keys unchanged
-   ├─ 📋 P2 — folder pick + filtered child listing (`ImportTarget` folder cases, `UTType.folder` both platforms)
-   ├─ 📋 P3 — sidebar FOLDER block — in-canvas design pass, then live wiring
+   ├─ ✅ P2 — folder pick + filtered child listing — `ImportTarget.videoFolder`/`.imageFolder`, one shared folders MRU, `folderListing(of:kind:)` (resource-value UTType filter, shallow, name-sorted)
+   ├─ 🌱 P3 — sidebar FOLDER block — `FolderBlock`/`FoldersBlock` + design gallery built ← **awaiting the in-canvas session** (placement + presentation are the user's call); live wiring after
    └─ 📋 P4 — polish: large-folder cap, freshness, MRU-removal call, preview gallery
 
-👉 next — **start M13·P2 — folder pick + filtered child listing**: `ImportTarget` gains `videoFolder`/`imageFolder` (`UTType.folder` through both pickers), `handlePicked` routes to `RecentFolders.addOrPromote`, shallow UTType-filtered child enumeration helper. → [features/folder-sources.md](./features/folder-sources.md)
+👉 next — **the P3 in-canvas session**: open `Apps/Shared/Shell/Sidebar/FolderBlockGallery.swift` in the Xcode canvas and settle ⚖️ placement (FOLDERS above vs below RECENT — cases 1–2, stress case 7) + ⚖️ presentation (independent vs one-expanded — cases 3–4); then wire the winner live. → [features/folder-sources.md](./features/folder-sources.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)

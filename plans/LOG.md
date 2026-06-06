@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M13 — Folder sources** (P1 ✅ · P2 📋 ← next · P3 📋 · P4 📋, on `m13-folder-sources`) — pick a folder in Playback/Image, collapsible sidebar block of its matching children (child picks promote into RECENT as usual), MRU of folders.
-👉 Next: **start M13·P2 — folder pick + filtered child listing** — `ImportTarget.videoFolder`/`.imageFolder` (`UTType.folder` through both pickers), route picks into `RecentFolders`, shallow UTType-filtered enumeration helper. → [`BOARD.md`](./BOARD.md)
+🌱 **M13 — Folder sources** (P1 ✅ · P2 ✅ · P3 🌱 ← gallery built, awaiting the in-canvas session · P4 📋, on `m13-folder-sources`) — pick a folder in Playback/Image, collapsible sidebar block of its matching children (child picks promote into RECENT as usual), MRU of folders.
+👉 Next: **the P3 in-canvas session** — `FolderBlockGallery.swift` in the Xcode canvas; user settles ⚖️ placement (cases 1–2, 7) + ⚖️ presentation (cases 3–4); then wire the winner. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -990,3 +990,17 @@
 - Verified: `swift test` **278** green (count unchanged — Apps/Shared stays test-unreachable, deferral stands); **both schemes BUILD SUCCEEDED**; `git diff main -- Sources/Iris/` empty (library untouched); pbxproj diff purely additive (xcodegen re-run for the two new files).
 - 💡 Learned: the originals' "near-identical" claim held exactly — the only divergences were key, logger category, and doc prose (incl. `RecentImages`' "deliberate sibling, not a generic base" note, deleted as P1 reverses precisely that). Extraction is behavior-preserving by construction.
 - 👉 Next: **M13·P2 — folder pick + filtered child listing**. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (evening) — M13·P2 + P3a: folder-pick plumbing + the design gallery; paused at the canvas
+
+- Did: **built + committed M13·P2** (`a5d366e`, build agent) — folder picking end to end, no UI surface yet:
+  - `ImportTarget` gains `videoFolder`/`imageFolder` (`contentTypes: [.folder]`; stock pickers carry it on both platforms — iOS `DocumentPicker` needed nothing extra).
+  - **One shared `RecentFolders`** on the shell (a folder is a folder; the per-mode filter applies at enumeration time, not storage time); `handlePicked` → `pickFolder(url:kind:)` → scope + `addOrPromote` + enumerate + `notice` log. `presentVideoFolderPicker()`/`presentImageFolderPicker()` mirror the file pickers, awaiting a P3 call site.
+  - **`folderListing(of:kind:)`** (`Apps/Shared/State/FolderListing.swift`) — shallow, hidden-skipping, `localizedStandardCompare`-sorted; filters by **resource-value `contentType` conformance** (`.movie`/`.image` umbrellas — the filesystem's type assignment wins over extension guessing). Caller owns security scope (documented). `// M13·P4:` cap breadcrumb in place.
+- Did: **built + committed M13·P3a** (`7ceecb6`, build agent) — the design-pass gallery, fixture-fed only:
+  - **`FolderBlock`** (production-shaped) — collapsible disclosure: folder glyph + name + rotating chevron; children as `RecentList`-rhyming rows one indent deeper w/ quieter glyphs; empty → "No matching files" caption. Plain-data init, fully preview-drivable.
+  - **`FoldersBlock`** — N folders + the two candidate presentations behind a `FolderPresentation` switch (`.independent` / `.oneExpanded`; loser gets deleted at wiring).
+  - **`FolderBlockGallery.swift`** (throwaway, DEBUG) — light + dark previews, 9 boxed+captioned cases: placement above/below RECENT in real `ModeSection` anatomy (1–2), the two presentations (3–4), edges (empty folder · ~12-child folder · FOLDERS-with-empty-RECENT · image kind · inactive section).
+- Verified (both phases): `swift test` **278** green; **both schemes BUILD SUCCEEDED**; `Sources/Iris/` untouched. ℹ️ 3 pre-existing actor-isolation warnings on `IrisShell+Playback.swift` (`movieContentTypes` etc.) predate M13 — agent verified against the base commit.
+- ⏸ **Paused at the designed stuck point:** P3's ⚖️ placement + ⚖️ presentation are the user's call, settled live in the canvas (M9·P6 style) — not on paper, not by the assistant.
+- 👉 Next: **the P3 in-canvas session** (`FolderBlockGallery.swift`), then wire the winner. → [`BOARD.md`](./BOARD.md)
