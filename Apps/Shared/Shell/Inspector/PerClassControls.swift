@@ -16,17 +16,23 @@ import SwiftUI
 /// the present/absent visual distinction inherited from M11, just re-sourced.
 ///
 /// **Tri-state (redesign).** Each label is Hide / Auto / Show:
-/// - **Hide** — never drawn (`OverlayFilter.hiddenLabels`).
+/// - **Hide** — never drawn (`OverlayFilter.hiddenLabels`), and **pulled out of
+///   the working list** into the expander's HIDDEN group (M12·P5, user call:
+///   "we just decided this thing was unimportant so we don't want to show it
+///   in our recent detectors list"). Unhiding (→ Auto) returns it to the list.
 /// - **Auto** — drawn when present; the default for a newly-seen label.
 /// - **Show** (pinned) — always listed here + drawn when present, even before
 ///   it first appears (store `Visibility.show`, app-side UI listing state).
 ///
 /// **Working set.** The rows are the active detector's store keys (seen ∪
-/// opined-on), sorted alphabetically — pinned-Show rows fall out of store
-/// membership automatically. A **Show all classes** expander reveals the
-/// detector's full roster (`availableLabels`) so a class can be set to
-/// Show/Hide before it ever appears. When the roster isn't statically reachable
-/// (a dynamic / class-agnostic detector → `availableLabels == nil`) the expander
+/// opined-on) **minus hidden**, sorted alphabetically — pinned-Show rows fall
+/// out of store membership automatically. A **Show all classes** expander
+/// reveals a HIDDEN group first (everything hidden, so it stays reachable to
+/// unhide) and then the detector's full remaining roster (`availableLabels`,
+/// hidden labels repeating there) so a class can be set to Show/Hide before it
+/// ever appears. When the roster isn't statically reachable (a dynamic /
+/// class-agnostic detector → `availableLabels == nil`) the expander carries
+/// only the HIDDEN group (titled "Hidden classes"), or — with nothing hidden —
 /// is replaced by a small caption noting the full roster is unavailable.
 ///
 /// **Render-side, app-side state.** Floors + hidden/pinned live on the
@@ -53,22 +59,54 @@ struct PerClassControls: View {
     /// stock YOLO box detector), else `nil` — drives the "Show all" expander.
     let availableLabels: [String]?
 
-    @State private var showingAll = false
+    @State private var showingAll: Bool
 
     /// The label whose inline slider is currently revealed (tapped open). A row
     /// that's already overridden shows its slider regardless; this is the lever
     /// for tuning a *default* row in place without first overriding it.
     @State private var tuningLabel: String?
 
-    /// The always-listed rows: the active detector's accumulated labels (store
-    /// keys — seen ∪ opined-on), sorted. Pinned-Show rows are included by
-    /// construction since opining creates a key.
-    private var workingLabels: [String] {
-        labelStore.labels(for: detectorID).sorted()
+    init(
+        labelStore: DetectorLabelStore,
+        detectorID: String,
+        globalFloor: Double,
+        presentLabels: Set<String>,
+        availableLabels: [String]?,
+        initiallyExpanded: Bool = false
+    ) {
+        self.labelStore = labelStore
+        self.detectorID = detectorID
+        self.globalFloor = globalFloor
+        self.presentLabels = presentLabels
+        self.availableLabels = availableLabels
+        // Static previews need the expander open to render the HIDDEN group;
+        // live use always starts collapsed (the default).
+        _showingAll = State(initialValue: initiallyExpanded)
     }
 
-    /// Roster labels NOT already in the working set — what the "Show all"
-    /// expander adds. Empty when there's no static roster.
+    /// The always-listed rows: the active detector's accumulated labels (store
+    /// keys — seen ∪ opined-on) **minus hidden** (those move to the expander's
+    /// HIDDEN group), sorted. Pinned-Show rows are included by construction
+    /// since opining creates a key.
+    private var workingLabels: [String] {
+        labelStore.labels(for: detectorID)
+            .filter { labelStore.visibility(of: $0, for: detectorID) != .hide }
+            .sorted()
+    }
+
+    /// Everything hidden for the active detector — always store keys (an
+    /// opinion creates one), grouped at the top of the expander so they stay
+    /// reachable to unhide.
+    private var hiddenLabels: [String] {
+        labelStore.labels(for: detectorID)
+            .filter { labelStore.visibility(of: $0, for: detectorID) == .hide }
+            .sorted()
+    }
+
+    /// Roster labels NOT in the working set — what the "Show all" expander adds
+    /// below the HIDDEN group. Hidden labels repeat here on purpose (user call):
+    /// the group is the quick-unhide surface, the roster stays complete. Empty
+    /// when there's no static roster.
     private var additionalRosterLabels: [String] {
         guard let roster = availableLabels else { return [] }
         let working = Set(workingLabels)
@@ -92,19 +130,11 @@ struct PerClassControls: View {
             header
 
             ForEach(workingLabels, id: \.self) { label in
-                PerClassRow(
-                    labelStore: labelStore,
-                    detectorID: detectorID,
-                    globalFloor: globalFloor,
-                    label: label,
-                    isLive: presentLabels.contains(label),
-                    isTuning: tuningLabel == label,
-                    onToggleTuning: { toggleTuning(label) }
-                )
+                row(for: label)
             }
 
             if workingLabels.isEmpty {
-                Text("No classes seen yet.")
+                Text(hiddenLabels.isEmpty ? "No classes seen yet." : "All seen classes are hidden.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -163,8 +193,9 @@ struct PerClassControls: View {
 
     @ViewBuilder
     private var rosterSection: some View {
-        if availableLabels == nil {
-            // No static roster for this detector (dynamic / class-agnostic).
+        if hiddenLabels.isEmpty && availableLabels == nil {
+            // No static roster (dynamic / class-agnostic) and nothing hidden —
+            // nothing to expand.
             HStack(spacing: 6) {
                 Text("Full class list unavailable for this detector.")
                     .font(.caption)
@@ -174,25 +205,40 @@ struct PerClassControls: View {
                 Spacer(minLength: 4)
                 clearSeenButton
             }
-        } else if !additionalRosterLabels.isEmpty {
+        } else if hiddenLabels.isEmpty && additionalRosterLabels.isEmpty {
+            // Roster known but fully covered by the working set — keep the clear
+            // affordance reachable.
+            HStack {
+                Spacer(minLength: 0)
+                clearSeenButton
+            }
+        } else {
+            // The expander: HIDDEN group first (quick-unhide surface), then the
+            // remaining roster (hidden labels repeat there — the roster stays
+            // complete). With no static roster the expander carries only the
+            // HIDDEN group and is titled accordingly.
             DisclosureGroup(isExpanded: $showingAll) {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(additionalRosterLabels, id: \.self) { label in
-                        PerClassRow(
-                            labelStore: labelStore,
-                            detectorID: detectorID,
-                            globalFloor: globalFloor,
-                            label: label,
-                            isLive: presentLabels.contains(label),
-                            isTuning: tuningLabel == label,
-                            onToggleTuning: { toggleTuning(label) }
-                        )
+                    if !hiddenLabels.isEmpty {
+                        rosterCaption("Hidden")
+                        ForEach(hiddenLabels, id: \.self) { label in
+                            row(for: label)
+                        }
+                    }
+                    if !additionalRosterLabels.isEmpty {
+                        if !hiddenLabels.isEmpty {
+                            rosterCaption("All classes")
+                                .padding(.top, 4)
+                        }
+                        ForEach(additionalRosterLabels, id: \.self) { label in
+                            row(for: label)
+                        }
                     }
                 }
                 .padding(.top, 4)
             } label: {
                 HStack(spacing: 6) {
-                    Text("Show all classes")
+                    Text(expanderTitle)
                         .font(.caption.weight(.semibold))
                         .textCase(.uppercase)
                         .tracking(0.6)
@@ -202,15 +248,40 @@ struct PerClassControls: View {
                     clearSeenButton
                 }
             }
-            .accessibilityLabel("Show all classes")
-        } else {
-            // Roster known but fully covered by the working set — keep the clear
-            // affordance reachable.
-            HStack {
-                Spacer(minLength: 0)
-                clearSeenButton
-            }
+            .accessibilityLabel(expanderTitle)
         }
+    }
+
+    /// "Show all classes" when a static roster exists; with hidden-only content
+    /// (no roster) that title would be a lie — call it what it is.
+    private var expanderTitle: String {
+        availableLabels == nil ? "Hidden classes" : "Show all classes"
+    }
+
+    /// Sub-caption inside the expander separating the HIDDEN group from the
+    /// remaining roster.
+    private func rosterCaption(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .textCase(.uppercase)
+            .tracking(0.6)
+            .foregroundStyle(.quaternary)
+            .lineLimit(1)
+    }
+
+    /// One per-class row bound to `label` — shared by the working list, the
+    /// HIDDEN group, and the roster (a hidden label renders in two places;
+    /// both bind the same store entry, so cycling either updates both).
+    private func row(for label: String) -> some View {
+        PerClassRow(
+            labelStore: labelStore,
+            detectorID: detectorID,
+            globalFloor: globalFloor,
+            label: label,
+            isLive: presentLabels.contains(label),
+            isTuning: tuningLabel == label,
+            onToggleTuning: { toggleTuning(label) }
+        )
     }
 
     /// A modest secondary "Clear seen labels" action — forgets bare sightings
@@ -502,6 +573,8 @@ private struct PerClassGalleryCase: View {
     var globalFloor: Double = 0.30
     var presentLabels: Set<String> = []
     var availableLabels: [String]?
+    /// Open the expander so the HIDDEN group + roster render statically.
+    var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -513,7 +586,8 @@ private struct PerClassGalleryCase: View {
                 detectorID: previewDetectorID,
                 globalFloor: globalFloor,
                 presentLabels: presentLabels,
-                availableLabels: availableLabels
+                availableLabels: availableLabels,
+                initiallyExpanded: expanded
             )
             .padding(10)
             .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
@@ -536,10 +610,12 @@ private var perClassGallery: some View {
             availableLabels: previewRoster
         )
 
-        // Mixed opinions: live + accumulated rows, overrides, a hidden, a
-        // pinned-never-seen, the show-all roster.
+        // Mixed opinions: live + accumulated rows, overrides, a
+        // pinned-never-seen; the hidden label is OUT of the working list and
+        // renders in the expander's HIDDEN group + again in the roster
+        // (expander opened so both show).
         PerClassGalleryCase(
-            title: "Mixed — live ⊂ seen, overrides, hidden, pinned",
+            title: "Mixed — live ⊂ seen, overrides, pinned; hidden → expander",
             store: previewStore(
                 seen: ["person", "sports ball", "car", "dog"],
                 overrides: ["sports ball": 0.65, "car": 0.40],
@@ -547,11 +623,13 @@ private var perClassGallery: some View {
                 pinned: ["bicycle"]
             ),
             presentLabels: ["person", "sports ball"],
-            availableLabels: previewRoster
+            availableLabels: previewRoster,
+            expanded: true
         )
 
-        // Cleared: opinions survive a sightings clear — only pinned / hidden /
-        // overridden rows remain; "Clear seen" disabled (nothing bare left).
+        // Cleared: opinions survive a sightings clear — pinned / overridden
+        // rows remain in the list, the hidden one only in the expander;
+        // "Clear seen" disabled (nothing bare left).
         PerClassGalleryCase(
             title: "Cleared — opinions only, Clear seen disabled",
             store: previewStore(
@@ -559,7 +637,8 @@ private var perClassGallery: some View {
                 hidden: ["dog"],
                 pinned: ["bicycle"]
             ),
-            availableLabels: previewRoster
+            availableLabels: previewRoster,
+            expanded: true
         )
 
         // No static roster (class-agnostic / dynamic detector): the expander
@@ -569,6 +648,16 @@ private var perClassGallery: some View {
             store: previewStore(seen: ["rect"]),
             globalFloor: 0.45,
             presentLabels: ["rect"]
+        )
+
+        // No static roster BUT something hidden: the expander exists anyway —
+        // titled "Hidden classes" — so the hidden label stays unhidable; the
+        // working list shows the all-hidden caption.
+        PerClassGalleryCase(
+            title: "No roster + hidden — Hidden classes expander",
+            store: previewStore(seen: ["rect"], hidden: ["rect"]),
+            globalFloor: 0.45,
+            expanded: true
         )
 
         // Fresh detector: nothing seen, no roster — just the empty caption.
