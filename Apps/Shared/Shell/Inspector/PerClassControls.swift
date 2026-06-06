@@ -8,25 +8,45 @@ import SwiftUI
 /// appears on a row ONLY while that row is being tuned (tapped) or is already
 /// overridden — default rows stay value-only so the list reads dense.
 ///
+/// **Store-sourced roster (M12·P3).** The working set is the active detector's
+/// **accumulated** labels — the keys of its ``DetectorLabelStore`` slice
+/// (`labelStore.labels(for:)`), stable across frames so the rows no longer
+/// flicker as detections come and go. `presentLabels` keeps one job: marking
+/// which rows are **currently live** (drawn this frame) vs. merely accumulated —
+/// the present/absent visual distinction inherited from M11, just re-sourced.
+///
 /// **Tri-state (redesign).** Each label is Hide / Auto / Show:
 /// - **Hide** — never drawn (`OverlayFilter.hiddenLabels`).
 /// - **Auto** — drawn when present; the default for a newly-seen label.
 /// - **Show** (pinned) — always listed here + drawn when present, even before
-///   it first appears (`ModelSelection.pinnedLabels`, app-side UI state).
+///   it first appears (store `Visibility.show`, app-side UI listing state).
 ///
-/// **Working set.** The rows are the union of (present ∪ pinned ∪ configured
-/// hidden), sorted alphabetically. A **Show all classes** expander reveals the
+/// **Working set.** The rows are the active detector's store keys (seen ∪
+/// opined-on), sorted alphabetically — pinned-Show rows fall out of store
+/// membership automatically. A **Show all classes** expander reveals the
 /// detector's full roster (`availableLabels`) so a class can be set to
 /// Show/Hide before it ever appears. When the roster isn't statically reachable
 /// (a dynamic / class-agnostic detector → `availableLabels == nil`) the expander
 /// is replaced by a small caption noting the full roster is unavailable.
 ///
-/// **Render-side, app-side state.** Floors + hidden/pinned live on
-/// `ModelSelection`; observing it re-runs each consuming overlay.
+/// **Render-side, app-side state.** Floors + hidden/pinned live on the
+/// ``DetectorLabelStore`` keyed by the active detector id; observing it re-runs
+/// each consuming overlay.
 struct PerClassControls: View {
-    @Bindable var modelSelection: ModelSelection
+    /// The per-detector per-class store — the source of truth for the roster
+    /// (its keys) and every per-class opinion (M12·P3).
+    @Bindable var labelStore: DetectorLabelStore
 
-    /// Distinct, non-empty labels currently visible in the active mode.
+    /// The active detector id the rows + roster are keyed to. Switching it
+    /// switches the whole per-class view.
+    let detectorID: String
+
+    /// The global render floor — the per-label slider's lower bound + fallback,
+    /// and the clamp every per-label floor sits above.
+    let globalFloor: Double
+
+    /// Labels currently **live** (drawn this frame) in the active mode. Drives
+    /// the present/accumulated visual distinction — NOT the roster anymore.
     let presentLabels: Set<String>
 
     /// The detector's full class roster, when statically known (COCO-80 for a
@@ -40,13 +60,11 @@ struct PerClassControls: View {
     /// for tuning a *default* row in place without first overriding it.
     @State private var tuningLabel: String?
 
-    /// The always-listed rows: present ∪ pinned ∪ configured-hidden, sorted.
+    /// The always-listed rows: the active detector's accumulated labels (store
+    /// keys — seen ∪ opined-on), sorted. Pinned-Show rows are included by
+    /// construction since opining creates a key.
     private var workingLabels: [String] {
-        let configuredHidden = modelSelection.hiddenLabels
-        let union = presentLabels
-            .union(modelSelection.pinnedLabels)
-            .union(configuredHidden)
-        return union.sorted()
+        labelStore.labels(for: detectorID).sorted()
     }
 
     /// Roster labels NOT already in the working set — what the "Show all"
@@ -57,11 +75,16 @@ struct PerClassControls: View {
         return roster.filter { !working.contains($0) }.sorted()
     }
 
-    /// Whether any per-class state is set — gates the group reset affordance.
+    /// Whether the active detector carries any explicit opinion — gates the
+    /// group reset affordance.
     private var hasAnyConfiguration: Bool {
-        !modelSelection.hiddenLabels.isEmpty
-            || !modelSelection.pinnedLabels.isEmpty
-            || !modelSelection.perLabelMinConfidence.isEmpty
+        labelStore.hasAnyOpinion(for: detectorID)
+    }
+
+    /// Whether there are bare sightings (all-default entries) to forget — gates
+    /// the "Clear seen labels" affordance. Opinions are NOT clearable here.
+    private var hasClearableSightings: Bool {
+        labelStore.hasClearableSightings(for: detectorID)
     }
 
     var body: some View {
@@ -70,8 +93,11 @@ struct PerClassControls: View {
 
             ForEach(workingLabels, id: \.self) { label in
                 PerClassRow(
-                    modelSelection: modelSelection,
+                    labelStore: labelStore,
+                    detectorID: detectorID,
+                    globalFloor: globalFloor,
                     label: label,
+                    isLive: presentLabels.contains(label),
                     isTuning: tuningLabel == label,
                     onToggleTuning: { toggleTuning(label) }
                 )
@@ -106,13 +132,12 @@ struct PerClassControls: View {
 
             Spacer(minLength: 4)
 
-            // Group reset affordance: clears every per-class override back to
-            // Auto + global floor. Shown only when something is set.
+            // Group reset affordance: clears every per-class opinion back to
+            // Auto + global floor (sightings survive). Shown only when something
+            // is set.
             if hasAnyConfiguration {
                 Button {
-                    modelSelection.hiddenLabels.removeAll()
-                    modelSelection.pinnedLabels.removeAll()
-                    modelSelection.perLabelMinConfidence.removeAll()
+                    labelStore.clearOpinions(for: detectorID)
                     tuningLabel = nil
                 } label: {
                     Label("Reset all", systemImage: "arrow.counterclockwise")
@@ -132,18 +157,25 @@ struct PerClassControls: View {
     private var rosterSection: some View {
         if availableLabels == nil {
             // No static roster for this detector (dynamic / class-agnostic).
-            Text("Full class list unavailable for this detector.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            HStack(spacing: 6) {
+                Text("Full class list unavailable for this detector.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 4)
+                clearSeenButton
+            }
         } else if !additionalRosterLabels.isEmpty {
             DisclosureGroup(isExpanded: $showingAll) {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(additionalRosterLabels, id: \.self) { label in
                         PerClassRow(
-                            modelSelection: modelSelection,
+                            labelStore: labelStore,
+                            detectorID: detectorID,
+                            globalFloor: globalFloor,
                             label: label,
+                            isLive: presentLabels.contains(label),
                             isTuning: tuningLabel == label,
                             onToggleTuning: { toggleTuning(label) }
                         )
@@ -151,15 +183,47 @@ struct PerClassControls: View {
                 }
                 .padding(.top, 4)
             } label: {
-                Text("Show all classes")
-                    .font(.caption.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.6)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text("Show all classes")
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(0.6)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    clearSeenButton
+                }
             }
             .accessibilityLabel("Show all classes")
+        } else {
+            // Roster known but fully covered by the working set — keep the clear
+            // affordance reachable.
+            HStack {
+                Spacer(minLength: 0)
+                clearSeenButton
+            }
         }
+    }
+
+    /// A modest secondary "Clear seen labels" action — forgets bare sightings
+    /// for the active detector (opinions survive), styled like the group's other
+    /// secondary actions (Reset all). Disabled when there's nothing to clear.
+    @ViewBuilder
+    private var clearSeenButton: some View {
+        Button {
+            labelStore.clearSightings(for: detectorID)
+            tuningLabel = nil
+        } label: {
+            Label("Clear seen", systemImage: "eraser")
+                .font(.caption)
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .disabled(!hasClearableSightings)
+        .help("Forget seen labels (kept pins, hides, and floors survive)")
+        .accessibilityLabel("Clear seen labels")
     }
 }
 
@@ -172,7 +236,8 @@ struct PerClassControls: View {
 /// - **Eye** — a PLAIN tri-state SF Symbol (no circular container, which would
 ///   read as a radio button): `eye.slash` (Hide) / `eye` outline (Auto) /
 ///   `eye.fill` (Show/pinned). Tapping cycles Hide → Auto → Show.
-/// - **Name** — readable (`.body`), dimmed when hidden.
+/// - **Name** — readable (`.body`), dimmed when hidden OR when accumulated but
+///   not currently live (the present/accumulated distinction, M12·P3).
 /// - **Inline slider** — NOT permanently shown. It appears only while the row is
 ///   being tuned (`isTuning`, tapped open) or is already overridden, letting a
 ///   default row stay value-only/dense until you choose to tune it.
@@ -187,36 +252,37 @@ struct PerClassControls: View {
 /// reveals the slider; once it differs from global the row is "overridden" (the
 /// reset icon appears); reset clears it back to value-only.
 struct PerClassRow: View {
-    @Bindable var modelSelection: ModelSelection
+    @Bindable var labelStore: DetectorLabelStore
+    let detectorID: String
+    let globalFloor: Double
     let label: String
+    /// Whether this label is currently drawn (live) vs. merely accumulated.
+    let isLive: Bool
     /// Whether this row's inline slider is currently revealed (tapped open).
     let isTuning: Bool
     /// Toggle the inline slider open/closed for this row.
     let onToggleTuning: () -> Void
 
     private var visibility: LabelVisibility {
-        modelSelection.visibility(of: label)
+        labelStore.visibility(of: label, for: detectorID)
     }
     private var isHidden: Bool { visibility == .hide }
-    private var hasOverride: Bool { modelSelection.perLabelMinConfidence[label] != nil }
+    private var hasOverride: Bool { labelStore.floor(of: label, for: detectorID) != nil }
 
     /// Whether the inline slider should render: while actively tuning, OR once
     /// the row is overridden (so an override stays adjustable in place).
     private var showsSlider: Bool { (isTuning || hasOverride) && !isHidden }
-
-    /// Global floor as the per-label slider's lower bound + fallback value.
-    private var globalFloor: Double { modelSelection.minConfidence }
 
     /// Per-label floor, clamped to ≥ the global floor on both read and write.
     private var floor: Binding<Double> {
         Binding(
             get: {
                 max(
-                    modelSelection.perLabelMinConfidence[label] ?? globalFloor,
+                    labelStore.floor(of: label, for: detectorID) ?? globalFloor,
                     globalFloor
                 )
             },
-            set: { modelSelection.setPerLabelFloor($0, for: label) }
+            set: { labelStore.setPerLabelFloor($0, of: label, for: detectorID, globalFloor: globalFloor) }
         )
     }
 
@@ -234,6 +300,13 @@ struct PerClassRow: View {
         case .auto: return AnyShapeStyle(.secondary)
         case .show: return AnyShapeStyle(.tint)
         }
+    }
+
+    /// Accumulated-but-not-live rows read dimmer (tertiary) than live ones, so
+    /// the stable working list still shows which classes are on screen now.
+    private var nameStyle: HierarchicalShapeStyle {
+        if isHidden { return .tertiary }
+        return isLive ? .primary : .secondary
     }
 
     private var accessibilityVisibilityLabel: String {
@@ -255,7 +328,7 @@ struct PerClassRow: View {
         HStack(spacing: 8) {
             // Plain tri-state eye — NO circular/background container.
             Button {
-                modelSelection.cycleVisibility(of: label)
+                labelStore.cycleVisibility(of: label, for: detectorID)
             } label: {
                 Image(systemName: eyeIcon)
                     .font(.system(size: 13))
@@ -267,7 +340,7 @@ struct PerClassRow: View {
 
             Text(label)
                 .font(.body)
-                .foregroundStyle(isHidden ? .tertiary : .primary)
+                .foregroundStyle(nameStyle)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -287,7 +360,7 @@ struct PerClassRow: View {
             // the value column stays aligned on default rows.
             if hasOverride {
                 Button {
-                    modelSelection.perLabelMinConfidence[label] = nil
+                    labelStore.clearPerLabelFloor(of: label, for: detectorID)
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.caption)
@@ -322,44 +395,78 @@ struct PerClassRow: View {
 }
 
 #if DEBUG
-/// A deterministic `ModelSelection` for previews — its own throwaway suite so
-/// each case starts from a known per-class state without touching real defaults.
+/// A deterministic `DetectorLabelStore` for previews — its own throwaway suite
+/// so each case starts from a known per-class state without touching real
+/// defaults. Seeds the given detector slice with sightings + opinions.
 @MainActor
-private func previewSelection(
-    global: Double = 0.30,
+private func previewStore(
+    detectorID: String = previewDetectorID,
+    globalFloor: Double = 0.30,
+    seen: Set<String> = [],
     overrides: [String: Double] = [:],
     hidden: Set<String> = [],
     pinned: Set<String> = []
-) -> ModelSelection {
+) -> DetectorLabelStore {
     let suite = "iris.preview.perclass.\(UUID().uuidString)"
-    let sel = ModelSelection(defaults: UserDefaults(suiteName: suite)!)
-    sel.minConfidence = global
-    sel.perLabelMinConfidence = overrides
-    sel.hiddenLabels = hidden
-    sel.pinnedLabels = pinned
-    return sel
+    let store = DetectorLabelStore(defaults: UserDefaults(suiteName: suite)!)
+    store.recordSightings(seen, for: detectorID)
+    for label in hidden { store.setVisibility(.hide, of: label, for: detectorID) }
+    for label in pinned { store.setVisibility(.show, of: label, for: detectorID) }
+    for (label, value) in overrides {
+        store.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: globalFloor)
+    }
+    return store
 }
 
-private let previewLabels: Set<String> = ["person", "sports ball", "car", "dog"]
+private let previewDetectorID = "coreml.yolo26n"
 private let previewRoster: [String] = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "dog", "cat",
     "sports ball", "bottle", "chair", "couch",
 ]
 
-/// Full redesigned panel — present rows + a couple overrides + a hidden + a
+/// A deterministic `ModelSelection` wrapping a seeded store + detector id, for
+/// the full-panel preview (`TuningGroups` binds `ModelSelection`).
+@MainActor
+private func previewSelection(
+    detectorID: String = previewDetectorID,
+    globalFloor: Double = 0.30,
+    seen: Set<String> = [],
+    overrides: [String: Double] = [:],
+    hidden: Set<String> = [],
+    pinned: Set<String> = []
+) -> ModelSelection {
+    let suite = "iris.preview.perclass.sel.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    let store = DetectorLabelStore(defaults: defaults)
+    store.recordSightings(seen, for: detectorID)
+    for label in hidden { store.setVisibility(.hide, of: label, for: detectorID) }
+    for label in pinned { store.setVisibility(.show, of: label, for: detectorID) }
+    for (label, value) in overrides {
+        store.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: globalFloor)
+    }
+    let sel = ModelSelection(defaults: defaults, labelStore: store)
+    sel.detectorID = detectorID
+    sel.minConfidence = globalFloor
+    return sel
+}
+
+/// Full redesigned panel — accumulated rows + a couple overrides + a hidden + a
 /// pinned + the show-all roster — in dark mode (the inspector's real context).
+/// `presentLabels` is a SUBSET of the accumulated set, so some rows read live
+/// (primary) and others accumulated-but-not-live (secondary).
 #Preview("Tuning panel · Variant 3 · dark") {
     ScrollView {
         TuningGroups(
             detectorName: "YOLO26n (Core ML)",
             settingsView: nil,
             modelSelection: previewSelection(
-                global: 0.25,
+                globalFloor: 0.25,
+                seen: ["person", "sports ball", "airplane", "car", "dog"],
                 overrides: ["sports ball": 0.45, "airplane": 0.35],
                 hidden: ["dog"],
                 pinned: ["fire hydrant"]
             ),
-            presentLabels: ["person", "sports ball", "airplane", "car"],
+            presentLabels: ["person", "car"],
             availableLabels: [
                 "person", "bicycle", "car", "motorcycle", "airplane", "bus",
                 "train", "truck", "boat", "traffic light", "fire hydrant",
@@ -374,16 +481,20 @@ private let previewRoster: [String] = [
 }
 
 /// The favorite-pattern gallery: per-class controls with a mix of
-/// hidden / pinned / overridden / auto rows + the show-all roster, light + dark.
+/// hidden / pinned / overridden / auto rows + accumulated-but-not-live rows +
+/// the show-all roster, light + dark.
 #Preview("Per-class · mixed · light") {
     PerClassControls(
-        modelSelection: previewSelection(
-            global: 0.30,
-            overrides: ["sports ball": 0.65, "car": 0.10],
+        labelStore: previewStore(
+            globalFloor: 0.30,
+            seen: ["person", "sports ball", "car", "dog"],
+            overrides: ["sports ball": 0.65, "car": 0.40],
             hidden: ["dog"],
             pinned: ["bicycle"]
         ),
-        presentLabels: previewLabels,
+        detectorID: previewDetectorID,
+        globalFloor: 0.30,
+        presentLabels: ["person", "sports ball"],
         availableLabels: previewRoster
     )
     .padding(.horizontal, 12)
@@ -394,13 +505,38 @@ private let previewRoster: [String] = [
 
 #Preview("Per-class · mixed · dark") {
     PerClassControls(
-        modelSelection: previewSelection(
-            global: 0.30,
-            overrides: ["sports ball": 0.65, "car": 0.10],
+        labelStore: previewStore(
+            globalFloor: 0.30,
+            seen: ["person", "sports ball", "car", "dog"],
+            overrides: ["sports ball": 0.65, "car": 0.40],
             hidden: ["dog"],
             pinned: ["bicycle"]
         ),
-        presentLabels: previewLabels,
+        detectorID: previewDetectorID,
+        globalFloor: 0.30,
+        presentLabels: ["person", "sports ball"],
+        availableLabels: previewRoster
+    )
+    .padding(.horizontal, 12)
+    .padding(.top, 12)
+    .frame(width: 300)
+    .preferredColorScheme(.dark)
+}
+
+/// Cleared state: opinions survive a sightings clear, so only the pinned / hidden
+/// / overridden rows remain — no bare-seen rows. "Clear seen" is disabled.
+#Preview("Per-class · cleared (opinions only)") {
+    PerClassControls(
+        labelStore: previewStore(
+            globalFloor: 0.30,
+            seen: [],
+            overrides: ["sports ball": 0.65],
+            hidden: ["dog"],
+            pinned: ["bicycle"]
+        ),
+        detectorID: previewDetectorID,
+        globalFloor: 0.30,
+        presentLabels: [],
         availableLabels: previewRoster
     )
     .padding(.horizontal, 12)
@@ -411,8 +547,13 @@ private let previewRoster: [String] = [
 
 #Preview("Per-class · no static roster") {
     PerClassControls(
-        modelSelection: previewSelection(global: 0.45),
-        presentLabels: previewLabels,
+        labelStore: previewStore(
+            globalFloor: 0.45,
+            seen: ["rect"]
+        ),
+        detectorID: previewDetectorID,
+        globalFloor: 0.45,
+        presentLabels: ["rect"],
         availableLabels: nil
     )
     .padding(.horizontal, 12)
@@ -420,9 +561,11 @@ private let previewRoster: [String] = [
     .frame(width: 300)
 }
 
-#Preview("Per-class · empty (agnostic / no detections)") {
+#Preview("Per-class · empty (fresh detector, no sightings)") {
     PerClassControls(
-        modelSelection: previewSelection(),
+        labelStore: previewStore(),
+        detectorID: previewDetectorID,
+        globalFloor: 0.30,
         presentLabels: [],
         availableLabels: nil
     )

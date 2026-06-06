@@ -234,6 +234,14 @@ final class DetectorLabelStore {
         detectors[detectorID]?.values.contains { !$0.isDefault } ?? false
     }
 
+    /// `true` when `detectorID` has any **bare sighting** (a default/`{}` entry)
+    /// that ``clearSightings(for:)`` would drop — gates the panel's "Clear seen
+    /// labels" affordance (P3). False when every entry carries an explicit
+    /// opinion (nothing to forget) or the detector has no entries at all.
+    func hasClearableSightings(for detectorID: String) -> Bool {
+        detectors[detectorID]?.values.contains { $0.isDefault } ?? false
+    }
+
     /// Drop every explicit opinion for `detectorID` (visibility + floor) while
     /// keeping the labels as bare sightings — the "Reset all" affordance.
     func clearOpinions(for detectorID: String) {

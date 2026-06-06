@@ -18,13 +18,15 @@ import Observation
 /// demos thread into `DetectionLayer` across Playback / Image / Capture is
 /// assembled by the store for the active detector.
 ///
-/// **M12·P1 bridge.** The per-class accessors that used to live here
-/// (`visibility(of:)`, `setVisibility`, `cycleVisibility`, `setPerLabelFloor`,
-/// `overlayFilter`, and the `perLabelMinConfidence` / `hiddenLabels` /
-/// `pinnedLabels` properties) are now thin forwarders onto ``labelStore`` keyed
-/// by the active ``detectorID``, so the panel UI keeps compiling unchanged until
-/// P3 re-points it at the store directly. The stored state moved off this object;
-/// these are computed views over the store's active slice.
+/// **M12·P3 — the per-class bridge is gone.** The panel (`PerClassControls` /
+/// `PerClassRow`) and the three detail views' overlay-filter assembly now talk
+/// to ``labelStore`` + the active ``detectorID`` directly. The forwarders that
+/// briefly lived here in P1 (`visibility(of:)`, `setVisibility`,
+/// `cycleVisibility`, `setPerLabelFloor`, `overlayFilter`, and the
+/// `perLabelMinConfidence` / `hiddenLabels` / `pinnedLabels` views) have been
+/// removed — nothing reads per-class state through `ModelSelection` anymore. What
+/// remains here is the selection (`detectorID`) the store is keyed *by* and the
+/// global render floor (`minConfidence`) the store clamps to.
 ///
 /// Persistence mirrors `RecentDetectors`: a `UserDefaults`-backed `@Observable`
 /// that loads in `init` and writes on every set via `didSet`. The `.v1` key
@@ -64,112 +66,6 @@ final class ModelSelection {
     /// Persisted on set.
     var minConfidence: Double {
         didSet { defaults.set(minConfidence, forKey: Self.minConfidenceKey) }
-    }
-
-    // MARK: - Per-class bridge (M12·P1 — P3 re-points the panel)
-    //
-    // The three per-class collections, the tri-state helpers, and `overlayFilter`
-    // moved onto `DetectorLabelStore`, keyed per-detector. These forwarders keep
-    // the panel UI (`PerClassControls` / `PerClassRow`) and previews compiling
-    // unchanged against `modelSelection.<x>` until P3 re-points them at the store
-    // + the active detector id directly. Each computed view reads/writes the
-    // store's slice for the *active* `detectorID`. Reading them in a view body
-    // observes `labelStore.detectors`, so the rows still update live.
-
-    /// Per-label confidence floors for the **active detector**, as a flat map
-    /// (bridge view of the store's slice). Setting reconciles the whole map into
-    /// the store (clamped to the global floor on the store side).
-    // M12·P1 bridge — P3 re-points the panel.
-    var perLabelMinConfidence: [String: Double] {
-        get {
-            var out: [String: Double] = [:]
-            for label in labelStore.labels(for: detectorID) {
-                if let floor = labelStore.floor(of: label, for: detectorID) {
-                    out[label] = floor
-                }
-            }
-            return out
-        }
-        set {
-            let current = perLabelMinConfidence
-            for label in current.keys where newValue[label] == nil {
-                labelStore.clearPerLabelFloor(of: label, for: detectorID)
-            }
-            for (label, value) in newValue where current[label] != value {
-                labelStore.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: minConfidence)
-            }
-        }
-    }
-
-    /// Labels hidden outright for the **active detector** (bridge view of the
-    /// store). Setting reconciles which labels are `.hide` into the store.
-    // M12·P1 bridge — P3 re-points the panel.
-    var hiddenLabels: Set<String> {
-        get { labelSet(matching: .hide) }
-        set { reconcileVisibility(newValue, target: .hide) }
-    }
-
-    /// Labels **pinned** ("Show") for the **active detector** (bridge view of the
-    /// store). Setting reconciles which labels are `.show` into the store.
-    // M12·P1 bridge — P3 re-points the panel.
-    var pinnedLabels: Set<String> {
-        get { labelSet(matching: .show) }
-        set { reconcileVisibility(newValue, target: .show) }
-    }
-
-    /// The library render-time filter for the **active detector**, assembled by
-    /// the store (clamped to the global `minConfidence`). Read by `DetectionLayer`
-    /// across Playback / Image / Capture; observing the store's slice re-runs each
-    /// overlay `body` when any knob moves.
-    var overlayFilter: OverlayFilter {
-        labelStore.overlayFilter(for: detectorID, globalFloor: minConfidence)
-    }
-
-    // MARK: - Per-class tri-state visibility (forwarders)
-
-    /// The current tri-state for `label` under the active detector.
-    func visibility(of label: String) -> LabelVisibility {
-        labelStore.visibility(of: label, for: detectorID)
-    }
-
-    /// Set a label's tri-state under the active detector.
-    func setVisibility(_ visibility: LabelVisibility, for label: String) {
-        labelStore.setVisibility(visibility, of: label, for: detectorID)
-    }
-
-    /// Cycle a label Hide → Auto → Show → Hide under the active detector.
-    func cycleVisibility(of label: String) {
-        labelStore.cycleVisibility(of: label, for: detectorID)
-    }
-
-    /// Set a per-label confidence floor under the active detector, clamped to
-    /// ≥ the global floor (the clamp lives in the store).
-    func setPerLabelFloor(_ value: Double, for label: String) {
-        labelStore.setPerLabelFloor(value, of: label, for: detectorID, globalFloor: minConfidence)
-    }
-
-    // MARK: - Bridge helpers
-
-    /// Labels under the active detector whose stored visibility matches `target`.
-    private func labelSet(matching target: DetectorLabelStore.Visibility) -> Set<String> {
-        let triState: LabelVisibility = target == .hide ? .hide : .show
-        return labelStore.labels(for: detectorID).filter {
-            labelStore.visibility(of: $0, for: detectorID) == triState
-        }
-    }
-
-    /// Reconcile the active detector's `target`-visibility labels to exactly
-    /// `desired`: labels gaining `target` are set to it; labels losing it drop to
-    /// Auto. (Bridge semantics for whole-set assignment / `removeAll()`.)
-    private func reconcileVisibility(_ desired: Set<String>, target: DetectorLabelStore.Visibility) {
-        let triState: LabelVisibility = target == .hide ? .hide : .show
-        let current = labelSet(matching: target)
-        for label in current.subtracting(desired) {
-            labelStore.setVisibility(.auto, of: label, for: detectorID)
-        }
-        for label in desired.subtracting(current) {
-            labelStore.setVisibility(triState, of: label, for: detectorID)
-        }
     }
 
     private let defaults: UserDefaults

@@ -125,6 +125,18 @@ struct IrisShell: View {
     var catalog: DetectorCatalog { DemoCatalog.detectors(store: modelStore) }
     var selectedDetectorID: String { modelSelection.detectorID }
 
+    /// The library render-time overlay filter for the active detector (M12·P3),
+    /// assembled by the store from its slice and clamped to the global floor.
+    /// The three detail views read this; reading the observed store + selection
+    /// re-runs `body` when any per-class knob or the global floor moves, so the
+    /// overlay re-filters live (pure draw-time filter, no re-detection).
+    var overlayFilter: OverlayFilter {
+        modelSelection.labelStore.overlayFilter(
+            for: modelSelection.detectorID,
+            globalFloor: modelSelection.minConfidence
+        )
+    }
+
     var resolvedEntry: DetectorCatalogEntry? {
         catalog.entries.first(where: { $0.id == selectedDetectorID })
             ?? catalog.entries.first

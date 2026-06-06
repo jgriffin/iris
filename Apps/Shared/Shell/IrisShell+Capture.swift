@@ -15,7 +15,7 @@ extension IrisShell {
         #if os(iOS)
         CaptureDetailView(
             capture: capture,
-            filter: modelSelection.overlayFilter,
+            filter: overlayFilter,
             onInspect: { inspectFrame($0) }
         )
         #else

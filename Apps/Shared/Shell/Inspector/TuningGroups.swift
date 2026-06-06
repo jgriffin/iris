@@ -51,8 +51,12 @@ struct TuningGroups: View {
             // overrides clamp to. Label stays exactly "Min confidence".
             MinConfidenceControl(modelSelection: modelSelection)
 
+            // Per-class rows read the store directly (M12·P3), keyed by the
+            // active detector id, with the global floor for clamp/fallback.
             PerClassControls(
-                modelSelection: modelSelection,
+                labelStore: modelSelection.labelStore,
+                detectorID: modelSelection.detectorID,
+                globalFloor: modelSelection.minConfidence,
                 presentLabels: presentLabels,
                 availableLabels: availableLabels
             )

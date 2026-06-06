@@ -109,12 +109,16 @@ struct ImageDetailView: View {
                 },
                 stalenessThreshold: coordinator.resultStore.playbackStalenessThreshold,
                 tuning: coordinator.session?.router,
-                // M9·P3 floor, generalized M10: render-time overlay filter.
-                // Reading the observed `modelSelection.overlayFilter` here
-                // re-runs `body` when any knob (global floor, per-label floor,
-                // hidden set) changes, so the held still re-filters live (pure
-                // draw-time filter — no re-detection).
-                filter: modelSelection.overlayFilter,
+                // M9·P3 floor, generalized M10, store-keyed M12·P3: render-time
+                // overlay filter for the active detector, assembled by the store
+                // from its slice + the global floor. Reading the observed store +
+                // selection here re-runs `body` when any knob (global floor,
+                // per-label floor, hidden set) changes, so the held still
+                // re-filters live (pure draw-time filter — no re-detection).
+                filter: modelSelection.labelStore.overlayFilter(
+                    for: modelSelection.detectorID,
+                    globalFloor: modelSelection.minConfidence
+                ),
                 displayTimeSource: { [coordinator] in
                     MainActor.assumeIsolated { coordinator.frame?.timestamp ?? .zero }
                 }
