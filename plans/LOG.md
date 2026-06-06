@@ -965,3 +965,9 @@
   - `PerClassControls` gained an explicit init (`initiallyExpanded`, default false) so the static gallery renders the expander open; gallery updated + a **no-roster-plus-hidden** case added. Row construction deduped into `row(for:)`. Store + `OverlayFilter` untouched.
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**.
 - 👉 Next: **M12 close-out** — hands-on look at the new hidden flow + gallery, merge → `main`, retire the branch; then **folder sources** → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (close) — M12 closed: merged to `main`, pushed
+
+- Did: **closed M12** — user confirmed the P5 hidden-classes flow hands-on ("looks good"). Board: M12 collapsed to its ✅ one-liner (five phases; the importer-race fix `749e798` rode along); 👉 → folder sources pickup.
+- Did: **merged `m12-label-accumulation` → `main`** (fast-forward), retired the branch, **pushed `main` to origin**.
+- 👉 Next: **pick up folder sources** — assign the milestone number, draft phases in [`features/folder-sources.md`](./features/folder-sources.md), settle placement in-canvas. → [`BOARD.md`](./BOARD.md)
