@@ -1,9 +1,8 @@
 # Folder sources — pick a folder, browse it in the sidebar
 
-<!-- Penciled feature: definition + settled forks + opens. Phases drafted at
-     pickup (milestone number assigned then, per the naming convention).
-     Status vocab per WORKFLOW.md. -->
-_Captured · 2026-06-05_ · **📋 penciled — pick up after M12 closes**
+<!-- M13 working plan: definition, settled forks, phases, opens. Status vocab
+     per WORKFLOW.md. -->
+_Captured · 2026-06-05 · picked up as **M13** 2026-06-05_ · **📋 defined — phases drafted, P1 next** · branch `m13-folder-sources`
 
 ## What & why (user, 2026-06-05)
 
@@ -23,39 +22,70 @@ items from it to load — without losing the existing RECENT behavior.
   *feeds* the existing recents, it doesn't replace them.
 - **Sequencing:** after M12·P4 — penciled as the next milestone candidate.
 
-## Design sketch (assistant, at capture)
+## Settled at pickup (2026-06-05)
 
-- **Pick.** Folder selection rides the existing enum-routed importer
-  (`ImportTarget` + `importerPresented`, post-`749e798` shape): macOS
-  `.fileImporter` accepts `UTType.folder`; iOS `DocumentPicker` likewise.
-  Either new enum cases (`videoFolder`/`imageFolder`) or a folder axis on the
-  existing cases — decide at pickup.
-- **Scope.** A folder is one security-scoped bookmark; scope on the folder
-  covers its children on both platforms (the existing
-  `user-selected.read-only` entitlement suffices). Enumerate + filter children
-  by content type (movies for Playback, images for Image); shallow,
-  non-recursive first cut.
-- **Sidebar.** A collapsible FOLDER block per mode section listing matching
-  children; tapping a child routes through the same load path as a pick
-  (`swapToExternal` / `pickImage`), which also promotes it into RECENT.
-- **Persistence.** A `RecentFolders` MRU (bookmark-backed UserDefaults, MRU
-  order, stale-drop) — the third near-identical sibling alongside
-  `RecentVideos`/`RecentImages`. **This is the moment the backlog's "shared
-  MRU generic" item gets pulled in** rather than writing the pattern a third
-  time. → [BOARD §Backlog](../BOARD.md)
+- **Importer shape: two new `ImportTarget` cases** — `videoFolder` +
+  `imageFolder` (`contentTypes = [.folder]`), not a folder axis on the
+  existing cases: `handlePicked` already routes by case, and the two folder
+  kinds filter children differently anyway. Rides the post-`749e798`
+  presentation/payload split unchanged.
+- **Stock pickers on both platforms** — macOS `.fileImporter` and the iOS
+  `DocumentPicker` wrapper both accept `UTType.folder` and return the
+  directory URL with security scope; one folder bookmark covers its children
+  (the existing `user-selected.read-only` entitlement suffices). No custom
+  `NSOpenPanel`.
+- **Enumeration: shallow + filtered** — non-recursive `contentsOfDirectory`,
+  children filtered by UTType conformance (movies for Playback, images for
+  Image), name-sorted. Freshness = re-enumerate on expand (P4 confirms it
+  suffices).
+- **P1 = the shared-MRU-generic pull-in, behavior-preserving** — factor the
+  bookmark-backed core out of `RecentVideos`/`RecentImages` (same defaults
+  keys, no migration; the two types stay thin wrappers, call sites untouched),
+  then `RecentFolders` (`iris.recent.folders.v1`) is the third instance.
+  Reverses M8·P4's "deliberate siblings" — the third sibling is the forcing
+  function. → [BOARD §Backlog](../BOARD.md)
+- **Design-pass-first inside P3** — block placement + multi-folder
+  presentation settle in a `#Preview` gallery (M9·P6 style) *before* the live
+  wiring.
 
-## Open at capture
+## Phases
 
-- ⚖️ **Placement** of the folder block within the mode section (above vs
-  below RECENT) + how multiple MRU folders present (all collapsible? one
-  expanded at a time?). Settle the M9·P6 way — live in a `#Preview` gallery,
-  not on paper.
-- ⚖️ **MRU entry removal** (user: "probably need a right-click to remove
-  things from the MRU as well. Well, maybe."). If it lands, it applies to
-  file recents too, not just folders — a small shared-MRU affordance
-  (macOS context menu; iOS long-press). Decide at pickup.
-- ⚖️ Large-folder behavior: cap the listed children? lazy enumeration?
-  (A shoot folder can hold hundreds of clips.) Decide at pickup; a simple
-  cap + "N more…" is probably enough for v1.
-- ⚖️ Folder-content freshness: re-enumerate on expand vs. watch the
-  directory. Re-enumerate-on-expand is almost certainly enough.
+- 📋 **P1 — Shared MRU generic + `RecentFolders`.** Factor the bookmark-backed
+  MRU core (UserDefaults `[Data]` bookmark persistence, platform-gated
+  bookmark/resolve flags, `addOrPromote` dedup-by-path, stale-refresh
+  `resolve()`, `clear()`) into one base in `Apps/Shared/State/`;
+  `RecentVideos`/`RecentImages` become thin wrappers (defaults keys + call
+  sites untouched); add `RecentFolders`. Exit: both schemes green, recents
+  behave identically, `Iris` library untouched.
+- 📋 **P2 — Folder pick + filtered child listing.** `ImportTarget` gains
+  `videoFolder`/`imageFolder`; both pickers accept `UTType.folder`;
+  `handlePicked` routes folder picks to `recentFolders.addOrPromote` + scope
+  bookmarking; a small shallow-enumeration helper filters children by content
+  type per mode. Exit: a picked folder lands in the folders MRU and yields the
+  right children (log-observable; the sidebar surface is P3).
+- 📋 **P3 — Sidebar FOLDER block — in-canvas design pass, then live wiring.**
+  `#Preview` gallery with fixture listings; the user settles placement (above
+  vs below RECENT) + multi-folder presentation (all collapsible vs
+  one-expanded-at-a-time) live in the canvas; then wire it — expand →
+  (re-)enumerate, child tap → `swapToExternal`/`pickImage` (RECENT promotion
+  for free), folder promoted in its MRU on use. Exit: design user-confirmed in
+  canvas, working on both platforms.
+- 📋 **P4 — Polish + remaining opens.** Large-folder cap + "N more…" (lean
+  v1); confirm re-enumerate-on-expand freshness; ⚖️ MRU-entry removal (user
+  call: in or stays backlog); static preview gallery cases light + dark; full
+  test pass + both schemes green; smoke + merge prep.
+
+## Opens (settle in-phase)
+
+- ⚖️ **Placement + multi-folder presentation** (→ P3, in-canvas) — above vs
+  below RECENT; all collapsible vs one expanded at a time. Settle the M9·P6
+  way — live in a `#Preview` gallery, not on paper.
+- ⚖️ **MRU entry removal** (→ P4) — user: "probably need a right-click to
+  remove things from the MRU as well. Well, maybe." If it lands, it applies to
+  file recents too (macOS context menu; iOS long-press) — small to add over
+  the P1 generic.
+- ⚖️ **Large-folder behavior** (→ P4) — cap the listed children? lazy
+  enumeration? (A shoot folder can hold hundreds of clips.) Lean: a simple cap
+  + "N more…" is probably enough for v1.
+- ⚖️ **Folder-content freshness** (→ P4) — re-enumerate on expand vs watch the
+  directory. Lean: re-enumerate-on-expand is almost certainly enough.

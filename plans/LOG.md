@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-📋 **M12 — Label accumulation** (defined, phases drafted P1–P4, not started, on `m12-label-accumulation`) — opens settled (video-first · default L2 · presence-only · clear button); ladder is wired for Playback only this milestone (Image/Capture are fast-follows).
-👉 Next: **start M12·P1 — ledger store** — build the app-side `LabelLedger` (`Apps/Shared/State/`): sighting set keyed `detectorID → sourceKey → labels`, M7 `AssetFingerprint` as the video sourceKey, UserDefaults/JSON, per-detector clear. → [`BOARD.md`](./BOARD.md)
+📋 **M13 — Folder sources** (defined, phases drafted P1–P4, not started, on `m13-folder-sources`) — pick a folder in Playback/Image, collapsible sidebar block of its matching children (child picks promote into RECENT as usual), MRU of folders; P1 pulls in the shared-MRU generic.
+👉 Next: **start M13·P1 — shared MRU generic + `RecentFolders`** — factor the bookmark-backed MRU core out of `RecentVideos`/`RecentImages` (behavior-preserving, same defaults keys, thin wrappers), add `RecentFolders` (`iris.recent.folders.v1`). → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -971,3 +971,11 @@
 - Did: **closed M12** — user confirmed the P5 hidden-classes flow hands-on ("looks good"). Board: M12 collapsed to its ✅ one-liner (five phases; the importer-race fix `749e798` rode along); 👉 → folder sources pickup.
 - Did: **merged `m12-label-accumulation` → `main`** (fast-forward), retired the branch, **pushed `main` to origin**.
 - 👉 Next: **pick up folder sources** — assign the milestone number, draft phases in [`features/folder-sources.md`](./features/folder-sources.md), settle placement in-canvas. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (pickup) — M13 — Folder sources: picked up, phases drafted
+
+- Did: **picked up folder sources as M13** (number at pickup, per convention); branch `m13-folder-sources` cut from `main`.
+- Did: **recon of the seams** (Explore agent): `RecentVideos`/`RecentImages` (`Apps/Shared/State/`) are near-identical bookmark-backed MRUs (same dedup/resolve/stale-refresh shape, platform-gated bookmark flags); the post-`749e798` enum-routed importer (`ImportTarget` + presentation/payload split) is the natural folder-pick seam; `ModeSection`'s active body + `RecentList` is where the FOLDER block slots; child taps can reuse `swapToExternal`/`pickImage`, which promote into RECENT for free.
+- Did: **phases drafted P1–P4** in [`features/folder-sources.md`](./features/folder-sources.md): P1 shared MRU generic + `RecentFolders` · P2 folder pick + filtered child listing · P3 sidebar FOLDER block (in-canvas design pass, then live wiring) · P4 polish + remaining opens.
+- 📌 Settled at pickup (→ [`DECISIONS.md`](./DECISIONS.md)): `ImportTarget` gains `videoFolder`/`imageFolder` cases (not a folder axis); stock pickers take `UTType.folder` on both platforms (one folder bookmark covers children); shallow non-recursive enumeration; P1 = the shared-MRU-generic pull-in, behavior-preserving (reverses M8·P4's "deliberate siblings"). Placement/presentation stay ⚖️ for the P3 canvas; cap, freshness, MRU-removal ride P4.
+- 👉 Next: **start M13·P1 — shared MRU generic + `RecentFolders`**. → [`BOARD.md`](./BOARD.md)

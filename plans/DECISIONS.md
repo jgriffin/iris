@@ -10,6 +10,19 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-05 — M13 — Folder sources picked up; phases drafted P1–P4
+
+Q: How do the folder-sources opens left "decide at pickup" land?
+
+The penciled folder-sources feature is the active milestone — **M13** (number assigned at pickup, per the naming convention), branch `m13-folder-sources`. Phases: **P1** shared MRU generic + `RecentFolders` · **P2** folder pick + filtered child listing · **P3** sidebar FOLDER block (in-canvas design pass, then live wiring) · **P4** polish + remaining opens. The pickup-time forks settle as:
+
+- **Importer: two new `ImportTarget` cases** (`videoFolder`/`imageFolder`, `contentTypes = [.folder]`) rather than a folder axis on the existing cases — `handlePicked` already routes by case, and the two folder kinds filter children differently anyway. Stock pickers suffice on both platforms (macOS `.fileImporter` + iOS `DocumentPicker` both take `UTType.folder` and return a scoped directory URL; one folder bookmark covers its children under the existing `user-selected.read-only` entitlement).
+- **Enumeration is shallow + filtered** — non-recursive `contentsOfDirectory`, children filtered by UTType conformance per mode, name-sorted.
+- **P1 pulls in the backlog's "shared MRU generic", behavior-preserving** — `RecentVideos`/`RecentImages` keep their defaults keys and call sites as thin wrappers over one bookmark-backed base; `RecentFolders` (`iris.recent.folders.v1`) is the third instance. This reverses M8·P4's "deliberate siblings" call — the third sibling is the forcing function. The stub's unrelated residuals (untested `RecentImages`, macOS image-mode detector-id nit) stay backlogged.
+- **Design-pass-first inside P3** — block placement + multi-folder presentation settle live in a `#Preview` gallery (M9·P6 style) before any wiring; they stay ⚖️ open until the canvas session. Large-folder cap, freshness (lean: re-enumerate on expand), and ⚖️ MRU-entry removal (user: "maybe") ride P4.
+
+→ [`features/folder-sources.md`](./features/folder-sources.md)
+
 ### 2026-06-04 — M12 pivot: one per-detector store IS the panel state; sources dropped (user)
 
 Q: The per-source ledger — does it survive contact with a concrete example?
