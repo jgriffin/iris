@@ -14,11 +14,12 @@ import SwiftUI
 //     are deleted.
 //
 // Shipped additions these cases exercise: RECENT and FOLDERS are each their own
-// collapsible sub-block (header + chevron) inside the active section body; a
+// collapsible sub-block (whole-row tap target) inside the active section body; a
 // quiet monospaced count rides every collapsible heading (RECENT, FOLDERS, each
-// folder row); the FOLDERS header carries an `folder.badge.plus` add button and
-// renders even with zero folders. Captions are statements of intended look (no
-// longer questions to judge).
+// folder row); the FOLDERS header carries NO add button (smoke round 1 — the
+// mode header's open button accepts a file OR a folder now), and the empty
+// FOLDERS hint points there. Captions are statements of intended look (no longer
+// questions to judge).
 //
 // `SourcesPanel` (the composed RECENT-over-FOLDERS body), `FoldersBlock`,
 // `FolderBlock`, and `PreviewFixtures.sample*Folders` survive; only the gallery
@@ -72,7 +73,6 @@ private struct ActiveSectionCase: View {
                     recentEmptyHint: "No recent videos",
                     folders: folders,
                     folderChildSystemImage: "film",
-                    onAddFolder: {},
                     onPickChild: { _ in },
                     onExpandFolder: { _ in }
                 )
@@ -96,7 +96,7 @@ private var folderGallery: some View {
         FolderGalleryCase(title: "RECENT collapsed to reach FOLDERS — the fast path the collapse exists for") {
             CollapsedRecentCase()
         }
-        FolderGalleryCase(title: "Empty FOLDERS — header + add button still render so the first folder can be added") {
+        FolderGalleryCase(title: "Empty FOLDERS — header renders; hint points at the mode header's open button (no add button)") {
             ActiveSectionCase(folders: [])
         }
         FolderGalleryCase(title: "FOLDERS present while RECENT is empty (quiet recents hint)") {
@@ -172,7 +172,6 @@ private struct OneExpandedFoldersCase: View {
             childSystemImage: childSystemImage,
             isExpanded: $expanded,
             openFolder: $openFolder,
-            onAddFolder: {},
             onPickChild: { _ in }
         )
         .onAppear { openFolder = folders.first?.url }

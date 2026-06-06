@@ -11,9 +11,15 @@ import os
 // A directory bookmark resolves exactly like a file bookmark, and
 // `FileManager.fileExists(atPath:)` returns `true` for directories, so the
 // base's `resolve()` validation passes for folders unchanged — no special
-// casing here. Not yet wired into the shell (that's M13·P2); it compiles as
-// part of the demo target via `Apps/project.yml`'s recursive glob over
-// `Apps/Shared/`.
+// casing here.
+//
+// **Per-mode, not shared (M13 smoke round 1).** Smoke testing showed a folder
+// picked via the Image flow appearing under *both* modes' FOLDERS — wrong: a
+// folder of clips and a folder of stills are different folders in practice. So
+// folders get TWO MRUs, one per mode, via the `.video()` / `.image()` factories
+// below (distinct keys + logger categories). The earlier shared key
+// `iris.recent.folders.v1` is abandoned WITHOUT migration — it was branch-only
+// state from smoke testing and never shipped on `main`.
 
 /// `UserDefaults`-backed MRU list of recently-opened **folder** URLs for the
 /// Iris demos — the folder sibling of [`RecentVideos`](./RecentVideos.swift)
@@ -21,26 +27,57 @@ import os
 /// children (the existing `user-selected.read-only` entitlement suffices). See
 /// [`RecentBookmarks`](./RecentBookmarks.swift) for the storage shape, platform
 /// gating, and concurrency notes.
+///
+/// **One type, two instances.** Unlike `RecentVideos` / `RecentImages` (which
+/// fix their key + category), folders are per-mode but otherwise identical, so a
+/// single parameterized type with `.video()` / `.image()` factories is the
+/// cleaner shape than two near-identical thin subclasses. The factories supply
+/// the distinct storage keys + logger categories.
 @MainActor
 final class RecentFolders: RecentBookmarks {
-    /// Default storage key. `.v1` lets future schema bumps migrate cleanly
-    /// without clobbering an existing user's MRU.
-    static let defaultKey = "iris.recent.folders.v1"
+    /// The Playback (movie-folder) MRU. Key/category distinct from the image
+    /// instance so a folder picked for clips never leaks into the Image mode.
+    static func video(
+        defaults: UserDefaults = .standard,
+        limit: Int = RecentBookmarks.defaultLimit
+    ) -> RecentFolders {
+        RecentFolders(
+            defaults: defaults,
+            key: "iris.recent.video-folders.v1",
+            category: "recent-video-folders",
+            limit: limit
+        )
+    }
+
+    /// The Image (still-folder) MRU. Sibling of `video()`.
+    static func image(
+        defaults: UserDefaults = .standard,
+        limit: Int = RecentBookmarks.defaultLimit
+    ) -> RecentFolders {
+        RecentFolders(
+            defaults: defaults,
+            key: "iris.recent.image-folders.v1",
+            category: "recent-image-folders",
+            limit: limit
+        )
+    }
 
     /// - Parameters:
     ///   - defaults: `UserDefaults` instance to read/write. Override for tests.
-    ///   - key: storage key. Override for tests or future schema bumps.
+    ///   - key: storage key (per-mode; see `video()` / `image()`).
+    ///   - category: logger category for this MRU's diagnostics.
     ///   - limit: max entries retained.
     init(
         defaults: UserDefaults = .standard,
-        key: String = RecentFolders.defaultKey,
+        key: String,
+        category: String,
         limit: Int = RecentBookmarks.defaultLimit
     ) {
         super.init(
             defaults: defaults,
             key: key,
             limit: limit,
-            logger: Logger(subsystem: "iris.demo", category: "recent-folders")
+            logger: Logger(subsystem: "iris.demo", category: category)
         )
     }
 }

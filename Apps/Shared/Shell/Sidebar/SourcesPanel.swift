@@ -45,7 +45,6 @@ struct SourcesPanel: View {
     // FOLDERS
     let folders: [FoldersBlock.Folder]
     let folderChildSystemImage: String
-    let onAddFolder: () -> Void
     let onPickChild: (URL) -> Void
     /// Fired when a folder's disclosure opens, with that folder's URL — the
     /// shell re-enumerates its children (freshness) under the folder's scope.
@@ -90,7 +89,7 @@ struct SourcesPanel: View {
             }
         } header: {
             SourcesSubHeader("FOLDERS", isExpanded: $foldersExpanded) {
-                FoldersBlockHeaderAccessory(count: folders.count, onAddFolder: onAddFolder)
+                ItemCount(count: folders.count)
             }
         }
 
@@ -141,6 +140,14 @@ struct SourcesPanel: View {
 /// A sub-block header (RECENT / FOLDERS) styled as a flattened, pinnable section
 /// header: the `SidebarSectionHeader` look inside the active section's anatomy —
 /// accent bar + opaque pinned underlay + 0.08 tint + the band's 7/10 padding.
+///
+/// **Whole-row tap target (M13 smoke round 1).** The header builds its row inline
+/// and wraps the WHOLE row in one `Button` over a `contentShape(Rectangle())`, so
+/// expand/collapse fires anywhere across the row — not just on a small chevron.
+/// The trailing accessory (the item count) is plain, non-interactive text, and
+/// the FOLDERS add button is gone (the mode header's open button does that now),
+/// so there's no accessory whose hit area needs to win over the row toggle. The
+/// chevron is non-interactive decoration that rotates with `isExpanded`.
 struct SourcesSubHeader<Accessory: View>: View {
     let title: String
     @Binding var isExpanded: Bool
@@ -153,12 +160,28 @@ struct SourcesSubHeader<Accessory: View>: View {
     }
 
     var body: some View {
-        SidebarSectionHeader(title, isExpanded: $isExpanded, accessory: accessory)
+        Button {
+            withAnimation { isExpanded.toggle() }
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                accessory()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
             .padding(.vertical, 7)
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .sidebarAccentBar()
-            .pinnedHeaderBackground(SidebarBand.bodyTint)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sidebarAccentBar()
+        .pinnedHeaderBackground(SidebarBand.bodyTint)
     }
 }
 
@@ -199,7 +222,6 @@ private struct SourcesPanelPreviewHost<Panel: View>: View {
             recentEmptyHint: "No recent videos",
             folders: PreviewFixtures.sampleVideoFolders,
             folderChildSystemImage: "film",
-            onAddFolder: {},
             onPickChild: { _ in },
             onExpandFolder: { _ in }
         )
@@ -216,7 +238,6 @@ private struct SourcesPanelPreviewHost<Panel: View>: View {
             recentEmptyHint: "No recent images",
             folders: [],
             folderChildSystemImage: "photo",
-            onAddFolder: {},
             onPickChild: { _ in },
             onExpandFolder: { _ in }
         )

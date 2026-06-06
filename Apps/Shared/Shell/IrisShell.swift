@@ -46,20 +46,24 @@ struct IrisShell: View {
     @State var recentVideos = RecentVideos()
     @State var recentImages = RecentImages()
     @State var recentDetectors = RecentDetectors()
-    // ONE shared folders MRU (M13·P2): a folder of clips and a folder of stills
-    // are both just folders; the per-mode movie/image filter is applied at
-    // enumeration time (`folderListing`), not at storage time. Surfaced in the
+    // PER-MODE folder MRUs (M13 smoke round 1): smoke showed a folder picked via
+    // the Image flow leaking into Playback's FOLDERS — clip folders and still
+    // folders are different folders in practice, so each mode keeps its own MRU
+    // (distinct keys + logger categories). The per-mode movie/image filter is
+    // still applied at enumeration time (`folderListing`). Surfaced in the
     // sidebar FOLDERS sub-block (M13·P3).
-    @State var recentFolders = RecentFolders()
+    @State var recentVideoFolders = RecentFolders.video()
+    @State var recentImageFolders = RecentFolders.image()
 
     /// Per-folder enumerated children, populated lazily on expand and keyed by
     /// `(folder URL, content kind)` (M13·P3). The freshness model is
     /// re-enumerate-on-expand: `onExpandFolder` recomputes the open folder's
     /// listing under its security scope and overwrites this entry, so a folder
     /// shows empty until first opened and refreshes every time it reopens. The
-    /// `kind` is part of the key because ONE shared folders MRU serves both
-    /// modes — the same folder can appear under Playback (movies) and Image
-    /// (stills), and each mode must see its own filtered listing.
+    /// `kind` stays part of the key because nothing stops a user from picking the
+    /// *same* directory into both per-mode MRUs — and each mode must then see its
+    /// own filtered (movies vs. stills) listing of it, so the two cache entries
+    /// must stay distinct.
     @State var folderChildren: [FolderChildKey: [URL]] = [:]
 
     // M7: flagging + export (shared FlagStore between writer + reader).
@@ -215,19 +219,17 @@ struct IrisShell: View {
                 onPickVideo: { swapToExternal(url: $0) },
                 onRemoveVideo: { removeRecentVideo(url: $0) },
                 videoFolders: folderBlocks(kind: .movie),
-                onAddVideoFolder: presentVideoFolderPicker,
-                onPickVideoChild: { pickFolderChild(url: $0, load: swapToExternal(url:)) },
+                onPickVideoChild: { pickFolderChild(url: $0, kind: .movie, load: swapToExternal(url:)) },
                 onExpandVideoFolder: { enumerateFolderOnExpand(url: $0, kind: .movie) },
-                onRemoveVideoFolder: { removeFolder(url: $0) },
+                onRemoveVideoFolder: { removeFolder(url: $0, kind: .movie) },
                 recentImages: recentImages.resolve(),
                 onOpenImage: presentImagePicker,
                 onPickImage: { pickImage(url: $0) },
                 onRemoveImage: { removeRecentImage(url: $0) },
                 imageFolders: folderBlocks(kind: .image),
-                onAddImageFolder: presentImageFolderPicker,
-                onPickImageChild: { pickFolderChild(url: $0, load: pickImage(url:)) },
+                onPickImageChild: { pickFolderChild(url: $0, kind: .image, load: pickImage(url:)) },
                 onExpandImageFolder: { enumerateFolderOnExpand(url: $0, kind: .image) },
-                onRemoveImageFolder: { removeFolder(url: $0) },
+                onRemoveImageFolder: { removeFolder(url: $0, kind: .image) },
                 exportedFrameCountText: exportedFrameCountText,
                 isSweeping: exportCoordinator?.isSweeping ?? false,
                 lastSummaryText: exportCoordinator?.lastSummary?.demoStatusLine,

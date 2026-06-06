@@ -118,31 +118,16 @@ extension IrisShell {
         presentImporter(for: .video)
     }
 
-    /// Present the folder picker for Playback (movies). Mirrors
-    /// `presentVideoPicker`; the `[.folder]` content type makes both pickers
-    /// return a directory URL with security scope. Not yet called from any
-    /// surface — the sidebar FOLDER block is M13·P3.
-    func presentVideoFolderPicker() {
-        presentImporter(for: .videoFolder)
-    }
-
-    /// Present the folder picker for Image (stills). Sibling of
-    /// `presentVideoFolderPicker`; differs only in how children are filtered
-    /// at enumeration time. Surface lands in M13·P3.
-    func presentImageFolderPicker() {
-        presentImporter(for: .imageFolder)
-    }
-
-    /// Handle a picked **folder**: register it in the shared folders MRU and
+    /// Handle a picked **folder**: register it in this mode's folders MRU and
     /// enumerate its matching children once, end-to-end, to exercise the
-    /// listing helper on a real pick (the live sidebar surface is M13·P3).
+    /// listing helper on a real pick.
     ///
     /// Scope discipline mirrors `swapToExternal` / `pickImage`: acquire the
     /// folder's security scope, do the scoped work (MRU bookmark creation reads
-    /// the URL; `folderListing` reads the directory), then release. Both folder
-    /// kinds share ONE MRU — a folder of clips and a folder of stills are both
-    /// just folders; the per-mode filter (`kind`) is applied here at
-    /// enumeration time, not at storage time.
+    /// the URL; `folderListing` reads the directory), then release. Each mode has
+    /// its OWN folders MRU (smoke round 1) — a folder of clips and a folder of
+    /// stills are different folders in practice — so the pick lands in the MRU
+    /// selected by `kind`.
     @MainActor
     func pickFolder(url: URL, kind: FolderContentKind) {
         guard url.startAccessingSecurityScopedResource() else {
@@ -153,7 +138,7 @@ extension IrisShell {
         }
         defer { url.stopAccessingSecurityScopedResource() }
 
-        recentFolders.addOrPromote(url)
+        recentFolders(for: kind).addOrPromote(url)
         let children = folderListing(of: url, kind: kind)
         Logger.shell.notice(
             """
@@ -165,15 +150,27 @@ extension IrisShell {
 
     // MARK: Sidebar FOLDERS sub-block wiring (M13·P3)
 
-    /// Build the FOLDERS sub-block's data for a mode from the shared folders MRU
-    /// + the lazily-enumerated child cache. The MRU is one shared list (both
-    /// modes); children are filtered per `kind` at enumeration time, so the same
-    /// folder can show movies under Playback and stills under Image. Children are
-    /// empty until the folder is first expanded (`enumerateFolderOnExpand`); the
-    /// quiet zero count is honest until then.
+    /// The folders MRU for a mode (smoke round 1: one MRU per mode). Movies →
+    /// `recentVideoFolders`, stills → `recentImageFolders`. Centralizing the
+    /// `kind → MRU` map here keeps every folder operation (`pickFolder`,
+    /// `folderBlocks`, `pickFolderChild`, `removeFolder`) routing through one
+    /// seam instead of branching on `kind` in each.
+    @MainActor
+    func recentFolders(for kind: FolderContentKind) -> RecentFolders {
+        switch kind {
+        case .movie: return recentVideoFolders
+        case .image: return recentImageFolders
+        }
+    }
+
+    /// Build the FOLDERS sub-block's data for a mode from that mode's folders MRU
+    /// + the lazily-enumerated child cache. Each mode has its own MRU; children
+    /// are filtered per `kind` at enumeration time. Children are empty until the
+    /// folder is first expanded (`enumerateFolderOnExpand`); the quiet zero count
+    /// is honest until then.
     @MainActor
     func folderBlocks(kind: FolderContentKind) -> [FoldersBlock.Folder] {
-        recentFolders.resolve().map { url in
+        recentFolders(for: kind).resolve().map { url in
             FoldersBlock.Folder(
                 url: url,
                 children: folderChildren[FolderChildKey(folder: url, kind: kind)] ?? []
@@ -219,17 +216,18 @@ extension IrisShell {
     /// works either way. We also promote the parent folder so a freshly-used
     /// folder sorts up the MRU.
     @MainActor
-    func pickFolderChild(url child: URL, load: (URL) -> Void) {
+    func pickFolderChild(url child: URL, kind: FolderContentKind, load: (URL) -> Void) {
+        let mru = recentFolders(for: kind)
         // Find the parent among the resolved (scoped) MRU folders so we hold a
         // real scope while bookmarking the child. Fall back to the plain parent
         // path if it isn't in the MRU (shouldn't happen — the child came from
         // enumerating an MRU folder).
         let parentPath = child.deletingLastPathComponent().standardizedFileURL.path
-        let scopedParent = recentFolders.resolve().first {
+        let scopedParent = mru.resolve().first {
             $0.standardizedFileURL.path == parentPath
         }
 
-        recentFolders.addOrPromote(scopedParent ?? child.deletingLastPathComponent())
+        mru.addOrPromote(scopedParent ?? child.deletingLastPathComponent())
         load(scopedChild(child, under: scopedParent) ?? child)
     }
 
@@ -274,13 +272,13 @@ extension IrisShell {
         withAnimation(.snappy) { recentVideos.remove(url) }
     }
 
-    /// Forget a folder from the shared folders MRU (sidebar "Remove Folder").
+    /// Forget a folder from this mode's folders MRU (sidebar "Remove Folder").
     /// Removes the MRU entry ONLY — it does not delete the directory. Animated so
-    /// the folder row animates out and the FOLDERS count updates. Serves both
-    /// modes (one shared folders MRU).
+    /// the folder row animates out and the FOLDERS count updates. `kind` selects
+    /// the per-mode MRU (smoke round 1).
     @MainActor
-    func removeFolder(url: URL) {
-        withAnimation(.snappy) { recentFolders.remove(url) }
+    func removeFolder(url: URL, kind: FolderContentKind) {
+        withAnimation(.snappy) { recentFolders(for: kind).remove(url) }
     }
 
     /// Load a file-picked Core ML model, then re-select the custom entry so the
@@ -341,36 +339,51 @@ extension IrisShell {
 /// shell carries one importer state and one dispatch instead of five flags and
 /// two parallel modifiers.
 //
-// M13·P2 adds two **folder** cases (`videoFolder` / `imageFolder`), both with
-// `contentTypes = [.folder]` — separate cases rather than a folder axis on the
-// existing ones because the two kinds filter their children differently (movies
-// vs. stills) and route to a folder handler, not to the single-file open flow.
+// M13 smoke round 1: the mode header's single open button does double duty —
+// `.video` and `.image` accept a file OR a folder in one panel (each adds
+// `.folder` to its content types). `handlePicked` routes by what came back
+// (directory → folder flow, file → single-file open flow), so the obsolete
+// separate `videoFolder` / `imageFolder` cases (and their dedicated pickers) are
+// gone. `.model` stays files-only.
 enum ImportTarget: String, Identifiable, CaseIterable {
     case video, image, model
-    case videoFolder, imageFolder
     var id: String { rawValue }
 
     var contentTypes: [UTType] {
         switch self {
-        case .video: return IrisShell.movieContentTypes
-        case .image: return IrisShell.imageContentTypes
+        // `.folder` rides alongside the file types so one picker offers both. On
+        // macOS `.fileImporter` and on iOS `UIDocumentPickerViewController(
+        // forOpeningContentTypes:)` both then allow selecting a directory and
+        // return it with a security scope, same as a file.
+        case .video: return IrisShell.movieContentTypes + [.folder]
+        case .image: return IrisShell.imageContentTypes + [.folder]
         case .model: return IrisShell.modelContentTypes
-        case .videoFolder, .imageFolder: return [.folder]
         }
     }
 }
 
 extension IrisShell {
     /// Dispatch a picked `url` to the per-target pick handler. The handlers own
-    /// security-scope + MRU; this just routes by case.
+    /// security-scope + MRU; this just routes by case — and, for the
+    /// file-or-folder targets, by whether a directory or a file came back.
+    ///
+    /// **Directory check.** `url.hasDirectoryPath` is the reliable, scope-free
+    /// discriminator: it reads the trailing slash both pickers stamp on a
+    /// directory URL, needs no `startAccessingSecurityScopedResource()`, and
+    /// avoids a `URLResourceValues` read that the sandbox could refuse before the
+    /// scope is held. (Resolving `contentType` would also work but is heavier and
+    /// scope-sensitive.)
     @MainActor
     func handlePicked(_ url: URL, for target: ImportTarget) {
         switch target {
-        case .video: swapToExternal(url: url)
-        case .image: pickImage(url: url)
-        case .model: loadPickedModel(at: url)
-        case .videoFolder: pickFolder(url: url, kind: .movie)
-        case .imageFolder: pickFolder(url: url, kind: .image)
+        case .video:
+            if url.hasDirectoryPath { pickFolder(url: url, kind: .movie) }
+            else { swapToExternal(url: url) }
+        case .image:
+            if url.hasDirectoryPath { pickFolder(url: url, kind: .image) }
+            else { pickImage(url: url) }
+        case .model:
+            loadPickedModel(at: url)
         }
     }
 

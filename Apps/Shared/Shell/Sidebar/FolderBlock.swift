@@ -165,17 +165,18 @@ private struct RemoveFolderMenu: ViewModifier {
 // MARK: - FOLDERS sub-block (the N-folder presentation wrapper)
 
 /// The "FOLDERS" sub-block inside a mode section's body — a collapsible
-/// `SidebarSection` (header + chevron + trailing count + add-folder button)
-/// whose body is the stack of `FolderBlock` disclosures (M13·P3). Settled
-/// design after the P3a canvas pass:
+/// `SidebarSection` (header + chevron + trailing count) whose body is the stack
+/// of `FolderBlock` disclosures (M13·P3). Settled design after the P3a canvas
+/// pass:
 ///
 /// - **One-expanded-at-a-time.** Opening a folder collapses its siblings; the
 ///   accordion is the only presentation (the `.independent` candidate lost and
 ///   was deleted, config and all). The collapse/expand is animated by the
 ///   parent keying `.snappy(duration: 0.22)` on the open-folder identity,
 ///   matching `SidebarView`'s page-accordion idiom.
-/// - **Renders even with zero folders** — header + add button always show, so
-///   the first folder can be added; an empty state shows a quiet hint.
+/// - **Renders even with zero folders** — the header always shows; an empty
+///   state shows a quiet hint pointing at the mode header's open button (which
+///   adds folders now — smoke round 1 deleted the dedicated add button).
 /// - **Counts everywhere** — the FOLDERS header carries the folder count; each
 ///   `FolderBlock` row carries its matching-child count.
 ///
@@ -184,8 +185,7 @@ private struct RemoveFolderMenu: ViewModifier {
 /// non-pinned context). In the live sidebar, the section is flattened into the
 /// pinning `LazyVStack`: `SourcesPanel` emits the FOLDERS header and each open
 /// folder as their own `Section`s rather than nesting them here, so they pin
-/// natively. The two share `FoldersBlockHeaderAccessory` + `FolderBlock` so the
-/// look stays one source of truth.
+/// natively. The two share `FolderBlock` so the look stays one source of truth.
 ///
 /// Like `FolderBlock`, this is fully data-driven for the gallery: it takes a
 /// list of folders + callbacks; no `RecentFolders` reads.
@@ -205,15 +205,13 @@ struct FoldersBlock: View {
     /// Which single folder's disclosure is open (one-expanded-at-a-time). `nil`
     /// when all folders are collapsed.
     @Binding var openFolder: URL?
-    /// Present the add-folder picker for this mode (`folder.badge.plus`).
-    let onAddFolder: () -> Void
     let onPickChild: (URL) -> Void
     /// Forget a folder from the MRU. `nil` in the gallery.
     var onRemoveFolder: ((URL) -> Void)?
 
     var body: some View {
         SidebarSection("FOLDERS", isExpanded: $isExpanded) {
-            FoldersBlockHeaderAccessory(count: folders.count, onAddFolder: onAddFolder)
+            ItemCount(count: folders.count)
         } content: {
             if folders.isEmpty {
                 FoldersBlockEmpty()
@@ -249,32 +247,13 @@ struct FoldersBlock: View {
     }
 }
 
-/// The FOLDERS header's trailing accessory: the folder count + the
-/// `folder.badge.plus` add button. Shared by the composed `FoldersBlock` and the
-/// flattened `SourcesPanel` so the header look is one source of truth.
-struct FoldersBlockHeaderAccessory: View {
-    let count: Int
-    let onAddFolder: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            ItemCount(count: count)
-            Button(action: onAddFolder) {
-                Image(systemName: "folder.badge.plus")
-                    .font(.body)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Add a folder")
-        }
-    }
-}
-
 /// The quiet zero-folders hint shown under the FOLDERS header. Shared by the
-/// composed + flattened forms.
+/// composed + flattened forms. Points at the mode header's open button — smoke
+/// round 1 deleted the dedicated add button, so that button (which now accepts a
+/// file OR a folder) is how folders get added.
 struct FoldersBlockEmpty: View {
     var body: some View {
-        Text("Add a folder to browse its contents here.")
+        Text("Use the open button above to add a folder to browse here.")
             .font(.callout)
             .foregroundStyle(.tertiary)
     }

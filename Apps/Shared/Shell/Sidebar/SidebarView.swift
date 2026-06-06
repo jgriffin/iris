@@ -51,13 +51,12 @@ struct SidebarView: View {
     /// matching children. The shell re-enumerates a folder on expand (see
     /// `onExpandVideoFolder`); children are empty until first opened.
     let videoFolders: [FoldersBlock.Folder]
-    let onAddVideoFolder: () -> Void
     /// Load a folder *child* — same load path as a RECENT tap, plus the parent
     /// folder is promoted in the folders MRU (distinct from `onPickVideo`,
     /// which must NOT touch the folders MRU on a plain recents tap).
     let onPickVideoChild: (URL) -> Void
     let onExpandVideoFolder: (URL) -> Void
-    /// Forget a video folder from the shared folders MRU (context-menu; never
+    /// Forget a video folder from the Playback folders MRU (context-menu; never
     /// deletes the directory on disk).
     let onRemoveVideoFolder: (URL) -> Void
 
@@ -68,10 +67,9 @@ struct SidebarView: View {
     /// Forget a recent image from the MRU (context-menu).
     let onRemoveImage: (URL) -> Void
     let imageFolders: [FoldersBlock.Folder]
-    let onAddImageFolder: () -> Void
     let onPickImageChild: (URL) -> Void
     let onExpandImageFolder: (URL) -> Void
-    /// Forget an image folder from the shared folders MRU (context-menu).
+    /// Forget an image folder from the Image folders MRU (context-menu).
     let onRemoveImageFolder: (URL) -> Void
 
     // DATASET strip. macOS-only export controls (iOS exposes Documents via
@@ -127,7 +125,6 @@ struct SidebarView: View {
                             onRemoveRecent: onRemoveVideo,
                             folders: videoFolders,
                             folderChildSystemImage: "film",
-                            onAddFolder: onAddVideoFolder,
                             onPickChild: onPickVideoChild,
                             onExpandFolder: onExpandVideoFolder,
                             onRemoveFolder: onRemoveVideoFolder
@@ -145,7 +142,6 @@ struct SidebarView: View {
                             onRemoveRecent: onRemoveImage,
                             folders: imageFolders,
                             folderChildSystemImage: "photo",
-                            onAddFolder: onAddImageFolder,
                             onPickChild: onPickImageChild,
                             onExpandFolder: onExpandImageFolder,
                             onRemoveFolder: onRemoveImageFolder
@@ -250,7 +246,6 @@ struct SidebarView: View {
         onPickVideo: { _ in },
         onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
-        onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
         onRemoveVideoFolder: { _ in },
@@ -259,7 +254,6 @@ struct SidebarView: View {
         onPickImage: { _ in },
         onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
-        onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
         onRemoveImageFolder: { _ in },
@@ -288,7 +282,6 @@ struct SidebarView: View {
         onPickVideo: { _ in },
         onRemoveVideo: { _ in },
         videoFolders: [],
-        onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
         onRemoveVideoFolder: { _ in },
@@ -297,7 +290,6 @@ struct SidebarView: View {
         onPickImage: { _ in },
         onRemoveImage: { _ in },
         imageFolders: [],
-        onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
         onRemoveImageFolder: { _ in },
@@ -326,7 +318,6 @@ struct SidebarView: View {
         onPickVideo: { _ in },
         onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
-        onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
         onRemoveVideoFolder: { _ in },
@@ -335,7 +326,6 @@ struct SidebarView: View {
         onPickImage: { _ in },
         onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
-        onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
         onRemoveImageFolder: { _ in },
@@ -364,7 +354,6 @@ struct SidebarView: View {
         onPickVideo: { _ in },
         onRemoveVideo: { _ in },
         videoFolders: PreviewFixtures.sampleVideoFolders,
-        onAddVideoFolder: {},
         onPickVideoChild: { _ in },
         onExpandVideoFolder: { _ in },
         onRemoveVideoFolder: { _ in },
@@ -373,7 +362,6 @@ struct SidebarView: View {
         onPickImage: { _ in },
         onRemoveImage: { _ in },
         imageFolders: PreviewFixtures.sampleImageFolders,
-        onAddImageFolder: {},
         onPickImageChild: { _ in },
         onExpandImageFolder: { _ in },
         onRemoveImageFolder: { _ in },
