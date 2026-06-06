@@ -27,15 +27,16 @@ _Snapshot · 2026-06-05_
    ├─ ✅ P1 — shared MRU generic + `RecentFolders` — `RecentBookmarks` base; videos/images now thin subclasses (308/266 → 41/42 lines), keys unchanged
    ├─ ✅ P2 — folder pick + filtered child listing — `ImportTarget.videoFolder`/`.imageFolder`, one shared folders MRU, `folderListing(of:kind:)` (resource-value UTType filter, shallow, name-sorted)
    ├─ ✅ P3 — sidebar FOLDER block, designed + wired — FOLDERS below RECENT; both are collapsible sub-blocks w/ item counts; one-expanded folders; child taps load + promote; add-folder button on the FOLDERS header
-   └─ 📋 P4 — polish: ⚖️ sticky context headers (shape call pending), freshness confirm, ⚖️ MRU-removal call, smoke
+   └─ ✅ P4 — sequential pinned context headers (mode band ▸ RECENT ▸ FOLDERS ▸ open-folder row; full LazyVStack flatten, anatomy preserved) + MRU entry removal (context menus on RECENT + folder rows)
 
-👉 next — **settle the sticky-header shape** (user idea, 2026-06-05: pin mode + folder name atop the scroll for context/escape — native sequential pinning vs custom stacked dual-pin), then **P4**. → [features/folder-sources.md](./features/folder-sources.md)
+👉 next — **M13 close-out**: hands-on smoke (pinning while scrolling a long folder · remove-from-recents menus · pick-folder→child→RECENT flow end-to-end, both platforms) → merge `m13-folder-sources` → `main`, retire the branch. → [features/folder-sources.md](./features/folder-sources.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)
 - ⚖️ "What if?" mode (BRIEF §5)
 
 📌 recent → [DECISIONS.md](./DECISIONS.md)
+- **M13·P4 calls settled** (user, 2026-06-05) — sticky context headers ship as **native sequential pinning** (deepest header replaces shallower; chosen over custom stacked dual-pin) and **MRU entry removal is IN** (context menus: "Remove from Recents" / "Remove Folder", destructive, never on children; one `remove(url:)` on the P1 base). M13 feature-complete; smoke + merge next → [features/folder-sources.md](./features/folder-sources.md) (2026-06-05)
 - **M13·P3 design settled in-canvas + wired** (user, 2026-06-05) — FOLDERS **below** RECENT (a picked child lands in RECENT up top anyway); folders expand **one-at-a-time** (animated, `.snappy` idiom); **RECENT + FOLDERS each became a collapsible sub-block** (recents get long; collapsing RECENT is the fast path to FOLDERS — supersedes M9·P6·4's caption-drop) with **item counts on every collapsible heading** (incl. per-folder child counts); large-list handling (scroll-inside vs cap) **deferred** → §Backlog → [features/folder-sources.md](./features/folder-sources.md) (2026-06-05)
 - **M13 — Folder sources picked up; phases drafted P1–P4** (📋 on `m13-folder-sources`) — P1 shared-MRU generic + `RecentFolders` (backlog pull-in) · P2 folder pick + filtered listing (`ImportTarget` gains `videoFolder`/`imageFolder`, stock pickers take `UTType.folder` on both platforms) · P3 sidebar FOLDER block (placement + multi-folder presentation settle in-canvas, M9·P6-style, before wiring) · P4 polish (large-folder cap, freshness, ⚖️ MRU-entry removal — user call). Shallow non-recursive enumeration; one folder bookmark covers children → [features/folder-sources.md](./features/folder-sources.md) (2026-06-05)
 - **M12 closed — shipped to `main`** (✅; `m12-label-accumulation` → `main`, fast-forward; branch retired) — five phases (P5 = the post-P4 hidden-classes rework, user call); M1–M12 now on `main` + pushed to origin. Hidden classes live in the expander's HIDDEN group, not the working list; the en-route importer-race fix (`749e798`) rode along. Next up: folder sources → [features/label-accumulation.md](./features/label-accumulation.md) (2026-06-05)

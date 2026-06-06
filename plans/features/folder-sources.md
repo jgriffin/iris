@@ -75,24 +75,23 @@ items from it to load — without losing the existing RECENT behavior.
   promote; `folder.badge.plus` add button on the FOLDERS sub-header; children
   get a scoped-bookmark round trip minted under the parent's scope. Gallery
   pruned to the shipped design (regression surface).
-- 📋 **P4 — Polish + remaining opens.** ⚖️ Sticky context headers (user,
-  2026-06-05: pin the mode + open-folder name atop the sidebar scroll for
-  context + quick collapse-to-escape; "if it's too much work, don't worry" —
-  shape call pending: native sequential pinning vs custom stacked dual-pin);
-  confirm re-enumerate-on-expand freshness in use; ⚖️ MRU-entry removal (user
-  call: in or stays backlog); full test pass + both schemes green; smoke +
-  merge prep.
+- ✅ **P4 — Sequential pinned context headers + MRU entry removal.** Both
+  user calls settled 2026-06-05: **sequential pinning** (native
+  `LazyVStack(pinnedViews:)`, chosen over custom stacked dual-pin) — mode
+  band ▸ RECENT ▸ FOLDERS ▸ open-folder row pin as you scroll, deepest
+  replaces shallower, tap the pinned folder row to collapse/escape; required
+  a full flatten of the active section into top-level Sections
+  (`SidebarPinnedLayout.swift` is the one home for band tints / accent bar /
+  opaque pinned underlays; `ModeSection` is preview-only now, live path =
+  `ModeHeaderBand` + flattened `SourcesPanel`). **MRU removal IN** —
+  `RecentBookmarks.remove(url:)` + context menus ("Remove from Recents" on
+  RECENT rows, "Remove Folder" on folder rows, destructive w/ trash, never on
+  children; animated out, counts update). Gallery reshaped to the flattened
+  anatomy + a context-menu note case.
 
-## Opens (settle in-phase)
+## Opens (close-out)
 
-- ⚖️ **Sticky context headers — shape** (→ P4) — the easy native version pins
-  one level at a time (`LazyVStack(pinnedViews:)` — the deepest header
-  replaces the shallower as you scroll); the described behavior (mode +
-  folder name *both* pinned, stacked) needs custom scroll-geometry work.
-  User's framing allows dropping it if costly.
-- ⚖️ **MRU entry removal** (→ P4) — user: "probably need a right-click to
-  remove things from the MRU as well. Well, maybe." If it lands, it applies to
-  file recents too (macOS context menu; iOS long-press) — small to add over
-  the P1 generic.
-- ⚖️ **Folder-content freshness** (→ P4) — re-enumerate-on-expand shipped in
-  P3; confirm it suffices in use (vs watching the directory).
+- 👀 **Hands-on smoke** (the merge gate) — pinning while scrolling a long
+  folder; remove menus both platforms (right-click / long-press); the
+  pick-folder → expand → child → RECENT-promotion flow end to end;
+  re-enumerate-on-expand freshness in real use.

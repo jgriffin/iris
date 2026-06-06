@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M13 — Folder sources** (P1 ✅ · P2 ✅ · P3 ✅ · P4 📋 ← next, on `m13-folder-sources`) — FOLDERS below RECENT, both collapsible sub-blocks w/ item counts, one-expanded folders, live on both platforms.
-👉 Next: **settle the sticky-context-header shape** (native sequential pinning vs custom stacked dual-pin vs drop), then **P4** — freshness confirm · ⚖️ MRU-removal call · smoke + merge prep. → [`BOARD.md`](./BOARD.md)
+🌱 **M13 — Folder sources** (P1–P4 ✅, feature-complete on `m13-folder-sources`) — FOLDERS below RECENT, collapsible sub-blocks + counts, one-expanded folders, sequential pinned context headers, MRU removal menus.
+👉 Next: **M13 close-out** — hands-on smoke (pinning · removal menus · folder→child→RECENT flow, both platforms) → merge `m13-folder-sources` → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -1016,3 +1016,14 @@
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; `Sources/Iris/` untouched; only the 3 known pre-existing warnings.
 - 📌 Mid-session user idea → P4 open: **sticky context headers** (pin mode + open-folder name atop the sidebar scroll; collapse-to-escape; "if it’s too much work we don’t have to worry") — shape call pending: native sequential pinning vs custom stacked dual-pin.
 - 👉 Next: settle the sticky-header shape, then **P4** — freshness confirm · ⚖️ MRU-removal call · smoke + merge prep. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (late) — M13·P4: pinned context headers + MRU removal; feature-complete
+
+- Did: **both P4 calls settled** (user, via option prompts): sticky context headers ship as **native sequential pinning** (over custom stacked dual-pin — the described both-pinned behavior wasn’t worth the scroll-geometry work); **MRU entry removal is IN** (not backlog). → [`DECISIONS.md`](./DECISIONS.md)
+- Did: **built + committed M13·P4** (`b7871f3`, build agent):
+  - **Pinning = full flatten.** Only top-level Sections pin, so the active section flattened into one `LazyVStack(pinnedViews: .sectionHeaders)`: mode band ▸ RECENT ▸ FOLDERS ▸ each open-folder row pin sequentially; tap the pinned folder row to collapse/escape. New `SidebarPinnedLayout.swift` = the one home for band tints, the re-laid 3-pt accent bar, and the opaque `.bar`-underlay pinned headers need over scrolling rows. `ModeSection` is preview-only now; the live path is `ModeHeaderBand` + flattened `SourcesPanel` (emits bare Sections). All P3 behavior preserved — deltas audited: rows now lazy (no row had onAppear side effects; enumeration fires from the expansion binding), mode band deliberately has no collapse-on-tap (selected, not collapsible).
+  - **Removal.** `RecentBookmarks.remove(url:)` (resolved-path match, persist-on-change, logs); `.contextMenu` "Remove from Recents" / "Remove Folder" (destructive, `trash`) on RECENT + folder rows — never children; shell wraps removes in `withAnimation(.snappy)` so rows animate out + counts update; one `removeFolder` serves both modes.
+  - Gallery reshaped to the flattened anatomy + a context-menu note case (menus don’t render statically).
+- Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; `Sources/Iris/` untouched; no new warnings (3 known pre-existing + 1 pre-existing `ImageDetailView.swift`).
+- 🧭 M13 is **feature-complete** — P1–P4 ✅ on `m13-folder-sources`.
+- 👉 Next: **M13 close-out** — hands-on smoke (the merge gate): pinning while scrolling a long folder · removal menus on both platforms · pick-folder → child → RECENT end-to-end → merge → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
