@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-🌱 **M13 — Folder sources** (P1–P4 ✅, feature-complete on `m13-folder-sources`) — FOLDERS below RECENT, collapsible sub-blocks + counts, one-expanded folders, sequential pinned context headers, MRU removal menus.
-👉 Next: **M13 close-out** — hands-on smoke (pinning · removal menus · folder→child→RECENT flow, both platforms) → merge `m13-folder-sources` → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
+🌱 **M13 — Folder sources** (P1–P4 ✅ + smoke round 1 applied, on `m13-folder-sources`) — per-mode folder MRUs, file-or-folder open button, whole-row sub-header taps, pinned context headers, MRU removal.
+👉 Next: **M13 close-out** — user re-smoke of the round-1 fixes → merge `m13-folder-sources` → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -1027,3 +1027,12 @@
 - Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; `Sources/Iris/` untouched; no new warnings (3 known pre-existing + 1 pre-existing `ImageDetailView.swift`).
 - 🧭 M13 is **feature-complete** — P1–P4 ✅ on `m13-folder-sources`.
 - 👉 Next: **M13 close-out** — hands-on smoke (the merge gate): pinning while scrolling a long folder · removal menus on both platforms · pick-folder → child → RECENT end-to-end → merge → `main`, retire the branch. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (smoke) — M13 smoke round 1: three fixes, two reversals
+
+- Did: **applied the user’s first hands-on pass** (`513e2de`, build agent) — full detail in [`DECISIONS.md`](./DECISIONS.md):
+  - **Per-mode folder MRUs** (supersedes P3’s shared-MRU call; smoke caught a folder leaking across modes) — parameterized `RecentFolders` w/ `.video()`/`.image()` factories, new keys, old `iris.recent.folders.v1` abandoned (branch-only, no migration). `(folder, kind)` cache key deliberately kept — the same directory can live in both MRUs.
+  - **Double-duty open button** (supersedes P2’s separate folder cases) — `.folder` joins each mode’s content types; routing by `hasDirectoryPath` (scope-free); FOLDERS add button + `videoFolder`/`imageFolder` + presenters deleted; empty-FOLDERS hint reworded.
+  - **Whole-row sub-header taps** — `SourcesSubHeader` is now one Button over the full row (`contentShape`), chevron + count decorative.
+- Verified: `swift test` **278** green; **both schemes BUILD SUCCEEDED**; only the 4 known pre-existing warnings; library + plans untouched by the agent.
+- 👉 Next: **user re-smoke** (row taps · file-or-folder pick on both modes · folders staying per-mode · pinning · removal · folder→child→RECENT) → merge → `main`. → [`BOARD.md`](./BOARD.md)

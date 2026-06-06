@@ -10,6 +10,18 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-05 — M13 smoke round 1: per-mode folder MRUs; double-duty open button; whole-row header taps (user)
+
+Q: First hands-on pass on the feature-complete M13 — what did real use overturn?
+
+Three fixes from the user's smoke, two of them superseding earlier in-milestone calls:
+
+- **Folders MRU goes per-mode** — `recentVideoFolders` (`iris.recent.video-folders.v1`) + `recentImageFolders` (`iris.recent.image-folders.v1`), one parameterized `RecentFolders` with `.video()`/`.image()` factories. **Supersedes P3's "one shared folders MRU"** (the "a folder is a folder" call): smoke showed a folder picked via Image appearing under Playback too — wrong in practice, "those folders are going to have one [mode] that makes sense to show them." Old shared key abandoned without migration (branch-only smoke state, never on `main`). The `(folder, kind)` child cache key deliberately survives — the same directory can still be picked into both MRUs.
+- **The mode header's open button does double duty** — one panel picks a file OR a folder (`.folder` joins each mode's content types; `handlePicked` routes by `url.hasDirectoryPath` — scope-free, both pickers stamp the trailing slash). The FOLDERS sub-header's separate add button is deleted, and with it **P2's `videoFolder`/`imageFolder` cases + presenters** (the separate-cases rationale — different routing per case — dissolved once routing moved to the URL's own shape).
+- **Whole-row tap on the RECENT/FOLDERS sub-headers** — the entire header row toggles expand/collapse (was effectively chevron-sized); count + chevron are now non-interactive decoration inside the row button.
+
+→ [`features/folder-sources.md`](./features/folder-sources.md)
+
 ### 2026-06-05 — M13·P3 design settled in-canvas: FOLDERS below RECENT, one-expanded, collapsible sub-blocks + counts (user)
 
 Q: The two P3 opens — placement and multi-folder presentation — plus what the canvas session surfaced?
