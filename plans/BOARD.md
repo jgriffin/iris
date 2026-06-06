@@ -23,13 +23,13 @@ _Snapshot · 2026-06-05_
 ├─ ✅ M11 — Unified tuning panel — the M10 deferrals delivered in one pass: detector-input knobs joined the per-class Display controls in ONE inspector tuning panel (Detector group w/ confidence affordance suppressed + Display group w/ global floor); per-class rows gained tri-state Hide/Auto/Show visibility (pinned "Show" = the old favorites idea) + per-label floors + a "show all classes" roster expander (`availableLabels`); Freeze + Flag moved to the window toolbar. Smoke passed; merged to `main` (fast-forward). 278 tests. Accumulation left OUT → picked up as M12 → [features/per-class-tuning.md](./features/per-class-tuning.md)
 ├─ ✅ M12 — Label accumulation — one per-detector store that IS the whole panel's per-class state (`detector id → label → {visibility?, floor?}`; key = seen, value = opinion): all three modes feed it; per-class floors + tri-state visibility absorbed off `ModelSelection` (which keeps only `detectorID` + global `minConfidence`); roster from store keys (stable, no flicker) w/ live-vs-accumulated rows; hidden classes moved to the expander's HIDDEN group (P5, user call); per-detector "Clear seen"; static preview gallery light+dark. P1 store · P2 feed (all 3 modes) · P3 panel rewiring · P4 polish+gallery · P5 hidden rework. Smoke passed; merged to `main` (fast-forward). 278 tests. Side quest en route: the macOS file-importer race fix (`749e798`). → [features/label-accumulation.md](./features/label-accumulation.md)
 
-└─ 📋 M13 — Folder sources — pick a folder in Playback/Image; collapsible sidebar block of its matching files; MRU of folders · branch `m13-folder-sources` → `main`
-   ├─ 📋 P1 — shared MRU generic + `RecentFolders` (backlog pull-in, behavior-preserving)
+└─ 🌱 M13 — Folder sources — pick a folder in Playback/Image; collapsible sidebar block of its matching files; MRU of folders · branch `m13-folder-sources` → `main`
+   ├─ ✅ P1 — shared MRU generic + `RecentFolders` — `RecentBookmarks` base; videos/images now thin subclasses (308/266 → 41/42 lines), keys unchanged
    ├─ 📋 P2 — folder pick + filtered child listing (`ImportTarget` folder cases, `UTType.folder` both platforms)
    ├─ 📋 P3 — sidebar FOLDER block — in-canvas design pass, then live wiring
    └─ 📋 P4 — polish: large-folder cap, freshness, MRU-removal call, preview gallery
 
-👉 next — **start M13·P1 — shared MRU generic + `RecentFolders`**: factor the bookmark-backed MRU core out of `RecentVideos`/`RecentImages` (behavior-preserving — same defaults keys, thin wrappers), add `RecentFolders` (`iris.recent.folders.v1`) as the third instance. → [features/folder-sources.md](./features/folder-sources.md)
+👉 next — **start M13·P2 — folder pick + filtered child listing**: `ImportTarget` gains `videoFolder`/`imageFolder` (`UTType.folder` through both pickers), `handlePicked` routes to `RecentFolders.addOrPromote`, shallow UTType-filtered child enumeration helper. → [features/folder-sources.md](./features/folder-sources.md)
 
 ❓ open → [QUESTIONS.md](./QUESTIONS.md)
 - ⚖️ Multi-detector pipelines under `TuningModel` (multi-active selection defers here)

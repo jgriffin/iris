@@ -3,8 +3,8 @@
 <!-- Append-only. Newest at bottom. -->
 
 <!-- STATUS · snapshot, rewritten each block · full board in BOARD.md -->
-📋 **M13 — Folder sources** (defined, phases drafted P1–P4, not started, on `m13-folder-sources`) — pick a folder in Playback/Image, collapsible sidebar block of its matching children (child picks promote into RECENT as usual), MRU of folders; P1 pulls in the shared-MRU generic.
-👉 Next: **start M13·P1 — shared MRU generic + `RecentFolders`** — factor the bookmark-backed MRU core out of `RecentVideos`/`RecentImages` (behavior-preserving, same defaults keys, thin wrappers), add `RecentFolders` (`iris.recent.folders.v1`). → [`BOARD.md`](./BOARD.md)
+🌱 **M13 — Folder sources** (P1 ✅ · P2 📋 ← next · P3 📋 · P4 📋, on `m13-folder-sources`) — pick a folder in Playback/Image, collapsible sidebar block of its matching children (child picks promote into RECENT as usual), MRU of folders.
+👉 Next: **start M13·P2 — folder pick + filtered child listing** — `ImportTarget.videoFolder`/`.imageFolder` (`UTType.folder` through both pickers), route picks into `RecentFolders`, shallow UTType-filtered enumeration helper. → [`BOARD.md`](./BOARD.md)
 <!-- /STATUS -->
 
 ---
@@ -979,3 +979,14 @@
 - Did: **phases drafted P1–P4** in [`features/folder-sources.md`](./features/folder-sources.md): P1 shared MRU generic + `RecentFolders` · P2 folder pick + filtered child listing · P3 sidebar FOLDER block (in-canvas design pass, then live wiring) · P4 polish + remaining opens.
 - 📌 Settled at pickup (→ [`DECISIONS.md`](./DECISIONS.md)): `ImportTarget` gains `videoFolder`/`imageFolder` cases (not a folder axis); stock pickers take `UTType.folder` on both platforms (one folder bookmark covers children); shallow non-recursive enumeration; P1 = the shared-MRU-generic pull-in, behavior-preserving (reverses M8·P4's "deliberate siblings"). Placement/presentation stay ⚖️ for the P3 canvas; cap, freshness, MRU-removal ride P4.
 - 👉 Next: **start M13·P1 — shared MRU generic + `RecentFolders`**. → [`BOARD.md`](./BOARD.md)
+
+## 2026-06-05 (later) — M13·P1: shared bookmark-MRU base + RecentFolders
+
+- Did: **built + committed M13·P1** (`2d6a035`, on `m13-folder-sources`, via build agent):
+  - **`RecentBookmarks`** (`Apps/Shared/State/`, ~330 lines incl. docs) — `@MainActor @Observable` base holding all the shared machinery: `[Data]` bookmark persistence to an injected defaults key, injected cap (default 10) + logger, `addOrPromote` dedup-by-resolved-path, stale-refresh `resolve()`, `clear()`, the platform-gated bookmark/resolve flag sets. The test-deferral + platform-gating header docs moved into the base.
+  - **Subclass over composition** — wrappers add no stored observable state, so `@Observable` on the base + plain `final` subclasses (observation verified to fire through the subclass). Per-type `static let logger` became an injected `@ObservationIgnored` instance property since base methods log.
+  - **`RecentVideos` 308 → 41 lines · `RecentImages` 266 → 42 lines** — same type names, public API, defaults keys (no migration), logger categories; call sites untouched.
+  - **`RecentFolders`** (47 lines) — `iris.recent.folders.v1`, cap 10; directories need no special-casing (`fileExists` + bookmark resolve behave the same; documented). Not shell-wired — that's P2.
+- Verified: `swift test` **278** green (count unchanged — Apps/Shared stays test-unreachable, deferral stands); **both schemes BUILD SUCCEEDED**; `git diff main -- Sources/Iris/` empty (library untouched); pbxproj diff purely additive (xcodegen re-run for the two new files).
+- 💡 Learned: the originals' "near-identical" claim held exactly — the only divergences were key, logger category, and doc prose (incl. `RecentImages`' "deliberate sibling, not a generic base" note, deleted as P1 reverses precisely that). Extraction is behavior-preserving by construction.
+- 👉 Next: **M13·P2 — folder pick + filtered child listing**. → [`BOARD.md`](./BOARD.md)
