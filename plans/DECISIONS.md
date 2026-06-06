@@ -10,6 +10,20 @@
      for traceability (QUESTIONS.md holds open questions only; settled ones move
      here, the QUESTIONS copy is deleted). -->
 
+### 2026-06-05 — M13·P3 design settled in-canvas: FOLDERS below RECENT, one-expanded, collapsible sub-blocks + counts (user)
+
+Q: The two P3 opens — placement and multi-folder presentation — plus what the canvas session surfaced?
+
+Settled from the `FolderBlockGallery` session:
+- **FOLDERS sits below RECENT** — "as soon as you select a video it's going to go into the recent at the top anyways." (Acknowledged: when these lists get big "we'll have to figure out something else" → the large-sidebar-lists backlog stub.)
+- **Folders expand one-at-a-time** (the `.independent` candidate deleted), with the sibling-collapse animated on the sidebar's `.snappy(duration: 0.22)` idiom.
+- **RECENT and FOLDERS each became a collapsible sub-block** (header + chevron, reusing `SidebarSection`) — the user's addition mid-session: recents get long, and collapsing RECENT is the fast path to FOLDERS. **Supersedes M9·P6·4's "recents dropped the RECENT caption"** — the caption returns as a functional collapsible header.
+- **Item counts on every collapsible heading** — RECENT (recents), FOLDERS (folders), each folder row (matching children) — quiet tertiary monospaced-digit, visible in both states; "an easy way to indicate how much stuff is in there."
+- **Large-list handling deferred** (user: "we can push that out for now") — no cap, no internal scrolling this milestone → BOARD §Backlog.
+- Implementation calls that rode along (assistant): add-folder button (`folder.badge.plus`) on the FOLDERS sub-header line (P6·4 idiom — the first folder needs an affordance, so the block renders even when empty); enumerated children get a scoped-bookmark round trip minted under the parent's scope (a plain enumerated URL would fail the macOS load path's scope acquisition); the child cache keys on `(folder, kind)` since one shared folders MRU serves both modes.
+
+→ [`features/folder-sources.md`](./features/folder-sources.md)
+
 ### 2026-06-05 — M13 — Folder sources picked up; phases drafted P1–P4
 
 Q: How do the folder-sources opens left "decide at pickup" land?

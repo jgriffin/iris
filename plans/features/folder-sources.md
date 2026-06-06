@@ -63,29 +63,36 @@ items from it to load — without losing the existing RECENT behavior.
   bookmarking; a small shallow-enumeration helper filters children by content
   type per mode. Exit: a picked folder lands in the folders MRU and yields the
   right children (log-observable; the sidebar surface is P3).
-- 📋 **P3 — Sidebar FOLDER block — in-canvas design pass, then live wiring.**
-  `#Preview` gallery with fixture listings; the user settles placement (above
-  vs below RECENT) + multi-folder presentation (all collapsible vs
-  one-expanded-at-a-time) live in the canvas; then wire it — expand →
-  (re-)enumerate, child tap → `swapToExternal`/`pickImage` (RECENT promotion
-  for free), folder promoted in its MRU on use. Exit: design user-confirmed in
-  canvas, working on both platforms.
-- 📋 **P4 — Polish + remaining opens.** Large-folder cap + "N more…" (lean
-  v1); confirm re-enumerate-on-expand freshness; ⚖️ MRU-entry removal (user
-  call: in or stays backlog); static preview gallery cases light + dark; full
-  test pass + both schemes green; smoke + merge prep.
+- ✅ **P3 — Sidebar FOLDER block — designed in-canvas, wired.** Settled (user,
+  from the `FolderBlockGallery` session): **FOLDERS below RECENT** (a picked
+  child lands in RECENT up top anyway); folders expand **one-at-a-time**
+  (animated, `.snappy` idiom; `.independent` deleted); **RECENT + FOLDERS each
+  a collapsible sub-block** (reusing `SidebarSection`; supersedes M9·P6·4's
+  caption-drop) with **item counts on every collapsible heading** incl.
+  per-folder child counts; large-list handling deferred → BOARD §Backlog.
+  Wired live: expand → re-enumerate under the folder's scope; child tap →
+  `swapToExternal`/`pickImage` (RECENT promotion for free) + folder MRU
+  promote; `folder.badge.plus` add button on the FOLDERS sub-header; children
+  get a scoped-bookmark round trip minted under the parent's scope. Gallery
+  pruned to the shipped design (regression surface).
+- 📋 **P4 — Polish + remaining opens.** ⚖️ Sticky context headers (user,
+  2026-06-05: pin the mode + open-folder name atop the sidebar scroll for
+  context + quick collapse-to-escape; "if it's too much work, don't worry" —
+  shape call pending: native sequential pinning vs custom stacked dual-pin);
+  confirm re-enumerate-on-expand freshness in use; ⚖️ MRU-entry removal (user
+  call: in or stays backlog); full test pass + both schemes green; smoke +
+  merge prep.
 
 ## Opens (settle in-phase)
 
-- ⚖️ **Placement + multi-folder presentation** (→ P3, in-canvas) — above vs
-  below RECENT; all collapsible vs one expanded at a time. Settle the M9·P6
-  way — live in a `#Preview` gallery, not on paper.
+- ⚖️ **Sticky context headers — shape** (→ P4) — the easy native version pins
+  one level at a time (`LazyVStack(pinnedViews:)` — the deepest header
+  replaces the shallower as you scroll); the described behavior (mode +
+  folder name *both* pinned, stacked) needs custom scroll-geometry work.
+  User's framing allows dropping it if costly.
 - ⚖️ **MRU entry removal** (→ P4) — user: "probably need a right-click to
   remove things from the MRU as well. Well, maybe." If it lands, it applies to
   file recents too (macOS context menu; iOS long-press) — small to add over
   the P1 generic.
-- ⚖️ **Large-folder behavior** (→ P4) — cap the listed children? lazy
-  enumeration? (A shoot folder can hold hundreds of clips.) Lean: a simple cap
-  + "N more…" is probably enough for v1.
-- ⚖️ **Folder-content freshness** (→ P4) — re-enumerate on expand vs watch the
-  directory. Lean: re-enumerate-on-expand is almost certainly enough.
+- ⚖️ **Folder-content freshness** (→ P4) — re-enumerate-on-expand shipped in
+  P3; confirm it suffices in use (vs watching the directory).
